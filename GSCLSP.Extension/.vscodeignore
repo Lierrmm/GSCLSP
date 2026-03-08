@@ -1,0 +1,14 @@
+# .vscodeignore
+**/*.map
+**/*.ts
+node_modules/**
+
+!dist/extension.js
+!out/GSCLSP.Server.exe
+!out/data/*.json
+
+.gitignore
+bun.lock
+.vscode/**
+
+tsconfig.json

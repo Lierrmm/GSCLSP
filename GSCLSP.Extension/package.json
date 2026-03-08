@@ -1,0 +1,65 @@
+{
+  "name": "gsclsp",
+  "displayName": "GSC Intelligence",
+  "description": "Language Server for GSC Scripts",
+  "version": "1.0.0",
+  "publisher": "bbe-tools",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:gsc"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "gsclsp.browseDumpPath",
+        "title": "GSC: Set Dump Folder Path"
+      }
+    ],
+    "languages": [
+      {
+        "id": "gsc",
+        "aliases": [
+          "GSC",
+          "gsc"
+        ],
+        "extensions": [
+          ".gsc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "GSC Intelligence",
+      "properties": {
+        "gsclsp.dumpPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to your MW2 Game Dump folder for navigation."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "list": "vsce ls",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "latest",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}
