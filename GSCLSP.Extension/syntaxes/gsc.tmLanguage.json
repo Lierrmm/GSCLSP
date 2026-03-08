@@ -1,0 +1,383 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "GSC",
+	"scopeName": "source.gsc",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#define"
+		},
+		{
+			"include": "#namespace"
+		},
+		{
+			"include": "#if"
+		},
+		{
+			"include": "#ifdef"
+		},
+		{
+			"include": "#undef"
+		},
+		{
+			"include": "#else"
+		},
+		{
+			"include": "#endif"
+		},
+		{
+			"include": "#include"
+		},
+		{
+			"include": "#using"
+		},
+		{
+			"include": "#inline"
+		},
+		{
+			"include": "#insert"
+		},
+		{
+			"include": "#using_animtree"
+		},
+		{
+			"include": "#precache"
+		},
+		{
+			"include": "#constants"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#variables"
+		}
+	],
+	"repository": {
+		"comments": {
+			"patterns": [
+				{
+					"begin": "/\\*",
+					"end": "\\*/",
+					"name": "comment.block.gsc"
+				},
+				{
+					"begin": "//",
+					"end": "\\n",
+					"name": "comment.line.double-slash.gsc"
+				}
+			]
+		},
+		"define": {
+			"comment": "Example: #define MACRO_NAME <value>",
+			"name": "meta.preprocessor.define.gsc",
+			"begin": "(#define)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.define.gsc"
+				},
+				"2": {
+					"name": "constant.language.c"
+				}
+			},
+			"end": "(?=(\"|\\d|\\(|[A-Za-z_]))"
+		},
+		"namespace": {
+			"comment": "Example: #namespace my_cool_namespace;",
+			"name": "meta.preprocessor.namespace.gsc",
+			"begin": "(#namespace)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.namespace.gsc"
+				},
+				"2": {
+					"name": "variable.other.gsc"
+				}
+			},
+			"end": "(?=;)"
+		},
+		"if": {
+			"comment": "Example: #if MACRO_NAME == <CONSTANT>",
+			"name": "meta.preprocessor.if.gsc",
+			"begin": "(#if)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.if.gsc"
+				}
+			},
+			"end": "$",
+			"patterns": [
+				{
+					"match": "\\bdefined\\s*\\(([^)]+)\\)",
+					"name": "support.function.preprocessor.defined.gsc",
+					"captures": {
+						"1": {
+							"name": "constant.language.c"
+						}
+					}
+				},
+				{
+					"match": "\\b(?:[A-Za-z_][A-Za-z_0-9]*)\\b",
+					"name": "constant.language.c"
+				},
+				{
+					"match": "==|!=|<=|>=|<|>|&&|\\|\\||\\!|\\(|\\)|\\+|\\-|\\*|\\/|%",
+					"name": "keyword.operator.gsc"
+				},
+				{
+					"match": "\\b[0-9]+\\b",
+					"name": "constant.numeric.gsc"
+				}
+			]
+		},
+		"ifdef": {
+			"comment": "Example: #ifdef MACRO_NAME",
+			"name": "meta.preprocessor.ifdef.gsc",
+			"begin": "(#ifdef)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.ifdef.gsc"
+				},
+				"2": {
+					"name": "constant.language.c"
+				}
+			},
+			"end": "$"
+		},
+		"undef": {
+			"comment": "Example: #undef MACRO_NAME",
+			"name": "meta.preprocessor.undef.gsc",
+			"begin": "(#undef)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.undef.gsc"
+				},
+				"2": {
+					"name": "constant.language.c"
+				}
+			},
+			"end": "$"
+		},
+		"else": {
+			"comment": "Example: #else",
+			"name": "meta.preprocessor.else.gsc",
+			"begin": "(#else)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.else.gsc"
+				}
+			},
+			"end": "$"
+		},
+		"endif": {
+			"comment": "Example: #endif MACRO_NAME",
+			"name": "meta.preprocessor.endif.gsc",
+			"begin": "(#endif)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.endif.gsc"
+				},
+				"2": {
+					"name": "constant.language.c"
+				}
+			},
+			"end": "$"
+		},
+		"include": {
+			"comment": "Example: #include maps\\mp\\gametypes",
+			"name": "meta.preprocessor.include.gsc",
+			"begin": "(#include)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.include.gsc"
+				}
+			},
+			"end": "(?=;)",
+			"patterns": [
+				{
+					"name": "variable.other.gsc",
+					"match": "[A-Za-z_][A-Za-z_0-9]*(\\\\[A-Za-z_][A-Za-z_0-9]*)*"
+				}
+			]
+		},
+		"using": {
+			"comment": "Example: #using maps\\mp\\gametypes",
+			"name": "meta.preprocessor.using.gsc",
+			"begin": "(#using)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.using.gsc"
+				}
+			},
+			"end": "(?=;)",
+			"patterns": [
+				{
+					"name": "variable.other.gsc",
+					"match": "[A-Za-z_][A-Za-z_0-9]*(\\\\[A-Za-z_][A-Za-z_0-9]*)*"
+				}
+			]
+		},
+		"inline": {
+			"comment": "Example: #inline maps\\mp\\gametypes\\_file.gsh",
+			"name": "meta.preprocessor.inline.gsc",
+			"begin": "(#inline)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.inline.gsc"
+				}
+			},
+			"end": "(?=;)",
+			"patterns": [
+				{
+					"name": "variable.other.gsc",
+					"match": "[A-Za-z_][A-Za-z_0-9]*(\\\\[A-Za-z_][A-Za-z_0-9]*)*(\\.[A-Za-z_0-9]+)?"
+				}
+			]
+		},
+		"insert": {
+			"comment": "Example: #insert scripts\\shared\\shared.gsh;",
+			"name": "meta.preprocessor.insert.gsc",
+			"begin": "(#insert)\\s+",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.insert.gsc"
+				}
+			},
+			"end": "(?=;)",
+			"patterns": [
+				{
+					"name": "variable.other.gsc",
+					"match": "[A-Za-z_][A-Za-z_0-9]*(\\\\[A-Za-z_][A-Za-z_0-9]*)*(\\.[A-Za-z_0-9]+)"
+				}
+			]
+		},
+		"using_animtree": {
+			"comment": "Example: #using_animtree(\"drones\");",
+			"name": "meta.preprocessor.include.gsc",
+			"begin": "(#using_animtree)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.include.gsc"
+				}
+			},
+			"end": "(?=;)",
+			"patterns": [
+				{
+					"include": "#strings"
+				}
+			]
+		},
+		"precache": {
+			"comment": "Example: #precache(\"model\", \"tag_origin\");",
+			"name": "meta.preprocessor.include.gsc",
+			"begin": "(#precache)",
+			"beginCaptures": {
+				"1": {
+					"name": "keyword.control.directive.include.gsc"
+				}
+			},
+			"end": "(?=;)",
+			"patterns": [
+				{
+					"include": "#strings"
+				}
+			]
+		},
+		"keywords": {
+			"patterns": [
+				{
+					"name": "keyword.control.gsc",
+					"match": "\\b(break(point)?|case|continue|default|else|for|foreach|if|return|switch|thread|waittill|waittillmatch|waittillframeend|while|do|wait|endon|notify|function|private|autoexec)\\b"
+				},
+				{
+					"name": "variable.language",
+					"match": "\\b(game|level|self)\\b"
+				}
+			]
+		},
+		"constants": {
+			"patterns": [
+				{
+					"name": "constant.language.gsc",
+					"match": "\\b(true|false|undefined)\\b"
+				},
+				{
+					"name": "storage.type.built-in.primitive.gsc",
+					"match": "\\b(int|float|bool|string)\\b"
+				},
+				{
+					"name": "constant.numeric.gsc",
+					"match": "(?:\\b|\\s)(?:(?:[1-9][0-9]*|0)?\\.[0-9]+|[1-9][0-9]*|0)\\b"
+				},
+				{
+					"name": "keyword.other",
+					"match": "%[A-Za-z_][A-Za-z_0-9]*"
+				},
+				{
+					"comment": "Localized string: &\"STRING_EXAMPLE\" ",
+					"match": "(&)(?=\"[^\"]*\")",
+					"captures": {
+						"1": {
+							"name": "keyword.control.directive.include.gsc"
+						}
+					}
+				},
+				{
+					"include": "#strings"
+				}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.gsc",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"comment": "Highlight escaped chars",
+					"name": "constant.character.escape.gsc",
+					"match": "\\\\."
+				},
+				{
+					"comment": "Highlight &&1 &&2 &&3 keywords in string",
+					"name": "constant.character.escape.gsc",
+					"match": "&&[1-9]"
+				}
+			]
+		},
+		"functions": {
+			"patterns": [
+				{
+					"comment": "Function reference after ::: ::funcName",
+					"match": "::\\s*([A-Za-z_][A-Za-z_0-9]*)",
+					"captures": {
+						"1": {
+							"name": "entity.name.function.gsc"
+						}
+					}
+				},
+				{
+					"comment": "Function call: functionCall(",
+					"match": "\\b([A-Za-z_][A-Za-z_0-9]*)\\b(?=\\s*\\()",
+					"captures": {
+						"1": {
+							"name": "entity.name.function.gsc"
+						}
+					}
+				}
+			]
+		},
+		"variables": {
+			"patterns": [
+				{
+					"name": "variable.other.gsc",
+					"match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+				}
+			]
+		}
+	}
+}

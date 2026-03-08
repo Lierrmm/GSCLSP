@@ -41,6 +41,13 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "grammars": [
+      {
+        "language": "gsc",
+        "scopeName": "source.gsc",
+        "path": "./syntaxes/gsc.tmLanguage.json"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "GSC Intelligence",
