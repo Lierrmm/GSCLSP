@@ -378,6 +378,29 @@ public partial class GscIndexer
         _fileMaps[path] = fileMap;
     }
 
+    public bool IsKnownFunction(string scriptPath, string functionName)
+    {
+        string searchSuffix = scriptPath.Replace("\\", "/");
+        if (!searchSuffix.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase))
+            searchSuffix += ".gsc";
+
+        var file = _fileMaps.Values.FirstOrDefault(f =>
+            f.FilePath.Replace("\\", "/").EndsWith(searchSuffix, StringComparison.OrdinalIgnoreCase));
+
+        return file?.LocalSymbols.Any(s =>
+            s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase)) ?? false;
+    }
+
+    public bool IsKnownPath(string scriptPath)
+    {
+        string searchSuffix = scriptPath.Replace("\\", "/");
+        if (!searchSuffix.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase))
+            searchSuffix += ".gsc";
+
+        return _fileMaps.Keys.Any(k =>
+            k.Replace("\\", "/").EndsWith(searchSuffix, StringComparison.OrdinalIgnoreCase));
+    }
+
     public IEnumerable<GscSymbol> GetSymbolsByName(string name) =>
         _symbols.Where(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
