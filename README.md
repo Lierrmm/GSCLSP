@@ -8,15 +8,16 @@ The core engine behind the GSC Language Support extension. This repository conta
 
 ## Project Structure
 
+- `GSCLSP.Core/`: The C# Library that handles all parsing & indexing logic
 - `GSCLSP.Server/`: The C# Language Server using OmniSharp.
 - `GSCLSP.Extension/`: The VS Code extension client (TypeScript).
 - `GSCLSP.Extension/out/`: Final binaries and data files for distribution.
 
 ## Tech Stack
 
-- **Server**: .NET 8 (Self-contained, Single-file, Compressed).
-- **Client**: TypeScript / Node.js.
-- **Package Manager**: Bun.
+- **Server**: .NET 10 (Self-contained, Single-file, Compressed)
+- **Client**: TypeScript
+- **Package Manager**: Bun
 
 ## Development
 
