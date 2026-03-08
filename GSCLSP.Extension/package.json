@@ -1,11 +1,12 @@
 {
   "name": "gsclsp",
-  "displayName": "GSC Intelligence",
+  "displayName": "GSC LSP - Language Support",
   "description": "Language Server for GSC Scripts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "icon": "logo.png",
   "publisher": "bbe-tools",
   "repository": {
+    "type": "git",
     "url": "https://github.com/Lierrmm/GSCLSP"
   },
   "engines": {
@@ -13,6 +14,11 @@
   },
   "categories": [
     "Programming Languages"
+  ],
+  "keywords": [
+    "gsc",
+    "lsp",
+    "cod"
   ],
   "activationEvents": [
     "onLanguage:gsc"
