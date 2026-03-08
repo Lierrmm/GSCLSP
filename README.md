@@ -31,3 +31,14 @@ The core engine behind the GSC Language Support extension. This repository conta
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:EnableCompressionInSingleFile=true
 ```
+
+### Testing the Server and Extension
+
+1. Open `GSCLSP.slnx` in Visual Studio or IDE of choice
+2. Setup your NuGet to build the C# server
+> You can do so by going to **Tools** -> **NuGet Package Manager** -> **Package Manager Settings**, and then going to **Sources** and adding `nuget.org` for source `https://api.nuget.org/v3/index.json`.
+3. Set the target to `Release`, and then right click on the solution on the right and click `Build Solution`
+4. Open a command prompt, and run `bun install` inside of the `GSCLSP.Extension` folder.
+
+Now you can open VSCode in the extension source code and click `F5` to test the extension. Any updates done to the server can easily be reloaded from VSCode with the extension tester.
+

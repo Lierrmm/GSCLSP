@@ -20,9 +20,6 @@
     "lsp",
     "cod"
   ],
-  "activationEvents": [
-    "onLanguage:gsc"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
