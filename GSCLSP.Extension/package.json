@@ -3,6 +3,7 @@
   "displayName": "GSC Intelligence",
   "description": "Language Server for GSC Scripts",
   "version": "1.0.0",
+  "icon": "logo.png",
   "publisher": "bbe-tools",
   "repository": {
     "url": "https://github.com/Lierrmm/GSCLSP"
@@ -50,8 +51,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "build": "bun run build.ts",
     "package": "vsce package",
     "list": "vsce ls",
     "publish": "vsce publish"
