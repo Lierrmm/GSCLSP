@@ -4,6 +4,9 @@
   "description": "Language Server for GSC Scripts",
   "version": "1.0.0",
   "publisher": "bbe-tools",
+  "repository": {
+    "url": "https://github.com/Lierrmm/GSCLSP"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
