@@ -83,8 +83,8 @@ export async function activate(context: ExtensionContext): Promise<void> {
       options: { cwd: path.dirname(serverExe) },
     },
     debug: {
-      command: serverExe,
-      options: { cwd: path.dirname(serverExe) },
+      command: debugExe,
+      options: { cwd: path.dirname(debugExe) },
     },
   };
 
