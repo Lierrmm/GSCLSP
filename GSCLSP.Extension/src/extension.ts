@@ -108,6 +108,11 @@ export async function activate(context: ExtensionContext): Promise<void> {
   context.subscriptions.push(client);
   await client.start();
   await client.setTrace(Trace.Verbose);
+
+  const workspacePaths = (workspace.workspaceFolders ?? []).map(f => f.uri.fsPath);
+  if (workspacePaths.length > 0) {
+    await client.sendNotification("custom/indexWorkspaceFolders", { paths: workspacePaths });
+  }
 }
 
 export async function deactivate(): Promise<void> {

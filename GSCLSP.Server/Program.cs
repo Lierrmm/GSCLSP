@@ -46,6 +46,27 @@ var server = await LanguageServer.From(options =>
             var newPath = config.GetValue<string>("dumpPath");
             indexer.UpdateDumpPath(newPath);
         })
+        .OnNotification<IndexWorkspaceFoldersParams>("custom/indexWorkspaceFolders", (data) =>
+        {
+            if (data?.Paths == null) return;
+
+            string[] subFolders = ["maps", "scripts", "custom_scripts", 
+                "aitype", "animscripts", "character", "codescripts", "common_scripst", "destructible_scripts",
+                "soundscripts", "vehicle_scripts"];
+
+            _ = Task.Run(() =>
+            {
+                foreach (var root in data.Paths)
+                {
+                    foreach (var sub in subFolders)
+                    {
+                        var dir = Path.Combine(root, sub);
+                        if (Directory.Exists(dir))
+                            indexer.IndexFolder(dir);
+                    }
+                }
+            });
+        })
         .OnDidChangeConfiguration(x =>
         {
             var settings = x.Settings?.SelectToken("gsclsp");
@@ -63,3 +84,5 @@ var server = await LanguageServer.From(options =>
 Console.Error.WriteLine("Running!");
 
 await server.WaitForExit;
+
+record IndexWorkspaceFoldersParams(List<string> Paths);
