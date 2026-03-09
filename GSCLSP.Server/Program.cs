@@ -51,7 +51,7 @@ var server = await LanguageServer.From(options =>
             if (data?.Paths == null) return;
 
             string[] subFolders = ["maps", "scripts", "custom_scripts", 
-                "aitype", "animscripts", "character", "codescripts", "common_scripst", "destructible_scripts",
+                "aitype", "animscripts", "character", "codescripts", "common_scripts", "destructible_scripts",
                 "soundscripts", "vehicle_scripts"];
 
             _ = Task.Run(() =>
