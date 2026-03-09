@@ -35,6 +35,27 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
         if (request.Position.Line >= lines.Length) return new DefinitionResult();
 
         var line = lines[request.Position.Line];
+
+        if (line.StartsWith("#include"))
+        {
+            string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
+            await Console.Error.WriteLineAsync($"Identifier {includedFile}");
+            if (string.IsNullOrEmpty(includedFile)) return new DefinitionResult();
+            var foundIncludePath = await _indexer.GetIncludePath(includedFile);
+            if (foundIncludePath == null) return new DefinitionResult();
+
+            if (!File.Exists(foundIncludePath)) return new DefinitionResult();
+            
+            return new DefinitionResult(new Location
+            {
+                Uri = DocumentUri.FromFileSystemPath(foundIncludePath),
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(0, 0),
+                    new Position(0, 0)
+                )
+            });
+        }
+
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
 
         if (string.IsNullOrEmpty(identifier)) return new DefinitionResult();

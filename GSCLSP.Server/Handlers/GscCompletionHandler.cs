@@ -4,6 +4,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
 {
@@ -27,7 +28,7 @@ namespace GSCLSP.Server.Handlers
             int safeLength = Math.Min(request.Position.Character, line.Length);
             string lineUntilCursor = line[..safeLength];
 
-            var namespaceMatch = namespaceRegex().Match(lineUntilCursor);
+            var namespaceMatch = NameSpaceRegex().Match(lineUntilCursor);
             if (namespaceMatch.Success)
             {
                 string pathPrefix = namespaceMatch.Groups[1].Value.Replace("\\", "/").ToLower();
@@ -50,7 +51,7 @@ namespace GSCLSP.Server.Handlers
 
             var includes = currentFileLines
                 .Where(l => l.Trim().StartsWith("#include"))
-                .Select(l => includeRegex().Match(l).Groups[1].Value.Replace("\\", "/").ToLower())
+                .Select(l => IncludeRegex().Match(l).Groups[1].Value.Replace("\\", "/").ToLower())
                 .ToList();
 
             if (includes.Count != 0)
@@ -76,7 +77,7 @@ namespace GSCLSP.Server.Handlers
         {
             var locals = new List<GscSymbol>();
             // function_name( arg1, arg2 )
-            var funcRegex = functionDefinitionRegex();
+            var funcRegex = FunctionDefinitionRegex();
             var content = string.Join("\n", lines);
 
             foreach (Match m in funcRegex.Matches(content))
@@ -135,12 +136,5 @@ namespace GSCLSP.Server.Handlers
                 TriggerCharacters = new Container<string>(":")
             };
         }
-
-        [GeneratedRegex(@"([\w\\]+)::$")]
-        private static partial Regex namespaceRegex();
-        [GeneratedRegex(@"#include\s+([\w\\]+)")]
-        private static partial Regex includeRegex();
-        [GeneratedRegex(@"^(\w+)\s*\((.*?)\)", RegexOptions.Multiline)]
-        private static partial Regex functionDefinitionRegex();
     }
 }

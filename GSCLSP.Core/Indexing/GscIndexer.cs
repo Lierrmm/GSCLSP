@@ -4,6 +4,7 @@ using GSCLSP.Core.Services;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Indexing;
 
@@ -13,6 +14,7 @@ public partial class GscIndexer
     public IEnumerable<GscSymbol> Symbols => _symbols;
     public int SymbolCount => _symbols.Count;
     public BuiltInProvider BuiltIns { get; } = new();
+    public string? _dumpPath { get; private set; }
 
     public void ExportIndexToJson(string dumpPath, string outputPath)
     {
@@ -46,6 +48,7 @@ public partial class GscIndexer
         if (string.IsNullOrWhiteSpace(newPath) || !Directory.Exists(newPath)) return;
         string cacheFile = Path.Combine(newPath, "symbols.json");
 
+        _dumpPath = newPath;
         _symbols.Clear();
         _fileMaps.Clear();
 
@@ -73,7 +76,7 @@ public partial class GscIndexer
         if (!File.Exists(jsonPath)) return;
 
         var data = File.ReadAllText(jsonPath);
-        var symbols = JsonSerializer.Deserialize<List<GscSymbol>>(data, GscJsonContext.Default.ListGscSymbol);
+        var symbols = JsonSerializer.Deserialize(data, GscJsonContext.Default.ListGscSymbol);
 
         if (symbols != null)
         {
@@ -123,6 +126,22 @@ public partial class GscIndexer
             }
         }
         _fileMaps[path.Replace("\\", "/")] = fileMap;
+    }
+
+    public async Task<string?> GetIncludePath(string filePath)
+    {
+        filePath = Uri.UnescapeDataString(filePath)
+            .Replace("file:///", "")
+            .Trim();
+
+        var appendedPath = Path.Join(_dumpPath, filePath);
+
+        if (!appendedPath.EndsWith(".gsc"))
+            appendedPath += ".gsc";
+
+        var hasMatch = _fileMaps.TryGetValue(appendedPath, out var match);
+
+        return hasMatch ? match?.FilePath : null;
     }
 
     public GscResolution ResolveFunction(string callingFilePath, string functionName)
@@ -423,10 +442,4 @@ public partial class GscIndexer
                    Path.GetFileNameWithoutExtension(entryPath) == searchPath;
         });
     }
-
-    [GeneratedRegex(@"^([a-zA-Z_]\w*)\s*\(([^)]*)\)")]
-    private static partial Regex FunctionLineRegex();
-
-    [GeneratedRegex(@"^#include\s+([\w\\]+);")]
-    private static partial Regex IncludeRegex();
 }

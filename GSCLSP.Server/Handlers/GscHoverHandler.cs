@@ -1,9 +1,10 @@
 ﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Parsing;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
@@ -35,6 +36,22 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
             GscHandlerCommon.GetCodeRanges(lines[l], ref inBlockComment);
         var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
         if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
+
+        if (line.StartsWith("#include"))
+        {
+            string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
+            await Console.Error.WriteLineAsync($"Identifier {includedFile}");
+            if (string.IsNullOrEmpty(includedFile)) return null;
+            var foundIncludePath = await _indexer.GetIncludePath(includedFile);
+            if (foundIncludePath == null) return null;
+            if (!File.Exists(foundIncludePath)) return null;
+
+            var contentValue = $"**#Include**\n";
+            contentValue += $"`{foundIncludePath}`";
+
+            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+        }
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
 
@@ -88,7 +105,4 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
 
         return null;
     }
-
-    [GeneratedRegex(@"(Summary|Example|MandatoryArg|OptionalArg|Module|CallOn|SPMP):")]
-    private static partial Regex DocRegex();
 }

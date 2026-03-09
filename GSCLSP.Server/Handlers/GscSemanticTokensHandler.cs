@@ -3,6 +3,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
 {
@@ -16,7 +17,7 @@ namespace GSCLSP.Server.Handlers
         {
             return new SemanticTokensRegistrationOptions
             {
-                DocumentSelector = TextDocumentSelector.ForLanguage("gsc"),
+                DocumentSelector = GscServerConstants.Selector,
                 Legend = new SemanticTokensLegend
                 {
                     TokenTypes = new Container<SemanticTokenType>(SemanticTokenType.Namespace),
@@ -51,7 +52,7 @@ namespace GSCLSP.Server.Handlers
                 var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
 
                 // #include #using
-                var directiveMatch = directivePathRegex().Match(line);
+                var directiveMatch = DirectivePathRegex().Match(line);
                 if (directiveMatch.Success && GscHandlerCommon.IsInCode(codeRanges, directiveMatch.Index))
                 {
                     var group = directiveMatch.Groups[1];
@@ -60,7 +61,7 @@ namespace GSCLSP.Server.Handlers
                 }
 
                 // #inline - .gsh files aren't indexed so just kinda ignore but support basically
-                var inlineMatch = inlinePathRegex().Match(line);
+                var inlineMatch = InlinePathRegex().Match(line);
                 if (inlineMatch.Success && GscHandlerCommon.IsInCode(codeRanges, inlineMatch.Index))
                 {
                     var group = inlineMatch.Groups[1];
@@ -68,7 +69,7 @@ namespace GSCLSP.Server.Handlers
                 }
 
                 // path::func
-                foreach (Match m in namespacePathRegex().Matches(line))
+                foreach (Match m in NamespacePathRegex().Matches(line))
                 {
                     if (!GscHandlerCommon.IsInCode(codeRanges, m.Groups[1].Index)) continue;
                     var pathGroup = m.Groups[1];
@@ -76,18 +77,6 @@ namespace GSCLSP.Server.Handlers
                         builder.Push(i, pathGroup.Index, pathGroup.Length, SemanticTokenType.Namespace, SemanticTokenModifier.Declaration);
                 }
             }
-        }
-
-        // #include #using paths
-        [GeneratedRegex(@"^#(?:include|using)\s+([\w\\]+)")]
-        private static partial Regex directivePathRegex();
-
-        // #inline .gsh
-        [GeneratedRegex(@"^#inline\s+([\w\\]+(?:\.\w+)?)")]
-        private static partial Regex inlinePathRegex();
-
-        // path::func
-        [GeneratedRegex(@"([\w\\]*\\[\w\\]+)::")]
-        private static partial Regex namespacePathRegex();
+        }        
     }
 }
