@@ -29,6 +29,13 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         if (lines == null || request.Position.Line >= lines.Length) return null;
 
         var line = lines[request.Position.Line];
+
+        bool inBlockComment = false;
+        for (int l = 0; l < request.Position.Line; l++)
+            GscHandlerCommon.GetCodeRanges(lines[l], ref inBlockComment);
+        var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
+        if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
+
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
 
         // Clean up namespace or pointer prefixes

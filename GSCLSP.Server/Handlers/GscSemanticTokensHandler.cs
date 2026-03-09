@@ -43,14 +43,16 @@ namespace GSCLSP.Server.Handlers
             if (!File.Exists(filePath)) return;
 
             var lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
+            bool inBlockComment = false;
 
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i];
+                var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
 
                 // #include #using
                 var directiveMatch = directivePathRegex().Match(line);
-                if (directiveMatch.Success)
+                if (directiveMatch.Success && GscHandlerCommon.IsInCode(codeRanges, directiveMatch.Index))
                 {
                     var group = directiveMatch.Groups[1];
                     if (_indexer.IsKnownPath(group.Value))
@@ -59,7 +61,7 @@ namespace GSCLSP.Server.Handlers
 
                 // #inline - .gsh files aren't indexed so just kinda ignore but support basically
                 var inlineMatch = inlinePathRegex().Match(line);
-                if (inlineMatch.Success)
+                if (inlineMatch.Success && GscHandlerCommon.IsInCode(codeRanges, inlineMatch.Index))
                 {
                     var group = inlineMatch.Groups[1];
                     builder.Push(i, group.Index, group.Length, SemanticTokenType.Namespace, SemanticTokenModifier.Declaration);
@@ -68,11 +70,11 @@ namespace GSCLSP.Server.Handlers
                 // path::func
                 foreach (Match m in namespacePathRegex().Matches(line))
                 {
+                    if (!GscHandlerCommon.IsInCode(codeRanges, m.Groups[1].Index)) continue;
                     var pathGroup = m.Groups[1];
                     if (_indexer.IsKnownPath(pathGroup.Value))
                         builder.Push(i, pathGroup.Index, pathGroup.Length, SemanticTokenType.Namespace, SemanticTokenModifier.Declaration);
                 }
-
             }
         }
 
