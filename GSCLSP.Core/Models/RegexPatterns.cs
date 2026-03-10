@@ -13,7 +13,7 @@ public partial class RegexPatterns
     [GeneratedRegex(@"([\w\\]+)::$", RegexOptions.Compiled)]
     public static partial Regex NameSpaceRegex();
 
-    [GeneratedRegex(@"^(\w+)\s*\((.*?)\)", RegexOptions.Multiline | RegexOptions.Compiled)]
+    [GeneratedRegex(@"^(?<name>[a-zA-Z_][a-zA-Z0-0_]*)\s*\(", RegexOptions.Multiline | RegexOptions.Compiled)]
     public static partial Regex FunctionDefinitionRegex();
 
     [GeneratedRegex(@"(Summary|Example|MandatoryArg|OptionalArg|Module|CallOn|SPMP):", RegexOptions.Compiled)]
@@ -33,7 +33,4 @@ public partial class RegexPatterns
     //// path::func
     [GeneratedRegex(@"([\w\\]*\\[\w\\]+)::", RegexOptions.Compiled)]
     public static partial Regex NamespacePathRegex();
-
-    //[GeneratedRegex(@"#include\s+([\w\\]+)")]
-    //private static partial Regex includeRegex();
 }

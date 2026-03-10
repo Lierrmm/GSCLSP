@@ -1,6 +1,7 @@
 ﻿using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Core.Services;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -15,6 +16,25 @@ public partial class GscIndexer
     public int SymbolCount => _symbols.Count;
     public BuiltInProvider BuiltIns { get; } = new();
     public string? _dumpPath { get; private set; }
+    public List<GscSymbol> WorkspaceSymbols { get; private set; } = [];
+    private readonly Dictionary<string, GscFileMap> _workspaceFileMaps = [];
+    private readonly Dictionary<string, GscFileMap> _fileMaps = [];
+
+    public static string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+
+        // Handle URI or File System Path
+        string clean = path.StartsWith("file://")
+            ? Uri.UnescapeDataString(new Uri(path).LocalPath)
+            : path;
+
+        return clean
+            .Replace("\\", "/")
+            .TrimStart('/')
+            .ToLower()
+            .Trim();
+    }
 
     public void ExportIndexToJson(string dumpPath, string outputPath)
     {
@@ -32,7 +52,9 @@ public partial class GscIndexer
 
         if (Directory.Exists(folderPath))
         {
-            var files = Directory.GetFiles(folderPath, "*.gsc", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories)
+                .Where(s => s.EndsWith(".gsc") || s.EndsWith(".gsh"));
+
             foreach (var file in files)
             {
                 ParseFile(file);
@@ -93,7 +115,6 @@ public partial class GscIndexer
         Console.Error.WriteLine($"GSCLSP: Indexer loaded {_symbols.Count} symbols from JSON.");
     }
 
-    private readonly Dictionary<string, GscFileMap> _fileMaps = [];
     private void ParseFile(string path)
     {
         var fileMap = new GscFileMap { FilePath = path };
@@ -128,110 +149,101 @@ public partial class GscIndexer
         _fileMaps[path.Replace("\\", "/")] = fileMap;
     }
 
-    public async Task<string?> GetIncludePath(string filePath)
+    public async Task<string?> GetIncludePath(string includeString)
     {
-        filePath = Uri.UnescapeDataString(filePath)
-            .Replace("file:///", "")
-            .Trim();
+        if (string.IsNullOrWhiteSpace(includeString)) return null;
 
-        var appendedPath = Path.Join(_dumpPath, filePath);
+        string normalized = includeString.Replace("\\", "/").ToLower();
 
-        if (!appendedPath.EndsWith(".gsc"))
-            appendedPath += ".gsc";
+        var extensions = new[] { ".gsc", ".gsh" };
 
-        var hasMatch = _fileMaps.TryGetValue(appendedPath, out var match);
+        foreach (var ext in extensions)
+        {
+            string searchSuffix = normalized;
+            if (!searchSuffix.EndsWith(ext)) searchSuffix += ext;
 
-        return hasMatch ? match?.FilePath : null;
+            var workspaceMatch = _workspaceFileMaps.Values.FirstOrDefault(f =>
+                f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
+            if (workspaceMatch != null) return workspaceMatch.FilePath;
+
+            var dumpMatch = _fileMaps.Values.FirstOrDefault(f =>
+                f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
+            if (dumpMatch != null) return dumpMatch.FilePath;
+        }
+
+        return null;
     }
 
     public GscResolution ResolveFunction(string callingFilePath, string functionName)
     {
-        // Converts file:///f%3A/path to F:/path
         string normalizedCallingPath = Uri.UnescapeDataString(callingFilePath)
             .Replace("file:///", "")
             .Replace("\\", "/")
+            .ToLower()
             .Trim();
 
         Console.Error.WriteLine($"GSCLSP: Resolving '{functionName}' for {normalizedCallingPath}");
 
-        // Priority 1: If it's defined in the same file, we don't care about includes or globals.
-        if (File.Exists(normalizedCallingPath))
+        var currentFileLocal = WorkspaceSymbols.FirstOrDefault(s =>
+            s.FilePath.Replace("\\", "/").Equals(normalizedCallingPath, StringComparison.OrdinalIgnoreCase) &&
+            s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+
+        if (currentFileLocal != null)
         {
-            var localMatch = ScanFileForFunction(normalizedCallingPath, functionName);
-            Console.Error.WriteLine($"Local Match {localMatch?.Name}");
-            if (localMatch != null)
-            {
-                Console.Error.WriteLine($"GSCLSP: Found '{functionName}' LOCALLY.");
-                return new GscResolution(localMatch, ResolutionType.Local, normalizedCallingPath);
-            }
+            return new GscResolution(currentFileLocal, ResolutionType.Local, normalizedCallingPath);
         }
 
-        // Priority 2: Built-ins like 'distance' or 'isDefined' override everything except local definitions.
+        // Built-ins like 'distance' or 'isDefined' override everything except local definitions.
         var builtIn = BuiltIns.GetBuiltIn(functionName);
         if (builtIn != null)
         {
             return new GscResolution(builtIn, ResolutionType.Global);
         }
 
-        // Priority 3: If the user typed maps\mp\path::func, we look ONLY in that file.
+        // If the user typed maps\mp\path::func, we look ONLY in that file.
         if (functionName.Contains("::"))
         {
             var parts = functionName.Split("::");
             string explicitPath = parts[0].Replace("\\", "/");
             string funcName = parts[1];
 
-            var explicitFile = _fileMaps.Values.FirstOrDefault(f =>
-                f.FilePath.Replace("\\", "/").EndsWith(explicitPath + ".gsc", StringComparison.OrdinalIgnoreCase));
+            var target = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
+                s.FilePath.Replace("\\", "/").ToLower().EndsWith(explicitPath + ".gsc") &&
+                s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase));
 
-            if (explicitFile != null)
-            {
-                var found = explicitFile.LocalSymbols.FirstOrDefault(s =>
-                    s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase));
-
-                if (found != null)
-                    return new GscResolution(found, ResolutionType.Included, explicitFile.FilePath);
-            }
-            return new GscResolution(null, ResolutionType.NotFound);
+            if (target != null)
+                return new GscResolution(target, ResolutionType.Included, target.FilePath);
         }
 
-        // Priority 4: Check files that are explicitly included in the current file's header.
-        var mapKey = _fileMaps.Keys.FirstOrDefault(k =>
-            normalizedCallingPath.EndsWith(k.Replace("\\", "/"), StringComparison.OrdinalIgnoreCase));
-
-        if (mapKey != null && _fileMaps.TryGetValue(mapKey, out var map))
+        // Check files that are explicitly included in the current file's header.
+        if (_workspaceFileMaps.TryGetValue(normalizedCallingPath, out var map) || 
+            _fileMaps.TryGetValue(normalizedCallingPath, out map))
         {
             foreach (var includePath in map.Includes)
             {
-                string searchSuffix = includePath.Replace("\\", "/");
-                if (!searchSuffix.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase))
-                    searchSuffix += ".gsc";
+                string searchSuffix = includePath.ToLower();
+                if (!searchSuffix.EndsWith(".gsc")) searchSuffix += ".gsc";
 
-                var includedFile = _fileMaps.Values.FirstOrDefault(f =>
-                    f.FilePath.Replace("\\", "/").EndsWith(searchSuffix, StringComparison.OrdinalIgnoreCase));
+                // Search for the included file in BOTH maps
+                var includedFile = _workspaceFileMaps.Values.Concat(_fileMaps.Values).FirstOrDefault(f =>
+                    f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
 
                 if (includedFile != null)
                 {
                     var found = includedFile.LocalSymbols.FirstOrDefault(s =>
                         s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
 
-                    if (found != null)
-                    {
-                        Console.Error.WriteLine($"GSCLSP: Found '{functionName}' via #include in {includedFile.FilePath}");
-                        return new GscResolution(found, ResolutionType.Included, includedFile.FilePath);
-                    }
+                    if (found != null) return new GscResolution(found, ResolutionType.Included, includedFile.FilePath);
                 }
             }
         }
 
-        // Priority 5: If nothing else works, search the entire project index (18k+ symbols).
-        var globalMatch = _symbols.FirstOrDefault(s =>
+        // If nothing else works, search the entire project index
+        var globalMatch = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
             s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
 
         if (globalMatch != null)
-        {
-            Console.Error.WriteLine($"GSCLSP: Global match found in {globalMatch.FilePath}");
             return new GscResolution(globalMatch, ResolutionType.Included, globalMatch.FilePath);
-        }
 
         Console.Error.WriteLine($"GSCLSP: '{functionName}' could not be resolved.");
         return new GscResolution(null, ResolutionType.NotFound);
@@ -384,7 +396,7 @@ public partial class GscIndexer
             {
                 var symbol = new GscSymbol(
                     funcMatch.Groups[1].Value,
-                    path,
+                    path.Replace("\\", "/").ToLower().Trim(),
                     lineNum,
                     funcMatch.Groups[2].Value,
                     SymbolType.Function
@@ -441,5 +453,60 @@ public partial class GscIndexer
             return entryPath.Contains(searchPath) ||
                    Path.GetFileNameWithoutExtension(entryPath) == searchPath;
         });
+    }
+
+    public void IndexWorkspace(string workspacePath)
+    {
+        Console.Error.WriteLine($"Indexing Workspace {workspacePath}");
+        var localSymbols = new List<GscSymbol>();
+
+        if (!Directory.Exists(workspacePath)) return;
+
+        _workspaceFileMaps.Clear();
+        var files = Directory.GetFiles(workspacePath, "*.*", SearchOption.AllDirectories)
+            .Where(s => s.EndsWith(".gsc") || s.EndsWith(".gsh"));
+
+        foreach (var file in files)
+        {
+            var content = File.ReadAllText(file);
+            string normalizedPath = file.Replace("\\", "/").ToLower();
+            var fileMap = new GscFileMap { FilePath = file };
+
+            var includeMatches = IncludeRegex().Matches(content);
+            foreach (Match inc in includeMatches)
+            {
+                fileMap.Includes.Add(inc.Groups[1].Value.Replace("\\", "/"));
+            }
+
+            var matches = FunctionDefinitionRegex().Matches(content);
+
+            foreach (Match match in matches)
+            {
+                var symbol = new GscSymbol(
+                    match.Groups[1].Value,
+                    file,
+                    GetLineNumberFromIndex(content, match.Index),
+                    match.Groups[2].Value,
+                    SymbolType.Function
+                );
+
+                localSymbols.Add(symbol);
+                fileMap.LocalSymbols.Add(symbol);
+            }
+
+            _workspaceFileMaps[normalizedPath] = fileMap;
+        }
+
+        WorkspaceSymbols = localSymbols;
+    }
+
+    private static int GetLineNumberFromIndex(string content, int index)
+    {
+        int lineCount = 0;
+        for (int i = 0; i < index; i++)
+        {
+            if (content[i] == '\n') lineCount++;
+        }
+        return lineCount;
     }
 }

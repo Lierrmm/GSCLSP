@@ -24,7 +24,7 @@ namespace GSCLSP.Server.Handlers
                     TokenModifiers = new Container<SemanticTokenModifier>(SemanticTokenModifier.Declaration)
                 },
                 Full = true,
-                Range = false
+                Range = true
             };
         }
 

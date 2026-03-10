@@ -20,7 +20,7 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
     {
         return new DefinitionRegistrationOptions
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("gsc")
+            DocumentSelector = TextDocumentSelector.ForLanguage("gsc", "gsh")
         };
     }
 
@@ -36,32 +36,28 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
 
         var line = lines[request.Position.Line];
 
-        if (line.StartsWith("#include"))
+        if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
         {
             string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
-            await Console.Error.WriteLineAsync($"Identifier {includedFile}");
             if (string.IsNullOrEmpty(includedFile)) return new DefinitionResult();
-            var foundIncludePath = await _indexer.GetIncludePath(includedFile);
-            if (foundIncludePath == null) return new DefinitionResult();
 
-            if (!File.Exists(foundIncludePath)) return new DefinitionResult();
-            
-            return new DefinitionResult(new Location
+            var foundIncludePath = await _indexer.GetIncludePath(includedFile);
+            if (foundIncludePath != null && File.Exists(foundIncludePath))
             {
-                Uri = DocumentUri.FromFileSystemPath(foundIncludePath),
-                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                    new Position(0, 0),
-                    new Position(0, 0)
-                )
-            });
+                return new DefinitionResult(new Location
+                {
+                    Uri = DocumentUri.FromFileSystemPath(foundIncludePath),
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(0, 0, 0, 0)
+                });
+            }
         }
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
-
         if (string.IsNullOrEmpty(identifier)) return new DefinitionResult();
 
         string lookupName = identifier;
         string? pathFilter = null;
+
         if (identifier.Contains("::"))
         {
             var parts = identifier.Split("::");
@@ -79,17 +75,22 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
         // If we have a pathFilter, override the symbol with one from that path
         if (symbol != null && !string.IsNullOrEmpty(pathFilter))
         {
-            symbol = _indexer.GetSymbolsByName(lookupName)
-                .FirstOrDefault(s => s.FilePath.Replace("\\", "/").Contains(pathFilter, StringComparison.CurrentCultureIgnoreCase));
+            var allSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
+
+            symbol = allSymbols.FirstOrDefault(s =>
+                s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
+                s.FilePath.Replace("\\", "/").Contains(pathFilter, StringComparison.OrdinalIgnoreCase));
         }
 
         if (symbol != null && symbol.FilePath != "Engine")
         {
             string targetPath = symbol.FilePath;
+            var shiftByIndex = true;
 
             if (resolution.Type == ResolutionType.Local && string.IsNullOrEmpty(pathFilter))
             {
                 targetPath = currentFilePath;
+                shiftByIndex = false;
             }
             else if (!Path.IsPathRooted(targetPath) && !string.IsNullOrEmpty(userDumpPath))
             {
@@ -99,7 +100,7 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
 
             if (File.Exists(targetPath))
             {
-                var lineIndex = Math.Max(0, symbol.LineNumber - 1);
+                var lineIndex = Math.Max(0, (shiftByIndex ? symbol.LineNumber - 1 : symbol.LineNumber));
                 return new DefinitionResult(new Location
                 {
                     Uri = DocumentUri.FromFileSystemPath(targetPath),

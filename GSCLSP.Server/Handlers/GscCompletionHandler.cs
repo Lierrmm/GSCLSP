@@ -3,7 +3,6 @@ using GSCLSP.Core.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
@@ -32,8 +31,10 @@ namespace GSCLSP.Server.Handlers
             if (namespaceMatch.Success)
             {
                 string pathPrefix = namespaceMatch.Groups[1].Value.Replace("\\", "/").ToLower();
-                var symbols = _indexer.Symbols
-                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.CurrentCultureIgnoreCase));
+
+                var allSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
+                var symbols = allSymbols
+                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase));
 
                 foreach (var symbol in symbols)
                 {
@@ -42,22 +43,26 @@ namespace GSCLSP.Server.Handlers
                 return FilteredList(completions);
             }
 
-            // We parse the current buffer to find functions defined in the same file
-            var localFunctions = ParseLocalFunctions(currentFileLines);
-            foreach (var local in localFunctions)
+            foreach (var symbol in _indexer.WorkspaceSymbols)
             {
-                completions.Add(CreateSymbolCompletion(local, CompletionItemKind.Field, "Local Function"));
+                bool isThisFile = symbol.FilePath.Equals(currentFilePath, StringComparison.OrdinalIgnoreCase);
+                completions.Add(CreateSymbolCompletion(symbol,
+                    isThisFile ? CompletionItemKind.Field : CompletionItemKind.Function,
+                    isThisFile ? "Local Function" : "Project Function"));
             }
 
             var includes = currentFileLines
-                .Where(l => l.Trim().StartsWith("#include"))
-                .Select(l => IncludeRegex().Match(l).Groups[1].Value.Replace("\\", "/").ToLower())
+                .Where(l => l.Trim().StartsWith("#include") || l.Trim().StartsWith("#using"))
+                .Select(l => IncludeRegex().Match(l).Groups[2].Value.Replace("\\", "/").ToLower())
                 .ToList();
 
             if (includes.Count != 0)
             {
-                var includedSymbols = _indexer.Symbols
-                    .Where(s => includes.Any(inc => s.FilePath.Replace("\\", "/").Contains(inc, StringComparison.CurrentCultureIgnoreCase)));
+                var allPotentialSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
+
+                var includedSymbols = allPotentialSymbols
+                    .Where(s => includes.Any(inc => s.FilePath.Replace("\\", "/")
+                    .Contains(inc, StringComparison.OrdinalIgnoreCase)));
 
                 foreach (var symbol in includedSymbols)
                 {
@@ -73,26 +78,6 @@ namespace GSCLSP.Server.Handlers
             return FilteredList(completions);
         }
 
-        private static List<GscSymbol> ParseLocalFunctions(string[] lines)
-        {
-            var locals = new List<GscSymbol>();
-            // function_name( arg1, arg2 )
-            var funcRegex = FunctionDefinitionRegex();
-            var content = string.Join("\n", lines);
-
-            foreach (Match m in funcRegex.Matches(content))
-            {
-                locals.Add(new GscSymbol(
-                    m.Groups[1].Value,
-                    "current_file",
-                    0,
-                    m.Groups[2].Value,
-                    SymbolType.Function
-                ));
-            }
-            return locals;
-        }
-
         private static CompletionItem CreateSymbolCompletion(GscSymbol symbol, CompletionItemKind kind, string detailSource)
         {
             var argList = symbol.Parameters
@@ -100,7 +85,6 @@ namespace GSCLSP.Server.Handlers
                 .Select(a => a.Trim())
                 .ToList();
 
-            // Build Snippet: func(${1:arg1}, ${2:arg2})
             var snippetParts = new List<string>();
             for (int i = 0; i < argList.Count; i++)
             {
@@ -114,7 +98,7 @@ namespace GSCLSP.Server.Handlers
                 Label = symbol.Name,
                 Kind = kind,
                 Detail = $"({symbol.Parameters})\n{detailSource}",
-                Documentation = symbol.FilePath != "current_file" ? $"Path: {symbol.FilePath}" : "Defined in this file",
+                Documentation = $"Source: {Path.GetFileName(symbol.FilePath)}",
                 InsertText = snippet,
                 InsertTextFormat = InsertTextFormat.Snippet,
                 FilterText = symbol.Name
@@ -125,7 +109,10 @@ namespace GSCLSP.Server.Handlers
         {
             // Group by Label to prevent showing the same function twice 
             // (e.g., if it's in the index and the local scan)
-            return new CompletionList(items.GroupBy(x => x.Label).Select(x => x.First()));
+            return new CompletionList(items
+            .OrderByDescending(x => x.Detail?.Contains("Project")) // Put local files first
+            .GroupBy(x => x.Label)
+            .Select(x => x.First()));
         }
 
         public CompletionRegistrationOptions GetRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
@@ -133,7 +120,7 @@ namespace GSCLSP.Server.Handlers
             return new CompletionRegistrationOptions
             {
                 DocumentSelector = TextDocumentSelector.ForLanguage("gsc"),
-                TriggerCharacters = new Container<string>(":")
+                TriggerCharacters = new Container<string>(":", ".")
             };
         }
     }

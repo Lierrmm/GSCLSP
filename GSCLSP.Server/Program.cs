@@ -38,8 +38,20 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscDefinitionHandler>()
         .WithHandler<GscHoverHandler>()
         .WithHandler<GscCompletionHandler>()
-        .WithHandler<GscSemanticTokensHandler>()
+        //.WithHandler<GscSemanticTokensHandler>()
         //.WithHandler<GscReferencesHandler>() - Skip for now - its not searching for called functions, just their definitions in dumped files
+        .OnInitialize((server, request, token) =>
+        {
+            string? workspacePath = request.RootPath ?? request.RootUri?.GetFileSystemPath();
+
+            if (!string.IsNullOrEmpty(workspacePath))
+            {
+                var indexer = server.Services.GetService<GscIndexer>();
+                indexer?.IndexWorkspace(workspacePath);
+            }
+
+            return Task.CompletedTask;
+        })
         .OnStarted(async (server, ct) =>
         {
             var config = server.Configuration.GetSection("gsclsp");

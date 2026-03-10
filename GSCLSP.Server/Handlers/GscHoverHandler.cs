@@ -1,6 +1,5 @@
 ﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Parsing;
-using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -16,7 +15,7 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
     {
         return new HoverRegistrationOptions
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("gsc")
+            DocumentSelector = TextDocumentSelector.ForLanguage("gsc", "gsh")
         };
     }
 
@@ -37,25 +36,20 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
         if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
 
-        if (line.StartsWith("#include"))
+        if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
         {
             string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
-            await Console.Error.WriteLineAsync($"Identifier {includedFile}");
             if (string.IsNullOrEmpty(includedFile)) return null;
+
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
             if (foundIncludePath == null) return null;
-            if (!File.Exists(foundIncludePath)) return null;
 
-            var contentValue = $"**#Include**\n";
-            contentValue += $"`{foundIncludePath}`";
-
+            var contentValue = $"### #Include\n`{foundIncludePath}`";
             var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
         }
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
-
-        // Clean up namespace or pointer prefixes
         if (identifier.StartsWith("::")) identifier = identifier[2..];
         if (string.IsNullOrEmpty(identifier)) return null;
 
@@ -81,8 +75,7 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
 
             if (!string.IsNullOrEmpty(symbol.Documentation))
             {
-                var doc = symbol.Documentation;
-                doc = DocRegex().Replace(doc, "**$1:**");
+                var doc = DocRegex().Replace(symbol.Documentation, "**$1:**");
                 contentValue += $"{doc}\n\n";
             }
 
@@ -90,13 +83,13 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
 
             if (symbol.FilePath == "Engine")
             {
-                contentValue += "**Built-in Engine Function**";
+                contentValue += "*(Engine Built-in)*";
             }
             else
             {
                 // Backticks around file path to prevent backslash escaping
-                contentValue += $"**File:** `{symbol.FilePath}`  \n" +
-                                $"**Line:** {symbol.LineNumber}";
+                contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
+                             $"**Line:** {symbol.LineNumber}";
             }
 
             var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
