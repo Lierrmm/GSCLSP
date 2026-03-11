@@ -47,7 +47,7 @@ namespace GSCLSP.Server.Handlers
                     request.Position
                 );
 
-                var directiveMapping = new[] { ("#include", "#include "), ("#using", "#using "), ("#inline", "#inline "), ("#define", "#define ");
+                var directiveMapping = new[] { ("#include", "#include "), ("#using", "#using "), ("#inline", "#inline "), ("#define", "#define ") };
                 foreach (var (label, insert) in directiveMapping )
                 {
                     completions.Add(new CompletionItem
