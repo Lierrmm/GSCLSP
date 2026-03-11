@@ -32,7 +32,9 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         bool inBlockComment = false;
         for (int l = 0; l < request.Position.Line; l++)
             GscHandlerCommon.GetCodeRanges(lines[l], ref inBlockComment);
+
         var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
+
         if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
 
         if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
@@ -43,7 +45,8 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
             if (foundIncludePath == null) return null;
 
-            var contentValue = $"### #Include\n`{foundIncludePath}`";
+            var directive = line.Trim().Split(' ', 2)[0];
+            var contentValue = $"### {directive}\n`{foundIncludePath}`";
             var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
         }
