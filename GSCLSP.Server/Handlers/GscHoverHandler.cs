@@ -39,13 +39,16 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
 
         if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
         {
-            string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
+            var parts = line.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) return null;
+
+            var directive = parts[0];
+            string includedFile = parts[1].Trim().TrimEnd(';');
             if (string.IsNullOrEmpty(includedFile)) return null;
 
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
             if (foundIncludePath == null) return null;
 
-            var directive = line.Trim().Split(' ', 2)[0];
             var contentValue = $"### {directive}\n`{foundIncludePath}`";
             var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
