@@ -52,6 +52,12 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         if (identifier.StartsWith("::")) identifier = identifier[2..];
         if (string.IsNullOrEmpty(identifier)) return null;
 
+        var macroHover = FindMacroDefinition(lines, identifier, request.Position.Line);
+        if (macroHover != null) return macroHover;
+
+        var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
+        if (localVarHover != null) return localVarHover;
+
         var resolution = _indexer.ResolveFunction(filePath, identifier);
 
         if (resolution.Symbol != null)
@@ -90,6 +96,64 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
                 contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
                              $"**Line:** {symbol.LineNumber}";
             }
+
+            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+        }
+
+        return null;
+    }
+
+    private static Hover? FindLocalVariable(string filePath, string[] lines, string identifier, int hoverLine)
+    {
+        var funcName = GscIndexer.FindEnclosingFunctionName(lines, hoverLine);
+        if (funcName == null) return null;
+
+        var locals = GscIndexer.GetLocalVariables(filePath, funcName, lines, hoverLine);
+        var localVar = locals.FirstOrDefault(v => v.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase));
+        if (localVar == null) return null;
+
+        var contentValue = $"```gsc\n{localVar.Name} = {localVar.Value}\n```\n---\n";
+        contentValue += $"**Line:** {localVar.Line}";
+
+        var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+    }
+
+    private static Hover? FindMacroDefinition(string[] lines, string identifier, int hoverLine)
+    {
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].TrimStart();
+            if (!trimmed.StartsWith("#define ")) continue;
+
+            var afterDefine = trimmed[8..]; // skip "#define "
+            int spaceIdx = afterDefine.IndexOf(' ');
+            int tabIdx = afterDefine.IndexOf('\t');
+
+            string macroName;
+            string macroValue;
+
+            if (spaceIdx < 0 && tabIdx < 0)
+            {
+                macroName = afterDefine.Trim();
+                macroValue = "";
+            }
+            else
+            {
+                int sepIdx = (spaceIdx >= 0 && tabIdx >= 0) ? Math.Min(spaceIdx, tabIdx)
+                           : (spaceIdx >= 0 ? spaceIdx : tabIdx);
+                macroName = afterDefine[..sepIdx].Trim();
+                macroValue = afterDefine[(sepIdx + 1)..].Trim();
+            }
+
+            if (!macroName.Equals(identifier, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var contentValue = $"```gsc\n#define {macroName}";
+            if (!string.IsNullOrEmpty(macroValue))
+                contentValue += $" {macroValue}";
+            contentValue += "\n```\n---\n";
+            contentValue += $"**Line:** {i + 1}";
 
             var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };

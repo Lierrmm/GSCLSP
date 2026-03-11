@@ -32,6 +32,10 @@ public partial class GscIndexer
     private static readonly Dictionary<string, GscSymbol?> _scanFunctionCache = [];
     private static readonly Lock _scanCacheLock = new();
 
+    public record LocalVariable(string Name, string Value, int Line);
+    private static readonly Dictionary<string, List<LocalVariable>> _localVarCache = [];
+    private static readonly Lock _localVarCacheLock = new();
+
     public static string NormalizePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
@@ -89,6 +93,11 @@ public partial class GscIndexer
         lock (_scanCacheLock)
         {
             _scanFunctionCache.Clear();
+        }
+
+        lock (_localVarCacheLock)
+        {
+            _localVarCache.Clear();
         }
 
         Task.Run(() =>
@@ -380,6 +389,97 @@ public partial class GscIndexer
         return null;
     }
 
+    public static string? FindEnclosingFunctionName(string[] lines, int cursorLine)
+    {
+        for (int i = cursorLine; i >= 0; i--)
+        {
+            if (lines[i].Length == 0 || char.IsWhiteSpace(lines[i][0])) continue;
+            var match = FunctionMultiLineRegex().Match(lines[i]);
+            if (match.Success) return match.Groups["name"].Value;
+        }
+        return null;
+    }
+
+    public static List<LocalVariable> GetLocalVariables(string filePath, string functionName, string[] lines, int cursorLine)
+    {
+        string cacheKey = $"{filePath}|{functionName}";
+
+        lock (_localVarCacheLock)
+        {
+            if (_localVarCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+        }
+
+        var result = ScanLocalVariablesForFunction(lines, cursorLine);
+
+        lock (_localVarCacheLock)
+        {
+            _localVarCache[cacheKey] = result;
+        }
+
+        return result;
+    }
+
+    private static readonly HashSet<string> _reservedWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "if", "else", "for", "foreach", "while", "switch", "return", "wait",
+        "waittill", "waittillmatch", "waittillframeend", "notify", "endon",
+        "thread", "childthread", "break", "continue", "case", "default",
+        "true", "false", "undefined", "self", "level", "game"
+    };
+
+    private static List<LocalVariable> ScanLocalVariablesForFunction(string[] lines, int cursorLine)
+    {
+        int funcDefLine = -1;
+        for (int i = cursorLine; i >= 0; i--)
+        {
+            if (lines[i].Length > 0 && !char.IsWhiteSpace(lines[i][0]) && FunctionMultiLineRegex().IsMatch(lines[i]))
+            {
+                funcDefLine = i;
+                break;
+            }
+        }
+        if (funcDefLine < 0) return [];
+
+        int braceStart = -1;
+        for (int i = funcDefLine; i < lines.Length; i++)
+        {
+            if (lines[i].Contains('{')) { braceStart = i; break; }
+        }
+        if (braceStart < 0) return [];
+
+        int depth = 0;
+        int funcEnd = lines.Length - 1;
+        for (int i = braceStart; i < lines.Length; i++)
+        {
+            foreach (char c in lines[i])
+            {
+                if (c == '{') depth++;
+                else if (c == '}') depth--;
+            }
+            if (depth == 0) { funcEnd = i; break; }
+        }
+
+        var variables = new Dictionary<string, LocalVariable>(StringComparer.OrdinalIgnoreCase);
+        for (int i = braceStart; i <= funcEnd; i++)
+        {
+            var match = LocalVarAssignmentRegex().Match(lines[i]);
+            if (!match.Success) continue;
+
+            string name = match.Groups[1].Value;
+            string value = match.Groups[2].Value.Trim();
+
+            if (_reservedWords.Contains(name)) continue;
+
+            if (!variables.ContainsKey(name))
+            {
+                variables[name] = new LocalVariable(name, value, i + 1);
+            }
+        }
+
+        return [.. variables.Values];
+    }
+
     public GscResolution ResolveFromLine(string contextPath, string rawLine)
     {
         var parsed = GscLineParser.ExtractCall(rawLine);
@@ -640,6 +740,16 @@ public partial class GscIndexer
 
                 foreach (var key in keysToRemove)
                     _scanFunctionCache.Remove(key);
+            }
+
+            lock (_localVarCacheLock)
+            {
+                var keysToRemove = _localVarCache.Keys
+                    .Where(k => k.StartsWith(filePath + "|", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                foreach (var key in keysToRemove)
+                    _localVarCache.Remove(key);
             }
 
             // Remove old symbols from this file

@@ -37,4 +37,7 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"(?:(\w+)\s+)?(?:([\w\\]+)::)?(\w+)\s*\((.*)\)", RegexOptions.Compiled)]
     public static partial Regex CallRegex();
+
+    [GeneratedRegex(@"^\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled)]
+    public static partial Regex LocalVarAssignmentRegex();
 }
