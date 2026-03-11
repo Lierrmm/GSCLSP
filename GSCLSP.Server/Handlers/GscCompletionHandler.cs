@@ -76,6 +76,25 @@ namespace GSCLSP.Server.Handlers
                 completions.Add(CreateSymbolCompletion(builtIn, CompletionItemKind.Function, "Engine Built-in"));
             }
 
+            var macros = _indexer.GetAllVisibleMacros(currentFilePath);
+            foreach (var macro in macros)
+            {
+                var macroDetail = string.IsNullOrEmpty(macro.Value) ? "" : $" {macro.Value}";
+                completions.Add(new CompletionItem
+                {
+                    Label = macro.Name,
+                    LabelDetails = new CompletionItemLabelDetails
+                    {
+                        Detail = macroDetail,
+                        Description = "Macro"
+                    },
+                    Kind = CompletionItemKind.Constant,
+                    InsertText = macro.Name,
+                    InsertTextFormat = InsertTextFormat.PlainText,
+                    FilterText = macro.Name
+                });
+            }
+
             // Local variables in the enclosing function
             var funcName = GscIndexer.FindEnclosingFunctionName(currentFileLines, request.Position.Line);
             if (funcName != null)
