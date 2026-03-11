@@ -21,7 +21,7 @@ public partial class GscIndexer
 
     // File watching and caching
     private FileSystemWatcher? _fileWatcher;
-    private string? _workspacePath;
+    public string? WorkspacePath { get; private set; }
     private readonly Dictionary<string, string> _fileContentCache = [];
     private readonly HashSet<string> _pendingChanges = [];
     private readonly Lock _pendingChangesLock = new();
@@ -698,6 +698,11 @@ public partial class GscIndexer
             k.Replace("\\", "/").EndsWith(searchSuffix, StringComparison.OrdinalIgnoreCase));
     }
 
+    public IEnumerable<string> GetAllIndexedFilePaths() =>
+        _workspaceFileMaps.Values.Select(f => f.FilePath)
+            .Concat(_fileMaps.Values.Select(f => f.FilePath))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
     public IEnumerable<GscSymbol> GetSymbolsByName(string name) =>
         _symbols.Where(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
 
@@ -730,7 +735,7 @@ public partial class GscIndexer
 
         _workspaceFileMaps.Clear();
         _fileContentCache.Clear();
-        _workspacePath = workspacePath;
+        WorkspacePath = workspacePath;
 
         var files = Directory.GetFiles(workspacePath, "*.*", SearchOption.AllDirectories)
             .Where(s => s.EndsWith(".gsc") || s.EndsWith(".gsh"));
@@ -816,14 +821,19 @@ public partial class GscIndexer
         }
     }
 
+    public string[] GetFileLines(string filePath)
+    {
+        return GetFileContent(filePath).Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+    }
+
     private void StartFileWatching()
     {
-        if (string.IsNullOrEmpty(_workspacePath) || _fileWatcher != null)
+        if (string.IsNullOrEmpty(WorkspacePath) || _fileWatcher != null)
             return;
 
         try
         {
-            _fileWatcher = new FileSystemWatcher(_workspacePath)
+            _fileWatcher = new FileSystemWatcher(WorkspacePath)
             {
                 Filter = "*.*",
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
@@ -836,7 +846,7 @@ public partial class GscIndexer
             _fileWatcher.Deleted += OnFileChanged;
             _fileWatcher.Renamed += OnFileRenamed;
 
-            Console.Error.WriteLine($"GSCLSP: File watching started for {_workspacePath}");
+            Console.Error.WriteLine($"GSCLSP: File watching started for {WorkspacePath}");
         }
         catch (Exception ex)
         {

@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using OmniSharp.Extensions.LanguageServer.Server;
 
 var indexer = new GscIndexer();
+var documentStore = new GscDocumentStore();
 
 string basePath = AppDomain.CurrentDomain.BaseDirectory;
 string builtInPath = Path.Combine(basePath, "data", "iw4_builtins.json");
@@ -34,7 +35,9 @@ var server = await LanguageServer.From(options =>
         .WithServices(services =>
         {
             services.AddSingleton(indexer);
+            services.AddSingleton(documentStore);
         })
+        .WithHandler<GscDocumentSyncHandler>()
         .WithHandler<GscDefinitionHandler>()
         .WithHandler<GscHoverHandler>()
         .WithHandler<GscCompletionHandler>()

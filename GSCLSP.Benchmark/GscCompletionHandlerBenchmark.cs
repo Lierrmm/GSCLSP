@@ -21,7 +21,7 @@ public class GscCompletionHandlerBenchmark
     public void Setup()
     {
         _indexer = new GscIndexer();
-        _completionHandler = new GscCompletionHandler(_indexer);
+        _completionHandler = new GscCompletionHandler(_indexer, new GscDocumentStore());
         // Create test workspace
         string tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-completion-" + Guid.NewGuid());
         Directory.CreateDirectory(tempDir);

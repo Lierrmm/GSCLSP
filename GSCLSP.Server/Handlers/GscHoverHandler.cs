@@ -7,9 +7,10 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
-public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
+public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore documentStore) : IHoverHandler
 {
     private readonly GscIndexer _indexer = indexer;
+    private readonly GscDocumentStore _documentStore = documentStore;
 
     public HoverRegistrationOptions GetRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities)
     {
@@ -24,8 +25,9 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         var uri = request.TextDocument.Uri;
         var filePath = uri.GetFileSystemPath();
 
-        var lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
-        if (lines == null || request.Position.Line >= lines.Length) return null;
+        var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(filePath);
+        var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+        if (request.Position.Line >= lines.Length) return null;
 
         var line = lines[request.Position.Line];
 
@@ -50,8 +52,8 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
             if (foundIncludePath == null) return null;
 
             var contentValue = $"### {directive}\n`{foundIncludePath}`";
-            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+            var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+            return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
@@ -103,8 +105,8 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
                              $"**Line:** {symbol.LineNumber}";
             }
 
-            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+            var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+            return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
 
         return null;
@@ -126,8 +128,8 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
             contentValue += $"{comment}\n\n";
         contentValue += $"---\n**Line:** {localVar.Line}";
 
-        var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-        return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+        var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
 
     private static string? GetLeadingComment(string[] lines, int lineIndex)
@@ -168,7 +170,7 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         var macro = _indexer.ResolveMacro(filePath, identifier);
         if (macro == null) return null;
 
-        string[] macroFileLines = File.ReadAllLines(macro.FilePath);
+        string[] macroFileLines = _indexer.GetFileLines(macro.FilePath);
         var comment = GetLeadingComment(macroFileLines, macro.Line - 1);
 
         var contentValue = $"```gsc\n#define {macro.Name}";
