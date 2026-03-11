@@ -105,11 +105,19 @@ namespace GSCLSP.Server.Handlers
                 insertText = $"{symbol.Name}($0)";
             }
 
+            var paramString = string.IsNullOrWhiteSpace(symbol.Parameters)
+                ? "()"
+                : $"({symbol.Parameters.Trim()})";
+
             return new CompletionItem
             {
                 Label = symbol.Name,
+                LabelDetails = new CompletionItemLabelDetails
+                {
+                    Detail = $"{paramString}",
+                    Description = detailSource
+                },
                 Kind = kind,
-                Detail = $"({symbol.Parameters?.Trim()})\n{detailSource}",
                 Documentation = new StringOrMarkupContent(new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
@@ -126,7 +134,7 @@ namespace GSCLSP.Server.Handlers
             // Group by Label to prevent showing the same function twice 
             // (e.g., if it's in the index and the local scan)
             return new CompletionList(items
-            .OrderByDescending(x => x.Detail?.Contains("Project")) // Put local files first
+            .OrderByDescending(x => x.LabelDetails?.Description?.Contains("Project")) // Put local files first
             .GroupBy(x => x.Label)
             .Select(x => x.First()));
         }
