@@ -52,7 +52,7 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         if (identifier.StartsWith("::")) identifier = identifier[2..];
         if (string.IsNullOrEmpty(identifier)) return null;
 
-        var macroHover = FindMacroDefinition(lines, identifier, request.Position.Line);
+        var macroHover = FindMacroDefinition(filePath, identifier);
         if (macroHover != null) return macroHover;
 
         var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
@@ -120,45 +120,19 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
     }
 
-    private static Hover? FindMacroDefinition(string[] lines, string identifier, int hoverLine)
+    private Hover? FindMacroDefinition(string filePath, string identifier)
     {
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var trimmed = lines[i].TrimStart();
-            if (!trimmed.StartsWith("#define ")) continue;
+        var macro = _indexer.ResolveMacro(filePath, identifier);
+        if (macro == null) return null;
 
-            var afterDefine = trimmed[8..]; // skip "#define "
-            int spaceIdx = afterDefine.IndexOf(' ');
-            int tabIdx = afterDefine.IndexOf('\t');
+        var contentValue = $"```gsc\n#define {macro.Name}";
+        if (!string.IsNullOrEmpty(macro.Value))
+            contentValue += $" {macro.Value}";
+        contentValue += "\n```\n---\n";
+        contentValue += $"**Defined in:** `{macro.FilePath}`\n\n";
+        contentValue += $"**Line:** {macro.Line}";
 
-            string macroName;
-            string macroValue;
-
-            if (spaceIdx < 0 && tabIdx < 0)
-            {
-                macroName = afterDefine.Trim();
-                macroValue = "";
-            }
-            else
-            {
-                int sepIdx = (spaceIdx >= 0 && tabIdx >= 0) ? Math.Min(spaceIdx, tabIdx)
-                           : (spaceIdx >= 0 ? spaceIdx : tabIdx);
-                macroName = afterDefine[..sepIdx].Trim();
-                macroValue = afterDefine[(sepIdx + 1)..].Trim();
-            }
-
-            if (!macroName.Equals(identifier, StringComparison.OrdinalIgnoreCase)) continue;
-
-            var contentValue = $"```gsc\n#define {macroName}";
-            if (!string.IsNullOrEmpty(macroValue))
-                contentValue += $" {macroValue}";
-            contentValue += "\n```\n---\n";
-            contentValue += $"**Line:** {i + 1}";
-
-            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
-        }
-
-        return null;
+        var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
     }
 }

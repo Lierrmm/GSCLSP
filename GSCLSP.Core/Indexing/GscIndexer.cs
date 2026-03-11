@@ -36,6 +36,10 @@ public partial class GscIndexer
     private static readonly Dictionary<string, List<LocalVariable>> _localVarCache = [];
     private static readonly Lock _localVarCacheLock = new();
 
+    public record MacroDefinition(string Name, string Value, string FilePath, int Line);
+    private static readonly Dictionary<string, List<MacroDefinition>> _macroCache = [];
+    private static readonly Lock _macroCacheLock = new();
+
     public static string NormalizePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
@@ -100,6 +104,11 @@ public partial class GscIndexer
             _localVarCache.Clear();
         }
 
+        lock (_macroCacheLock)
+        {
+            _macroCache.Clear();
+        }
+
         Task.Run(() =>
         {
             if (File.Exists(cacheFile))
@@ -155,6 +164,13 @@ public partial class GscIndexer
             if (includeMatch.Success)
             {
                 fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                continue;
+            }
+
+            var inlineMatch = InlinePathRegex().Match(line);
+            if (inlineMatch.Success)
+            {
+                fileMap.Inlines.Add(inlineMatch.Groups[1].Value.Replace("\\", "/"));
                 continue;
             }
 
@@ -480,6 +496,144 @@ public partial class GscIndexer
         return [.. variables.Values];
     }
 
+    public static List<MacroDefinition> GetFileMacros(string filePath)
+    {
+        string cacheKey = filePath.Replace("\\", "/").ToLower();
+
+        lock (_macroCacheLock)
+        {
+            if (_macroCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+        }
+
+        var result = ScanFileMacros(filePath);
+
+        lock (_macroCacheLock)
+        {
+            _macroCache[cacheKey] = result;
+        }
+
+        return result;
+    }
+
+    private static List<MacroDefinition> ScanFileMacros(string filePath)
+    {
+        var macros = new List<MacroDefinition>();
+        try
+        {
+            var lines = File.ReadAllLines(filePath);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var trimmed = lines[i].TrimStart();
+                if (!trimmed.StartsWith("#define ")) continue;
+
+                var afterDefine = trimmed[8..];
+                int spaceIdx = afterDefine.IndexOf(' ');
+                int tabIdx = afterDefine.IndexOf('\t');
+
+                string macroName;
+                string macroValue;
+
+                if (spaceIdx < 0 && tabIdx < 0)
+                {
+                    macroName = afterDefine.Trim();
+                    macroValue = "";
+                }
+                else
+                {
+                    int sepIdx = (spaceIdx >= 0 && tabIdx >= 0) ? Math.Min(spaceIdx, tabIdx)
+                               : (spaceIdx >= 0 ? spaceIdx : tabIdx);
+                    macroName = afterDefine[..sepIdx].Trim();
+                    macroValue = afterDefine[(sepIdx + 1)..].Trim();
+                }
+
+                if (!string.IsNullOrEmpty(macroName))
+                {
+                    macros.Add(new MacroDefinition(macroName, macroValue, filePath, i + 1));
+                }
+            }
+        }
+        catch { }
+        return macros;
+    }
+
+    public MacroDefinition? ResolveMacro(string callingFilePath, string macroName)
+    {
+        var localMacros = GetFileMacros(callingFilePath);
+        var found = localMacros.FirstOrDefault(m => m.Name.Equals(macroName, StringComparison.OrdinalIgnoreCase));
+        if (found != null) return found;
+
+        string normalizedPath = callingFilePath.Replace("\\", "/").ToLower();
+        GscFileMap? fileMap = null;
+
+        if (!_workspaceFileMaps.TryGetValue(normalizedPath, out fileMap))
+            _fileMaps.TryGetValue(normalizedPath, out fileMap);
+
+        if (fileMap != null)
+        {
+            foreach (var inlinePath in fileMap.Inlines)
+            {
+                var resolvedPath = ResolveInlinePath(inlinePath);
+                if (resolvedPath == null) continue;
+
+                var inlineMacros = GetFileMacros(resolvedPath);
+                found = inlineMacros.FirstOrDefault(m => m.Name.Equals(macroName, StringComparison.OrdinalIgnoreCase));
+                if (found != null) return found;
+            }
+        }
+
+        return null;
+    }
+
+    public List<MacroDefinition> GetAllVisibleMacros(string callingFilePath)
+    {
+        var result = new List<MacroDefinition>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var m in GetFileMacros(callingFilePath))
+        {
+            if (seen.Add(m.Name)) result.Add(m);
+        }
+
+        string normalizedPath = callingFilePath.Replace("\\", "/").ToLower();
+        GscFileMap? fileMap = null;
+
+        if (!_workspaceFileMaps.TryGetValue(normalizedPath, out fileMap))
+            _fileMaps.TryGetValue(normalizedPath, out fileMap);
+
+        if (fileMap != null)
+        {
+            foreach (var inlinePath in fileMap.Inlines)
+            {
+                var resolvedPath = ResolveInlinePath(inlinePath);
+                if (resolvedPath == null) continue;
+
+                foreach (var m in GetFileMacros(resolvedPath))
+                {
+                    if (seen.Add(m.Name)) result.Add(m);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private string? ResolveInlinePath(string inlinePath)
+    {
+        string normalized = inlinePath.Replace("\\", "/").ToLower();
+        if (!normalized.EndsWith(".gsh")) normalized += ".gsh";
+
+        var match = _workspaceFileMaps.Values.FirstOrDefault(f =>
+            f.FilePath.Replace("\\", "/").ToLower().EndsWith(normalized));
+        if (match != null) return match.FilePath;
+
+        match = _fileMaps.Values.FirstOrDefault(f =>
+            f.FilePath.Replace("\\", "/").ToLower().EndsWith(normalized));
+        if (match != null) return match.FilePath;
+
+        return null;
+    }
+
     public GscResolution ResolveFromLine(string contextPath, string rawLine)
     {
         var parsed = GscLineParser.ExtractCall(rawLine);
@@ -591,6 +745,12 @@ public partial class GscIndexer
             foreach (Match inc in includeMatches)
             {
                 fileMap.Includes.Add(inc.Groups[1].Value.Replace("\\", "/"));
+            }
+
+            var inlineMatches = InlinePathRegex().Matches(content);
+            foreach (Match inl in inlineMatches)
+            {
+                fileMap.Inlines.Add(inl.Groups[1].Value.Replace("\\", "/"));
             }
 
             var matches = FunctionMultiLineRegex().Matches(content);
@@ -752,6 +912,12 @@ public partial class GscIndexer
                     _localVarCache.Remove(key);
             }
 
+            lock (_macroCacheLock)
+            {
+                string macroKey = filePath.Replace("\\", "/").ToLower();
+                _macroCache.Remove(macroKey);
+            }
+
             // Remove old symbols from this file
             updatedSymbols.RemoveAll(s => s.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
 
@@ -775,6 +941,13 @@ public partial class GscIndexer
                             if (includeMatch.Success)
                             {
                                 fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                                continue;
+                            }
+
+                            var inlineMatch = InlinePathRegex().Match(line);
+                            if (inlineMatch.Success)
+                            {
+                                fileMap.Inlines.Add(inlineMatch.Groups[1].Value.Replace("\\", "/"));
                                 continue;
                             }
 
