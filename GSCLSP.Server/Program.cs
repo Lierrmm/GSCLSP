@@ -38,8 +38,7 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscDefinitionHandler>()
         .WithHandler<GscHoverHandler>()
         .WithHandler<GscCompletionHandler>()
-        //.WithHandler<GscSemanticTokensHandler>()
-        //.WithHandler<GscReferencesHandler>() - Skip for now - its not searching for called functions, just their definitions in dumped files
+        .WithHandler<GscReferencesHandler>()
         .OnInitialize((server, request, token) =>
         {
             string? workspacePath = request.RootPath ?? request.RootUri?.GetFileSystemPath();

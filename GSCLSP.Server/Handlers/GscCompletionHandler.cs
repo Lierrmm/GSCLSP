@@ -3,6 +3,7 @@ using GSCLSP.Core.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using System.Collections.Concurrent;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
@@ -10,6 +11,7 @@ namespace GSCLSP.Server.Handlers
     public partial class GscCompletionHandler(GscIndexer indexer) : ICompletionHandler
     {
         private readonly GscIndexer _indexer = indexer;
+        private readonly ConcurrentDictionary<string, HashSet<string>> _fileIncludesCache = [];
 
         public async Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
@@ -17,8 +19,9 @@ namespace GSCLSP.Server.Handlers
             var uri = request.TextDocument.Uri;
             var currentFilePath = uri.GetFileSystemPath();
 
-            if (!File.Exists(currentFilePath)) return new CompletionList();
-            var currentFileLines = await File.ReadAllLinesAsync(currentFilePath, cancellationToken);
+            // Use cached content instead of reading from disk
+            var content = _indexer.GetFileContent(currentFilePath);
+            var currentFileLines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
 
             if (request.Position.Line >= currentFileLines.Length) return new CompletionList();
             var line = currentFileLines[request.Position.Line];
@@ -32,11 +35,12 @@ namespace GSCLSP.Server.Handlers
             {
                 string pathPrefix = namespaceMatch.Groups[1].Value.Replace("\\", "/").ToLower();
 
-                var allSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
-                var symbols = allSymbols
-                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase));
+                var filteredSymbols = _indexer.WorkspaceSymbols
+                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase))
+                    .Concat(_indexer.Symbols
+                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase)));
 
-                foreach (var symbol in symbols)
+                foreach (var symbol in filteredSymbols)
                 {
                     completions.Add(CreateSymbolCompletion(symbol, CompletionItemKind.Method, "Global Function"));
                 }
@@ -51,20 +55,17 @@ namespace GSCLSP.Server.Handlers
                     isThisFile ? "Local Function" : "Project Function"));
             }
 
-            var includes = currentFileLines
-                .Where(l => l.Trim().StartsWith("#include") || l.Trim().StartsWith("#using"))
-                .Select(l => IncludeRegex().Match(l).Groups[2].Value.Replace("\\", "/").ToLower())
-                .ToList();
+            var includesSet = _fileIncludesCache.GetOrAdd(currentFilePath, _ => ParseIncludes(currentFileLines));
 
-            if (includes.Count != 0)
+            if (includesSet.Count > 0)
             {
-                var allPotentialSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
+                // Use HashSet for O(1) lookup
+                foreach (var symbol in _indexer.WorkspaceSymbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
+                {
+                    completions.Add(CreateSymbolCompletion(symbol, CompletionItemKind.Reference, "via #include"));
+                }
 
-                var includedSymbols = allPotentialSymbols
-                    .Where(s => includes.Any(inc => s.FilePath.Replace("\\", "/")
-                    .Contains(inc, StringComparison.OrdinalIgnoreCase)));
-
-                foreach (var symbol in includedSymbols)
+                foreach (var symbol in _indexer.Symbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
                     completions.Add(CreateSymbolCompletion(symbol, CompletionItemKind.Reference, "via #include"));
                 }
@@ -80,26 +81,41 @@ namespace GSCLSP.Server.Handlers
 
         private static CompletionItem CreateSymbolCompletion(GscSymbol symbol, CompletionItemKind kind, string detailSource)
         {
-            var argList = symbol.Parameters
+            var argList = (symbol.Parameters ?? "")
                 .Split(',', StringSplitOptions.RemoveEmptyEntries)
                 .Select(a => a.Trim())
+                .Where(a => !string.IsNullOrEmpty(a))
                 .ToList();
 
-            var snippetParts = new List<string>();
-            for (int i = 0; i < argList.Count; i++)
+            string insertText;
+            if (argList.Count > 0)
             {
-                snippetParts.Add($"${{{i + 1}:{argList[i]}}}");
+                var snippetParts = new List<string>();
+                for (int i = 0; i < argList.Count; i++)
+                {
+                    // Escape special snippet characters in the param name if necessary
+                    string paramName = argList[i].Replace("}", "\\}").Trim();
+                    snippetParts.Add($"${{{i + 1}:{paramName}}}");
+                }
+                insertText = $"{symbol.Name}({string.Join(", ", snippetParts)})";
             }
-
-            string snippet = $"{symbol.Name}({string.Join(", ", snippetParts)})";
+            else
+            {
+                // No params, just add parentheses and place cursor inside
+                insertText = $"{symbol.Name}($0)";
+            }
 
             return new CompletionItem
             {
                 Label = symbol.Name,
                 Kind = kind,
-                Detail = $"({symbol.Parameters})\n{detailSource}",
-                Documentation = $"Source: {Path.GetFileName(symbol.FilePath)}",
-                InsertText = snippet,
+                Detail = $"({symbol.Parameters?.Trim()})\n{detailSource}",
+                Documentation = new StringOrMarkupContent(new MarkupContent
+                {
+                    Kind = MarkupKind.Markdown,
+                    Value = $"**Source:** `{Path.GetFileName(symbol.FilePath)}`"
+                }),
+                InsertText = insertText,
                 InsertTextFormat = InsertTextFormat.Snippet,
                 FilterText = symbol.Name
             };
@@ -113,6 +129,28 @@ namespace GSCLSP.Server.Handlers
             .OrderByDescending(x => x.Detail?.Contains("Project")) // Put local files first
             .GroupBy(x => x.Label)
             .Select(x => x.First()));
+        }
+
+        private static HashSet<string> ParseIncludes(string[] fileLines)
+        {
+            var includesSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var line in fileLines)
+            {
+                var trimmed = line.Trim();
+                if (trimmed.StartsWith("#include") || trimmed.StartsWith("#using") || trimmed.StartsWith("#inline"))
+                {
+                    var match = IncludeRegex().Match(line);
+                    if (match.Success)
+                    {
+                        string includePath = match.Groups[1].Value.Replace("\\", "/").ToLower();
+                        if (!includePath.EndsWith(".gsc")) includePath += ".gsc";
+                        includesSet.Add(includePath);
+                    }
+                }
+            }
+
+            return includesSet;
         }
 
         public CompletionRegistrationOptions GetRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)

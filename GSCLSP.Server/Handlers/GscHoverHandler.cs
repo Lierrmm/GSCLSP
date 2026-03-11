@@ -24,7 +24,6 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         var uri = request.TextDocument.Uri;
         var filePath = uri.GetFileSystemPath();
 
-        if (!File.Exists(filePath)) return null;
         var lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
         if (lines == null || request.Position.Line >= lines.Length) return null;
 
@@ -60,7 +59,7 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
             var symbol = resolution.Symbol;
 
             // If we have a file path but no documentation, go get it from the source definition
-            if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine" && File.Exists(symbol.FilePath))
+            if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
             {
                 // We use our strict scanner to find the actual definition and its ScriptDoc
                 var detailedSymbol = GscIndexer.ScanFileForFunction(symbol.FilePath, symbol.Name);

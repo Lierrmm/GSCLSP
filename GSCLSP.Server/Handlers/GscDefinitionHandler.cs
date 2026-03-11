@@ -11,10 +11,10 @@ using DefinitionResult = OmniSharp.Extensions.LanguageServer.Protocol.Models.Loc
 
 namespace GSCLSP.Server.Handlers;
 
-public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfiguration configuration) : IDefinitionHandler
+public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfiguration? configuration = null) : IDefinitionHandler
 {
     private readonly GscIndexer _indexer = indexer;
-    private readonly ILanguageServerConfiguration _configuration = configuration;
+    private readonly ILanguageServerConfiguration? _configuration = configuration;
 
     public DefinitionRegistrationOptions GetRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities)
     {
@@ -28,9 +28,8 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
     {
         var uri = request.TextDocument.Uri;
         var currentFilePath = uri.GetFileSystemPath();
-        var userDumpPath = _configuration.GetValue<string>("gsclsp:dumpPath");
+        var userDumpPath = _configuration?.GetValue<string>("gsclsp:dumpPath");
 
-        if (!File.Exists(currentFilePath)) return new DefinitionResult();
         var lines = await File.ReadAllLinesAsync(currentFilePath, cancellationToken);
         if (request.Position.Line >= lines.Length) return new DefinitionResult();
 
@@ -42,7 +41,7 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
             if (string.IsNullOrEmpty(includedFile)) return new DefinitionResult();
 
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
-            if (foundIncludePath != null && File.Exists(foundIncludePath))
+            if (foundIncludePath != null)
             {
                 return new DefinitionResult(new Location
                 {
@@ -98,18 +97,15 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
                 targetPath = Path.Combine(cleanDump, targetPath.Replace("/", "\\"));
             }
 
-            if (File.Exists(targetPath))
+            var lineIndex = Math.Max(0, (shiftByIndex ? symbol.LineNumber - 1 : symbol.LineNumber));
+            return new DefinitionResult(new Location
             {
-                var lineIndex = Math.Max(0, (shiftByIndex ? symbol.LineNumber - 1 : symbol.LineNumber));
-                return new DefinitionResult(new Location
-                {
-                    Uri = DocumentUri.FromFileSystemPath(targetPath),
-                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                        new Position(lineIndex, 0),
-                        new Position(lineIndex, lookupName.Length)
-                    )
-                });
-            }
+                Uri = DocumentUri.FromFileSystemPath(targetPath),
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(lineIndex, 0),
+                    new Position(lineIndex, lookupName.Length)
+                )
+            });
         }
 
         return new DefinitionResult();

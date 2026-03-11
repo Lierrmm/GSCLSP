@@ -1,7 +1,6 @@
 ﻿using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Core.Services;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -15,12 +14,25 @@ public partial class GscIndexer
     public IEnumerable<GscSymbol> Symbols => _symbols;
     public int SymbolCount => _symbols.Count;
     public BuiltInProvider BuiltIns { get; } = new();
-    public string? _dumpPath { get; private set; }
+    public string? DumpPath { get; private set; }
     public List<GscSymbol> WorkspaceSymbols { get; private set; } = [];
     private readonly Dictionary<string, GscFileMap> _workspaceFileMaps = [];
     private readonly Dictionary<string, GscFileMap> _fileMaps = [];
 
-    public static string NormalizePath(string path)
+    // File watching and caching
+    private FileSystemWatcher? _fileWatcher;
+    private string? _workspacePath;
+    private readonly Dictionary<string, string> _fileContentCache = [];
+    private readonly HashSet<string> _pendingChanges = [];
+    private readonly Lock _pendingChangesLock = new();
+    private System.Timers.Timer? _debounceTimer;
+    private const int DEBOUNCE_MS = 300;
+
+    // Memoization cache for ScanFileForFunction
+    private static readonly Dictionary<string, GscSymbol?> _scanFunctionCache = [];
+    private static readonly Lock _scanCacheLock = new();
+
+    public static string NormalizePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path)) return string.Empty;
 
@@ -70,9 +82,14 @@ public partial class GscIndexer
         if (string.IsNullOrWhiteSpace(newPath) || !Directory.Exists(newPath)) return;
         string cacheFile = Path.Combine(newPath, "symbols.json");
 
-        _dumpPath = newPath;
+        DumpPath = newPath;
         _symbols.Clear();
         _fileMaps.Clear();
+
+        lock (_scanCacheLock)
+        {
+            _scanFunctionCache.Clear();
+        }
 
         Task.Run(() =>
         {
@@ -132,14 +149,18 @@ public partial class GscIndexer
                 continue;
             }
 
-            var funcMatch = FunctionLineRegex().Match(line);
+            var funcMatch = FunctionMultiLineRegex().Match(line);
             if (funcMatch.Success)
             {
+                var name = funcMatch.Groups["name"].Value;
+                var rawParams = funcMatch.Groups["params"].Value;
+                var cleanParams = CleanGscParams(rawParams);
+
                 var symbol = new GscSymbol(
-                    funcMatch.Groups[1].Value,
+                    name,
                     path,
                     lineNum,
-                    funcMatch.Groups[2].Value,
+                    cleanParams,
                     SymbolType.Function
                 );
                 fileMap.LocalSymbols.Add(symbol);
@@ -147,6 +168,17 @@ public partial class GscIndexer
             }
         }
         _fileMaps[path.Replace("\\", "/")] = fileMap;
+    }
+
+    private static string CleanGscParams(string raw)
+    {
+        // Remove single line comments //
+        string noComments = CommentRegex().Replace(raw, "");
+        // Remove multi-line comments /* */
+        noComments = MultilineCommentRegex().Replace(noComments, "");
+        // Replace all whitespace (newlines/tabs) with a single space
+        string flat = WhiteSpaceTabRegex().Replace(noComments, " ").Trim();
+        return flat;
     }
 
     public async Task<string?> GetIncludePath(string includeString)
@@ -181,8 +213,6 @@ public partial class GscIndexer
             .Replace("\\", "/")
             .ToLower()
             .Trim();
-
-        Console.Error.WriteLine($"GSCLSP: Resolving '{functionName}' for {normalizedCallingPath}");
 
         var currentFileLocal = WorkspaceSymbols.FirstOrDefault(s =>
             s.FilePath.Replace("\\", "/").Equals(normalizedCallingPath, StringComparison.OrdinalIgnoreCase) &&
@@ -251,6 +281,30 @@ public partial class GscIndexer
 
     public static GscSymbol? ScanFileForFunction(string filePath, string functionName)
     {
+        // Create cache key: "filepath|functionname"
+        string cacheKey = $"{filePath}|{functionName}";
+
+        // Check cache first
+        lock (_scanCacheLock)
+        {
+            if (_scanFunctionCache.TryGetValue(cacheKey, out var cached))
+                return cached;
+        }
+
+        // Not in cache, perform expensive scan
+        GscSymbol? result = ScanFileForFunctionUncached(filePath, functionName);
+
+        // Store in cache
+        lock (_scanCacheLock)
+        {
+            _scanFunctionCache[cacheKey] = result;
+        }
+
+        return result;
+    }
+
+    private static GscSymbol? ScanFileForFunctionUncached(string filePath, string functionName)
+    {
         try
         {
             var lines = File.ReadAllLines(filePath);
@@ -317,7 +371,7 @@ public partial class GscIndexer
                         LineNumber: i + 1,
                         Parameters: match.Groups[1].Value.Trim(),
                         Type: SymbolType.Function,
-                        Documentation: doc // Pass it here
+                        Documentation: doc
                     );
                 }
             }
@@ -365,48 +419,6 @@ public partial class GscIndexer
         }
 
         Console.WriteLine($"\nFound {count} references in {sw.Elapsed.TotalMilliseconds:N2}ms.");
-    }
-
-    public void UpdateFile(string path, string content)
-    {
-        path = path.Replace("\\", "/");
-
-        // Remove old symbols for this file from the global list
-        _symbols.RemoveAll(s => s.FilePath.Replace("\\", "/").Equals(path, StringComparison.OrdinalIgnoreCase));
-
-        var fileMap = new GscFileMap { FilePath = path };
-        var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-        int lineNum = 0;
-
-        foreach (var line in lines)
-        {
-            lineNum++;
-
-            // Match Includes
-            var includeMatch = IncludeRegex().Match(line);
-            if (includeMatch.Success)
-            {
-                fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
-                continue;
-            }
-
-            // Match Functions
-            var funcMatch = FunctionLineRegex().Match(line);
-            if (funcMatch.Success)
-            {
-                var symbol = new GscSymbol(
-                    funcMatch.Groups[1].Value,
-                    path.Replace("\\", "/").ToLower().Trim(),
-                    lineNum,
-                    funcMatch.Groups[2].Value,
-                    SymbolType.Function
-                );
-                fileMap.LocalSymbols.Add(symbol);
-                _symbols.Add(symbol);
-            }
-        }
-
-        _fileMaps[path] = fileMap;
     }
 
     public bool IsKnownFunction(string scriptPath, string functionName)
@@ -463,12 +475,15 @@ public partial class GscIndexer
         if (!Directory.Exists(workspacePath)) return;
 
         _workspaceFileMaps.Clear();
+        _fileContentCache.Clear();
+        _workspacePath = workspacePath;
+
         var files = Directory.GetFiles(workspacePath, "*.*", SearchOption.AllDirectories)
             .Where(s => s.EndsWith(".gsc") || s.EndsWith(".gsh"));
 
         foreach (var file in files)
         {
-            var content = File.ReadAllText(file);
+            var content = GetFileContent(file);
             string normalizedPath = file.Replace("\\", "/").ToLower();
             var fileMap = new GscFileMap { FilePath = file };
 
@@ -478,7 +493,7 @@ public partial class GscIndexer
                 fileMap.Includes.Add(inc.Groups[1].Value.Replace("\\", "/"));
             }
 
-            var matches = FunctionDefinitionRegex().Matches(content);
+            var matches = FunctionMultiLineRegex().Matches(content);
 
             foreach (Match match in matches)
             {
@@ -498,6 +513,195 @@ public partial class GscIndexer
         }
 
         WorkspaceSymbols = localSymbols;
+
+        StartFileWatching();
+        
+        PreWarmScanCache(localSymbols);
+    }
+
+    private static void PreWarmScanCache(List<GscSymbol> symbols)
+    {
+        Console.Error.WriteLine($"GSCLSP: Pre-warming scan cache for {symbols.Count} functions...");
+        var sw = Stopwatch.StartNew();
+        
+        foreach (var symbol in symbols)
+        {
+            // Only pre-cache functions from the workspace, not from dump
+            if (!symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase) && 
+                symbol.Type == SymbolType.Function)
+            {
+                // Trigger scan to populate cache
+                _ = ScanFileForFunction(symbol.FilePath, symbol.Name);
+            }
+        }
+        
+        sw.Stop();
+        Console.Error.WriteLine($"GSCLSP: Scan cache pre-warmed in {sw.Elapsed.TotalMilliseconds:N2}ms");
+    }
+
+    public string GetFileContent(string filePath)
+    {
+        if (_fileContentCache.TryGetValue(filePath, out var cached))
+            return cached;
+
+        try
+        {
+            string content = File.ReadAllText(filePath);
+            _fileContentCache[filePath] = content;
+            return content;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private void StartFileWatching()
+    {
+        if (string.IsNullOrEmpty(_workspacePath) || _fileWatcher != null)
+            return;
+
+        try
+        {
+            _fileWatcher = new FileSystemWatcher(_workspacePath)
+            {
+                Filter = "*.*",
+                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
+                IncludeSubdirectories = true,
+                EnableRaisingEvents = true
+            };
+
+            _fileWatcher.Changed += OnFileChanged;
+            _fileWatcher.Created += OnFileChanged;
+            _fileWatcher.Deleted += OnFileChanged;
+            _fileWatcher.Renamed += OnFileRenamed;
+
+            Console.Error.WriteLine($"GSCLSP: File watching started for {_workspacePath}");
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"GSCLSP: File watching failed: {ex.Message}");
+        }
+    }
+
+    private void OnFileChanged(object sender, FileSystemEventArgs e)
+    {
+        if (!e.FullPath.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase) &&
+            !e.FullPath.EndsWith(".gsh", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        lock (_pendingChangesLock)
+        {
+            _pendingChanges.Add(e.FullPath);
+        }
+
+        _debounceTimer?.Stop();
+        _debounceTimer = new System.Timers.Timer(DEBOUNCE_MS);
+        _debounceTimer.Elapsed += (s, args) => ProcessPendingChanges();
+        _debounceTimer.AutoReset = false;
+        _debounceTimer.Start();
+    }
+
+    private void OnFileRenamed(object sender, RenamedEventArgs e)
+    {
+        // Invalidate cache for renamed file
+        _fileContentCache.Remove(e.OldFullPath);
+        OnFileChanged(sender, new FileSystemEventArgs(WatcherChangeTypes.Changed, Path.GetDirectoryName(e.FullPath)!, Path.GetFileName(e.FullPath)));
+    }
+
+    private void ProcessPendingChanges()
+    {
+        HashSet<string> changes;
+        lock (_pendingChangesLock)
+        {
+            if (_pendingChanges.Count == 0)
+                return;
+
+            changes = [.. _pendingChanges];
+            _pendingChanges.Clear();
+        }
+
+
+        Console.Error.WriteLine($"GSCLSP: Updating {changes.Count} files");
+
+        var updatedSymbols = new List<GscSymbol>(WorkspaceSymbols);
+
+        foreach (var filePath in changes)
+        {
+            // Invalidate cache
+            _fileContentCache.Remove(filePath);
+
+            // Clear scan function cache entries for this file
+            lock (_scanCacheLock)
+            {
+                var keysToRemove = _scanFunctionCache.Keys
+                    .Where(k => k.StartsWith(filePath + "|", StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                foreach (var key in keysToRemove)
+                    _scanFunctionCache.Remove(key);
+            }
+
+            // Remove old symbols from this file
+            updatedSymbols.RemoveAll(s => s.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
+
+            // Re-parse file if it still exists
+            if (File.Exists(filePath))
+            {
+                string normalizedPath = filePath.Replace("\\", "/").ToLower();
+                var fileMap = new GscFileMap { FilePath = filePath };
+                int lineNum = 0;
+
+                try
+                {
+                    using (var reader = new StreamReader(filePath))
+                    {
+                        string? line;
+                        while ((line = reader.ReadLine()) != null)
+                        {
+                            lineNum++;
+
+                            var includeMatch = IncludeRegex().Match(line);
+                            if (includeMatch.Success)
+                            {
+                                fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                                continue;
+                            }
+
+                            var funcMatch = FunctionMultiLineRegex().Match(line);
+                            if (funcMatch.Success)
+                            {
+                                var symbol = new GscSymbol(
+                                    funcMatch.Groups["name"].Value,
+                                    filePath,
+                                    lineNum,
+                                    funcMatch.Groups["params"].Value,
+                                    SymbolType.Function
+                                );
+
+                                updatedSymbols.Add(symbol);
+                                fileMap.LocalSymbols.Add(symbol);
+                            }
+                        }
+                    }
+
+                    _workspaceFileMaps[normalizedPath] = fileMap;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"GSCLSP: Error re-parsing {filePath}: {ex.Message}");
+                }
+            }
+            else
+            {
+                // File was deleted
+                string normalizedPath = filePath.Replace("\\", "/").ToLower();
+                _workspaceFileMaps.Remove(normalizedPath);
+            }
+        }
+
+        WorkspaceSymbols = updatedSymbols;
+        Console.Error.WriteLine($"GSCLSP: Workspace updated. {WorkspaceSymbols.Count} symbols now indexed.");
     }
 
     private static int GetLineNumberFromIndex(string content, int index)

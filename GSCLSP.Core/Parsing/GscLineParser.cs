@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+﻿using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Parsing;
 
@@ -6,11 +6,6 @@ public record ParsedCall(string? Caller, string? Path, string FunctionName, stri
 
 public static partial class GscLineParser
 {
-    // Updated Regex to capture the caller (like 'player' or 'self')
-    // It looks for: (caller)? (path::)? function(args)
-    [GeneratedRegex(@"(?:(\w+)\s+)?(?:([\w\\]+)::)?(\w+)\s*\((.*)\)")]
-    private static partial Regex CallRegex();
-
     public static ParsedCall? ExtractCall(string line)
     {
         var match = CallRegex().Match(line);
