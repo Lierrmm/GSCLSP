@@ -1,0 +1,131 @@
+name: Run Benchmarks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build benchmarks
+        run: dotnet build GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64
+
+      - name: Run benchmarks on PR branch
+        run: dotnet run --project GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64 -- --exportjson=benchmark-results-pr.json
+
+      - name: Upload PR benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results-pr-${{ github.ref_name }}
+          path: benchmark-results-pr.json
+
+      - name: Checkout main for baseline comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main-checkout
+
+      - name: Run benchmarks on main (baseline)
+        if: github.event_name == 'pull_request'
+        run: dotnet run --project main-checkout/GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64 -- --exportjson=benchmark-results-main.json
+
+      - name: Compare benchmarks
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            const prResults = JSON.parse(fs.readFileSync('benchmark-results-pr.json', 'utf8'));
+            const mainResults = JSON.parse(fs.readFileSync('benchmark-results-main.json', 'utf8'));
+
+            const prBenchmarks = new Map();
+            const mainBenchmarks = new Map();
+
+            prResults.benchmarks?.forEach(b => {
+              prBenchmarks.set(b.method || b.displayName, b);
+            });
+
+            mainResults.benchmarks?.forEach(b => {
+              mainBenchmarks.set(b.method || b.displayName, b);
+            });
+
+            let comment = '## Benchmark Comparison (PR vs Main)\n\n';
+            comment += '| Benchmark | PR Mean | Main Mean | Change | Allocated (PR) | Allocated (Main) |\n';
+            comment += '|-----------|---------|-----------|--------|----------------|------------------|\n';
+
+            let hasRegression = false;
+            let hasImprovement = false;
+
+            prBenchmarks.forEach((prBench, name) => {
+              const mainBench = mainBenchmarks.get(name);
+              
+              if (!mainBench) {
+                comment += `| ${name} | ${(prBench.statistics?.mean || 0).toFixed(2)} ms | N/A | New |\n`;
+                return;
+              }
+              
+              const prMean = prBench.statistics?.mean || 0;
+              const mainMean = mainBench.statistics?.mean || 0;
+              const changePercent = ((prMean - mainMean) / mainMean * 100).toFixed(2);
+              const changeStr = changePercent > 0 ? `+${changePercent}%` : `${changePercent}%`;
+              
+              if (changePercent > 5) hasRegression = true;
+              if (changePercent < -5) hasImprovement = true;
+              
+              const prAllocated = prBench.memory?.allocated || 0;
+              const mainAllocated = mainBench.memory?.allocated || 0;
+              
+              const emoji = changePercent > 5 ? '🔴' : changePercent < -5 ? '🟢' : '🟡';
+              
+              comment += `| ${name} | ${prMean.toFixed(2)} ms | ${mainMean.toFixed(2)} ms | ${emoji} ${changeStr} | ${prAllocated} B | ${mainAllocated} B |\n`;
+            });
+
+            if (hasRegression) {
+              comment += '\n⚠️ **Performance regressions detected!** Please review.';
+            } else if (hasImprovement) {
+              comment += '\n✨ **Performance improvements detected!**';
+            } else {
+              comment += '\n✅ **No significant performance changes detected.**';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Comment on push
+        if: github.event_name == 'push'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const benchmarkData = JSON.parse(fs.readFileSync('benchmark-results-pr.json', 'utf8'));
+
+            let comment = '## Benchmark Results\n\n';
+            comment += '| Benchmark | Mean | Allocated |\n';
+            comment += '|-----------|------|----------|\n';
+
+            benchmarkData.benchmarks?.forEach(benchmark => {
+              const mean = benchmark.statistics?.mean?.toFixed(2) || 'N/A';
+              const allocated = benchmark.memory?.allocated || 'N/A';
+              comment += `| ${benchmark.displayName || benchmark.method} | ${mean} ms | ${allocated} B |\n`;
+            });
+
+            console.log(comment);
