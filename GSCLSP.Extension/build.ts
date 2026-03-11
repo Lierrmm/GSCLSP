@@ -4,7 +4,8 @@ await Bun.build({
   outdir: "./dist",
   target: "node",
   format: "cjs",
-  // This is the important part:
   external: ["vscode"],
   naming: "extension.js",
 });
+
+export {};

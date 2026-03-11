@@ -7,6 +7,7 @@ import {
   type OpenDialogOptions,
   commands,
   ProgressLocation,
+  ExtensionMode,
 } from "vscode";
 import {
   LanguageClient,
@@ -107,7 +108,12 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   context.subscriptions.push(client);
   await client.start();
-  await client.setTrace(Trace.Verbose);
+
+  if (context.extensionMode === ExtensionMode.Development) {
+    await client.setTrace(Trace.Verbose);
+  } else {
+    await client.setTrace(Trace.Off);
+  }
 }
 
 export async function deactivate(): Promise<void> {

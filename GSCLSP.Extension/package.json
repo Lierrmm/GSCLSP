@@ -2,7 +2,7 @@
   "name": "gsclsp",
   "displayName": "GSC LSP - Language Support",
   "description": "Language Server for GSC Scripts",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "icon": "logo.png",
   "publisher": "bbe-tools",
   "repository": {
