@@ -22,15 +22,15 @@ jobs:
       - name: Build benchmarks
         run: dotnet build GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64
 
-      - name: Run benchmarks on PR branch
-        run: dotnet run --project GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64 -- --exportjson=benchmark-results-pr.json
+      - name: Run benchmarks on current branch
+        run: dotnet run --project GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64 -- --exportjson=benchmark-results.json
 
-      - name: Upload PR benchmark results
+      - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: benchmark-results-pr-${{ github.ref_name }}
-          path: benchmark-results-pr.json
+          name: benchmark-results-${{ github.ref_name }}
+          path: benchmark-results.json
 
       - name: Checkout main for baseline comparison
         if: github.event_name == 'pull_request'
@@ -43,15 +43,21 @@ jobs:
         if: github.event_name == 'pull_request'
         run: dotnet run --project main-checkout/GSCLSP.Benchmark/GSCLSP.Benchmark.csproj --configuration Release -p:RuntimeIdentifier=linux-x64 -- --exportjson=benchmark-results-main.json
 
-      - name: Compare benchmarks
+      - name: Compare benchmarks and comment
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
 
-            const prResults = JSON.parse(fs.readFileSync('benchmark-results-pr.json', 'utf8'));
-            const mainResults = JSON.parse(fs.readFileSync('benchmark-results-main.json', 'utf8'));
+            let prResults, mainResults;
+            try {
+              prResults = JSON.parse(fs.readFileSync('benchmark-results.json', 'utf8'));
+              mainResults = JSON.parse(fs.readFileSync('benchmark-results-main.json', 'utf8'));
+            } catch (e) {
+              console.error('Failed to read benchmark results:', e);
+              return;
+            }
 
             const prBenchmarks = new Map();
             const mainBenchmarks = new Map();
@@ -81,8 +87,8 @@ jobs:
               
               const prMean = prBench.statistics?.mean || 0;
               const mainMean = mainBench.statistics?.mean || 0;
-              const changePercent = ((prMean - mainMean) / mainMean * 100).toFixed(2);
-              const changeStr = changePercent > 0 ? `+${changePercent}%` : `${changePercent}%`;
+              const changePercent = mainMean > 0 ? ((prMean - mainMean) / mainMean * 100) : 0;
+              const changeStr = changePercent > 0 ? `+${changePercent.toFixed(2)}%` : `${changePercent.toFixed(2)}%`;
               
               if (changePercent > 5) hasRegression = true;
               if (changePercent < -5) hasImprovement = true;
@@ -109,23 +115,3 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
-
-      - name: Comment on push
-        if: github.event_name == 'push'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const benchmarkData = JSON.parse(fs.readFileSync('benchmark-results-pr.json', 'utf8'));
-
-            let comment = '## Benchmark Results\n\n';
-            comment += '| Benchmark | Mean | Allocated |\n';
-            comment += '|-----------|------|----------|\n';
-
-            benchmarkData.benchmarks?.forEach(benchmark => {
-              const mean = benchmark.statistics?.mean?.toFixed(2) || 'N/A';
-              const allocated = benchmark.memory?.allocated || 'N/A';
-              comment += `| ${benchmark.displayName || benchmark.method} | ${mean} ms | ${allocated} B |\n`;
-            });
-
-            console.log(comment);
