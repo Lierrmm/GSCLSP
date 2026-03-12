@@ -21,7 +21,7 @@ public class GscHoverHandlerBenchmark
     public void Setup()
     {
         _indexer = new GscIndexer();
-        _hoverHandler = new GscHoverHandler(_indexer);
+        _hoverHandler = new GscHoverHandler(_indexer, new GscDocumentStore());
         // Create test workspace
         string tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-hover-" + Guid.NewGuid());
         Directory.CreateDirectory(tempDir);

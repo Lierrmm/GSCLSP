@@ -7,9 +7,10 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
-public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
+public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore documentStore) : IHoverHandler
 {
     private readonly GscIndexer _indexer = indexer;
+    private readonly GscDocumentStore _documentStore = documentStore;
 
     public HoverRegistrationOptions GetRegistrationOptions(HoverCapability capability, ClientCapabilities clientCapabilities)
     {
@@ -24,33 +25,46 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
         var uri = request.TextDocument.Uri;
         var filePath = uri.GetFileSystemPath();
 
-        var lines = await File.ReadAllLinesAsync(filePath, cancellationToken);
-        if (lines == null || request.Position.Line >= lines.Length) return null;
+        var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(filePath);
+        var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+        if (request.Position.Line >= lines.Length) return null;
 
         var line = lines[request.Position.Line];
 
         bool inBlockComment = false;
         for (int l = 0; l < request.Position.Line; l++)
             GscHandlerCommon.GetCodeRanges(lines[l], ref inBlockComment);
+
         var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
+
         if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
 
         if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
         {
-            string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
+            var parts = line.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2) return null;
+
+            var directive = parts[0];
+            string includedFile = parts[1].Trim().TrimEnd(';');
             if (string.IsNullOrEmpty(includedFile)) return null;
 
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
             if (foundIncludePath == null) return null;
 
-            var contentValue = $"### #Include\n`{foundIncludePath}`";
-            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+            var contentValue = $"### {directive}\n`{foundIncludePath}`";
+            var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+            return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
         if (identifier.StartsWith("::")) identifier = identifier[2..];
         if (string.IsNullOrEmpty(identifier)) return null;
+
+        var macroHover = FindMacroDefinition(filePath, identifier);
+        if (macroHover != null) return macroHover;
+
+        var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
+        if (localVarHover != null) return localVarHover;
 
         var resolution = _indexer.ResolveFunction(filePath, identifier);
 
@@ -91,10 +105,84 @@ public partial class GscHoverHandler(GscIndexer indexer) : IHoverHandler
                              $"**Line:** {symbol.LineNumber}";
             }
 
-            var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+            var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+            return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
 
         return null;
+    }
+
+    private static Hover? FindLocalVariable(string filePath, string[] lines, string identifier, int hoverLine)
+    {
+        var funcName = GscIndexer.FindEnclosingFunctionName(lines, hoverLine);
+        if (funcName == null) return null;
+
+        var locals = GscIndexer.GetLocalVariables(filePath, funcName, lines, hoverLine);
+        var localVar = locals.FirstOrDefault(v => v.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase));
+        if (localVar == null) return null;
+
+        var comment = GetLeadingComment(lines, localVar.Line - 1);
+
+        var contentValue = $"```gsc\n{localVar.Name} = {localVar.Value}\n```\n";
+        if (!string.IsNullOrEmpty(comment))
+            contentValue += $"{comment}\n\n";
+        contentValue += $"---\n**Line:** {localVar.Line}";
+
+        var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+    }
+
+    private static string? GetLeadingComment(string[] lines, int lineIndex)
+    {
+        if (lineIndex <= 0 || string.IsNullOrWhiteSpace(lines[lineIndex - 1].Trim()))
+            return null;
+
+        List<string> commentLines = [];
+        bool inBlockComment = false;
+
+        for (int i = lineIndex - 1; i >= 0; i--)
+        {
+            string prevLine = lines[i].Trim();
+
+            if (prevLine.EndsWith("*/")) { inBlockComment = true; prevLine = prevLine.Replace("*/", ""); }
+            if (prevLine.StartsWith("/*"))
+            {
+                string clean = prevLine.TrimStart('/', '*', ' ').Trim();
+                if (!string.IsNullOrWhiteSpace(clean))
+                    commentLines.Insert(0, clean);
+                break;
+            }
+
+            if (inBlockComment || prevLine.StartsWith("//"))
+            {
+                string clean = prevLine.TrimStart('/', '*', ' ').Trim();
+                if (!string.IsNullOrWhiteSpace(clean))
+                    commentLines.Insert(0, clean);
+            }
+            else break;
+        }
+
+        return commentLines.Count > 0 ? string.Join("  \n", commentLines) : null;
+    }
+
+    private Hover? FindMacroDefinition(string filePath, string identifier)
+    {
+        var macro = _indexer.ResolveMacro(filePath, identifier);
+        if (macro == null) return null;
+
+        string[] macroFileLines = _indexer.GetFileLines(macro.FilePath);
+        var comment = GetLeadingComment(macroFileLines, macro.Line - 1);
+
+        var contentValue = $"```gsc\n#define {macro.Name}";
+        if (!string.IsNullOrEmpty(macro.Value))
+            contentValue += $" {macro.Value}";
+        contentValue += "\n```\n";
+        if (!string.IsNullOrEmpty(comment))
+            contentValue += $"{comment}\n\n";
+        contentValue += $"---\n**Defined in:** `{macro.FilePath}`\n\n";
+        contentValue += $"**Line:** {macro.Line}";
+
+        var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
     }
 }

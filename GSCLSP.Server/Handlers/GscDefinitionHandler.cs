@@ -54,6 +54,39 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
         if (string.IsNullOrEmpty(identifier)) return new DefinitionResult();
 
+        var macro = _indexer.ResolveMacro(currentFilePath, identifier);
+        if (macro != null)
+        {
+            int targetLine = macro.Line - 1;
+            return new DefinitionResult(new Location
+            {
+                Uri = DocumentUri.FromFileSystemPath(macro.FilePath),
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(targetLine, 0),
+                    new Position(targetLine, 0)
+                )
+            });
+        }
+
+        var funcName = GscIndexer.FindEnclosingFunctionName(lines, request.Position.Line);
+        if (funcName != null)
+        {
+            var locals = GscIndexer.GetLocalVariables(currentFilePath, funcName, lines, request.Position.Line);
+            var localVar = locals.FirstOrDefault(v => v.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase));
+            if (localVar != null)
+            {
+                int targetLine = localVar.Line - 1;
+                return new DefinitionResult(new Location
+                {
+                    Uri = uri,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                        new Position(targetLine, 0),
+                        new Position(targetLine, lines[targetLine].Length)
+                    )
+                });
+            }
+        }
+
         string lookupName = identifier;
         string? pathFilter = null;
 

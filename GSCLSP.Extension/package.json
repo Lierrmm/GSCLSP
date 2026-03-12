@@ -17,6 +17,7 @@
   ],
   "keywords": [
     "gsc",
+    "gsh",
     "lsp",
     "cod"
   ],
@@ -33,10 +34,13 @@
         "id": "gsc",
         "aliases": [
           "GSC",
-          "gsc"
+          "gsc",
+          "GSH",
+          "gsh"
         ],
         "extensions": [
-          ".gsc"
+          ".gsc",
+          ".gsh"
         ],
         "configuration": "./language-configuration.json"
       }
@@ -45,6 +49,11 @@
       {
         "language": "gsc",
         "scopeName": "source.gsc",
+        "path": "./syntaxes/gsc.tmLanguage.json"
+      },
+      {
+        "language": "gsh",
+        "scopeName": "source.gsh",
         "path": "./syntaxes/gsc.tmLanguage.json"
       }
     ],
