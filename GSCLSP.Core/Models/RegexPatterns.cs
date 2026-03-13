@@ -40,4 +40,7 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"^\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled)]
     public static partial Regex LocalVarAssignmentRegex();
+
+    [GeneratedRegex(@"(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))?(?<name>[a-zA-Z_]\w*)\s*\(", RegexOptions.Compiled)]
+    public static partial Regex CallSiteRegex();
 }

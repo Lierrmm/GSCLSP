@@ -11,9 +11,10 @@ using DefinitionResult = OmniSharp.Extensions.LanguageServer.Protocol.Models.Loc
 
 namespace GSCLSP.Server.Handlers;
 
-public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfiguration? configuration = null) : IDefinitionHandler
+public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentStore, ILanguageServerConfiguration? configuration = null) : IDefinitionHandler
 {
     private readonly GscIndexer _indexer = indexer;
+    private readonly GscDocumentStore _documentStore = documentStore;
     private readonly ILanguageServerConfiguration? _configuration = configuration;
 
     public DefinitionRegistrationOptions GetRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities)
@@ -30,7 +31,10 @@ public class GscDefinitionHandler(GscIndexer indexer, ILanguageServerConfigurati
         var currentFilePath = uri.GetFileSystemPath();
         var userDumpPath = _configuration?.GetValue<string>("gsclsp:dumpPath");
 
-        var lines = await File.ReadAllLinesAsync(currentFilePath, cancellationToken);
+        var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(currentFilePath);
+        if (string.IsNullOrEmpty(content)) return new DefinitionResult();
+
+        var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         if (request.Position.Line >= lines.Length) return new DefinitionResult();
 
         var line = lines[request.Position.Line];
