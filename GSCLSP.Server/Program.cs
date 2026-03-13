@@ -36,12 +36,14 @@ var server = await LanguageServer.From(options =>
         {
             services.AddSingleton(indexer);
             services.AddSingleton(documentStore);
+            services.AddSingleton<GscDiagnosticsHandler>();
         })
         .WithHandler<GscDocumentSyncHandler>()
         .WithHandler<GscDefinitionHandler>()
         .WithHandler<GscHoverHandler>()
         .WithHandler<GscCompletionHandler>()
         .WithHandler<GscReferencesHandler>()
+        .WithHandler<GscCodeActionHandler>()
         .OnInitialize((server, request, token) =>
         {
             string? workspacePath = request.RootPath ?? request.RootUri?.GetFileSystemPath();

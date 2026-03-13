@@ -2,7 +2,7 @@
   "name": "gsclsp",
   "displayName": "GSC LSP - Language Support",
   "description": "Language Server for GSC Scripts",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "icon": "logo.png",
   "publisher": "bbe-tools",
   "repository": {
@@ -49,11 +49,6 @@
       {
         "language": "gsc",
         "scopeName": "source.gsc",
-        "path": "./syntaxes/gsc.tmLanguage.json"
-      },
-      {
-        "language": "gsh",
-        "scopeName": "source.gsh",
         "path": "./syntaxes/gsc.tmLanguage.json"
       }
     ],

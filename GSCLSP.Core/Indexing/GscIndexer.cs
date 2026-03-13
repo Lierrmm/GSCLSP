@@ -360,34 +360,65 @@ public partial class GscIndexer
 
                     List<string> commentLines = [];
                     bool inBlockComment = false;
+                    bool foundComment = false;
 
                     for (int j = i - 1; j >= 0; j--)
                     {
                         string prevLine = lines[j].Trim();
 
-                        // Handle end of a block comment
-                        if (prevLine.EndsWith("*/")) { inBlockComment = true; prevLine = prevLine.Replace("*/", ""); }
+                        if (string.IsNullOrWhiteSpace(prevLine))
+                            break;
 
-                        // Handle start of a block comment
-                        if (prevLine.StartsWith("/*")) { inBlockComment = false; break; }
-
-                        if (inBlockComment || prevLine.StartsWith("//"))
+                        if (prevLine.EndsWith("*/", StringComparison.Ordinal))
                         {
+                            inBlockComment = true;
+                            foundComment = true;
+                            prevLine = prevLine.Replace("*/", "");
+                        }
+
+                        if (prevLine.StartsWith("//", StringComparison.Ordinal))
+                        {
+                            foundComment = true;
                             string cleanLine = prevLine
-                                .TrimStart('/', '*', ' ')   // Remove comment markers
-                                .Replace("\"", "")          // Remove ScriptDoc quotes
+                                .TrimStart('/', '*', ' ')
+                                .Replace("\"", "")
                                 .Replace("ScriptDocBegin", "")
                                 .Replace("ScriptDocEnd", "")
                                 .Trim();
 
                             if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("==="))
-                            {
                                 commentLines.Insert(0, cleanLine);
-                            }
+
+                            continue;
                         }
-                        else if (string.IsNullOrWhiteSpace(prevLine)) continue;
-                        else break;
+
+                        if (inBlockComment || prevLine.StartsWith("/*", StringComparison.Ordinal))
+                        {
+                            foundComment = true;
+                            string cleanLine = prevLine
+                                .Replace("/*", "")
+                                .Replace("*/", "")
+                                .TrimStart('*', ' ')
+                                .Replace("\"", "")
+                                .Replace("ScriptDocBegin", "")
+                                .Replace("ScriptDocEnd", "")
+                                .Trim();
+
+                            if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("==="))
+                                commentLines.Insert(0, cleanLine);
+
+                            if (prevLine.StartsWith("/*", StringComparison.Ordinal))
+                                break;
+
+                            continue;
+                        }
+
+                        if (foundComment)
+                            break;
+
+                        break;
                     }
+
                     string doc = string.Join("  \n", commentLines);
 
                     return new GscSymbol(

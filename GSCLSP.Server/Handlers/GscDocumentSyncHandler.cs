@@ -17,33 +17,39 @@ public class GscDocumentStore
     public string? Get(DocumentUri uri) => _documents.TryGetValue(uri, out var text) ? text : null;
 }
 
-public class GscDocumentSyncHandler(GscDocumentStore store) : TextDocumentSyncHandlerBase
+public class GscDocumentSyncHandler(GscDocumentStore store, GscDiagnosticsHandler diagnosticsHandler) : TextDocumentSyncHandlerBase
 {
     private readonly GscDocumentStore _store = store;
+    private readonly GscDiagnosticsHandler _diagnosticsHandler = diagnosticsHandler;
 
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri) =>
         new(uri, "gsc");
 
-    public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         _store.Update(request.TextDocument.Uri, request.TextDocument.Text);
-        return Unit.Task;
+        await _diagnosticsHandler.PublishAsync(request.TextDocument.Uri, request.TextDocument.Text, cancellationToken);
+        return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
     {
         foreach (var change in request.ContentChanges)
         {
             if (change.Range == null)
+            {
                 _store.Update(request.TextDocument.Uri, change.Text);
+                await _diagnosticsHandler.PublishAsync(request.TextDocument.Uri, change.Text, cancellationToken);
+            }
         }
-        return Unit.Task;
+        return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
     {
         _store.Remove(request.TextDocument.Uri);
-        return Unit.Task;
+        await _diagnosticsHandler.ClearAsync(request.TextDocument.Uri, cancellationToken);
+        return Unit.Value;
     }
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken) =>
