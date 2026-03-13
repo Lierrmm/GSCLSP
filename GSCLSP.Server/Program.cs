@@ -1,6 +1,5 @@
 ﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Server.Handlers;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
@@ -11,15 +10,10 @@ var documentStore = new GscDocumentStore();
 
 string basePath = AppDomain.CurrentDomain.BaseDirectory;
 string builtInPath = Path.Combine(basePath, "data", "iw4_builtins.json");
-string dumpIndexPath = Path.Combine(basePath, "data", "symbols.json");
 
 try
 {
     indexer.BuiltIns.LoadBuiltIns(builtInPath);
-    if (File.Exists(dumpIndexPath))
-    {
-        indexer.LoadGlobalIndex(dumpIndexPath);
-    }
 }
 catch (Exception ex)
 {
@@ -46,35 +40,20 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscCodeActionHandler>()
         .OnInitialize((server, request, token) =>
         {
-            string? workspacePath = request.RootPath ?? request.RootUri?.GetFileSystemPath();
+            var workspacePath = request.RootPath
+                ?? request.RootUri?.GetFileSystemPath()
+                ?? request.WorkspaceFolders?.FirstOrDefault()?.Uri?.GetFileSystemPath();
 
             if (!string.IsNullOrEmpty(workspacePath))
             {
-                var indexer = server.Services.GetService<GscIndexer>();
-                indexer?.IndexWorkspace(workspacePath);
+                var serverIndexer = server.Services.GetService<GscIndexer>();
+                serverIndexer?.IndexWorkspace(workspacePath);
             }
 
+            indexer.UpdateSettingDumpPath(null);
             return Task.CompletedTask;
         })
-        .OnStarted(async (server, ct) =>
-        {
-            var config = server.Configuration.GetSection("gsclsp");
-            var newPath = config.GetValue<string>("dumpPath");
-            indexer.UpdateDumpPath(newPath);
-        })
-        .OnDidChangeConfiguration(x =>
-        {
-            var settings = x.Settings?.SelectToken("gsclsp");
-
-            if (settings != null)
-            {
-                var newPath = settings.Value<string>("dumpPath");
-                Console.Error.WriteLine($"New Path {newPath}");
-                indexer.UpdateDumpPath(newPath);
-            }
-        })
 );
-
 
 Console.Error.WriteLine("Running!");
 

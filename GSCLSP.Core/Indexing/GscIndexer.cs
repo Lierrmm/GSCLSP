@@ -26,6 +26,7 @@ public partial class GscIndexer
     private readonly HashSet<string> _pendingChanges = [];
     private readonly Lock _pendingChangesLock = new();
     private System.Timers.Timer? _debounceTimer;
+    private System.Timers.Timer? _configDebounceTimer;
     private const int DEBOUNCE_MS = 300;
 
     // Memoization cache for ScanFileForFunction
@@ -39,6 +40,8 @@ public partial class GscIndexer
     public record MacroDefinition(string Name, string Value, string FilePath, int Line);
     private static readonly Dictionary<string, List<MacroDefinition>> _macroCache = [];
     private static readonly Lock _macroCacheLock = new();
+
+    private string? _settingDumpPath;
 
     public static string NormalizePath(string? path)
     {
@@ -87,7 +90,30 @@ public partial class GscIndexer
 
     public void UpdateDumpPath(string? newPath)
     {
-        if (string.IsNullOrWhiteSpace(newPath) || !Directory.Exists(newPath)) return;
+        if (string.IsNullOrWhiteSpace(newPath) || !Directory.Exists(newPath))
+        {
+            DumpPath = null;
+            _symbols.Clear();
+            _fileMaps.Clear();
+
+            lock (_scanCacheLock)
+            {
+                _scanFunctionCache.Clear();
+            }
+
+            lock (_localVarCacheLock)
+            {
+                _localVarCache.Clear();
+            }
+
+            lock (_macroCacheLock)
+            {
+                _macroCache.Clear();
+            }
+
+            return;
+        }
+
         string cacheFile = Path.Combine(newPath, "symbols.json");
 
         DumpPath = newPath;
@@ -757,6 +783,82 @@ public partial class GscIndexer
         });
     }
 
+    public void UpdateSettingDumpPath(string? settingDumpPath)
+    {
+        _settingDumpPath = settingDumpPath;
+        ApplyConfiguredDumpPath();
+    }
+
+    private void ApplyConfiguredDumpPath()
+    {
+        var (hasWorkspaceConfig, workspaceDumpPath) = TryReadWorkspaceDumpPath(WorkspacePath);
+        var resolvedDumpPath = ResolveDumpPathValue(_settingDumpPath, WorkspacePath, hasWorkspaceConfig, workspaceDumpPath);
+
+        if (hasWorkspaceConfig)
+        {
+            if (string.IsNullOrWhiteSpace(workspaceDumpPath))
+                Console.Error.WriteLine("GSCLSP: gsclsp.config.json found with no dumpPath. Clearing dump index.");
+            else
+                Console.Error.WriteLine($"GSCLSP: dumpPath from gsclsp.config.json -> {workspaceDumpPath}");
+        }
+        else
+        {
+            Console.Error.WriteLine("GSCLSP: gsclsp.config.json not found. Dump index disabled unless configured.");
+        }
+
+        UpdateDumpPath(resolvedDumpPath);
+    }
+
+    private static string? ResolveDumpPathValue(string? settingDumpPath, string? workspacePath, bool hasWorkspaceConfig, string? workspaceDumpPath)
+    {
+        var candidate = hasWorkspaceConfig ? workspaceDumpPath : settingDumpPath;
+
+        if (string.IsNullOrWhiteSpace(candidate))
+            return null;
+
+        var clean = candidate.Trim();
+        if (Uri.TryCreate(clean, UriKind.Absolute, out var uri) && uri.IsFile)
+            clean = uri.LocalPath;
+
+        if (!Path.IsPathRooted(clean) && !string.IsNullOrEmpty(workspacePath))
+            clean = Path.GetFullPath(Path.Combine(workspacePath, clean));
+
+        return clean;
+    }
+
+    private static (bool HasConfigFile, string? DumpPath) TryReadWorkspaceDumpPath(string? workspacePath)
+    {
+        if (string.IsNullOrWhiteSpace(workspacePath) || !Directory.Exists(workspacePath))
+            return (false, null);
+
+        var configPath = Path.Combine(workspacePath, "gsclsp.config.json");
+        if (!File.Exists(configPath))
+            return (false, null);
+
+        return (true, ReadDumpPathFromFile(configPath));
+    }
+
+    private static string? ReadDumpPathFromFile(string filePath)
+    {
+        if (!File.Exists(filePath))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(filePath));
+            var root = doc.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Object)
+                return null;
+
+            if (root.TryGetProperty("dumpPath", out var directDumpPath) && directDumpPath.ValueKind == JsonValueKind.String)
+                return directDumpPath.GetString();
+        }
+        catch { }
+
+        return null;
+    }
+
     public void IndexWorkspace(string workspacePath)
     {
         Console.Error.WriteLine($"Indexing Workspace {workspacePath}");
@@ -811,7 +913,8 @@ public partial class GscIndexer
         WorkspaceSymbols = localSymbols;
 
         StartFileWatching();
-        
+        ApplyConfiguredDumpPath();
+
         PreWarmScanCache(localSymbols);
     }
 
@@ -885,8 +988,39 @@ public partial class GscIndexer
         }
     }
 
+    private static bool IsWorkspaceConfigFile(string fullPath) =>
+        Path.GetFileName(fullPath).Equals("gsclsp.config.json", StringComparison.OrdinalIgnoreCase);
+
+    private void ScheduleConfigReload()
+    {
+        _configDebounceTimer?.Stop();
+        _configDebounceTimer?.Dispose();
+
+        _configDebounceTimer = new System.Timers.Timer(DEBOUNCE_MS)
+        {
+            AutoReset = false,
+        };
+
+        _configDebounceTimer.Elapsed += (_, _) =>
+        {
+            try
+            {
+                ApplyConfiguredDumpPath();
+            }
+            catch { }
+        };
+
+        _configDebounceTimer.Start();
+    }
+
     private void OnFileChanged(object sender, FileSystemEventArgs e)
     {
+        if (IsWorkspaceConfigFile(e.FullPath))
+        {
+            ScheduleConfigReload();
+            return;
+        }
+
         if (!e.FullPath.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase) &&
             !e.FullPath.EndsWith(".gsh", StringComparison.OrdinalIgnoreCase))
             return;
@@ -905,6 +1039,11 @@ public partial class GscIndexer
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
+        if (IsWorkspaceConfigFile(e.OldFullPath) || IsWorkspaceConfigFile(e.FullPath))
+        {
+            ScheduleConfigReload();
+        }
+
         // Invalidate cache for renamed file
         _fileContentCache.Remove(e.OldFullPath);
         OnFileChanged(sender, new FileSystemEventArgs(WatcherChangeTypes.Changed, Path.GetDirectoryName(e.FullPath)!, Path.GetFileName(e.FullPath)));

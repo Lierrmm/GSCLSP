@@ -171,6 +171,11 @@ namespace GSCLSP.Server.Handlers
                     isThisFile ? "Local Function" : "Project Function"));
             }
 
+            foreach (var symbol in _indexer.Symbols)
+            {
+                completions.Add(CreateSymbolCompletion(symbol, CompletionItemKind.Method, "Dump Function"));
+            }
+
             var includesSet = _fileIncludesCache.GetOrAdd(currentFilePath, _ => ParseIncludes(currentFileLines));
 
             if (includesSet.Count > 0)

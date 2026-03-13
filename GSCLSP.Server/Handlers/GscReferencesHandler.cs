@@ -43,7 +43,7 @@ namespace GSCLSP.Server.Handlers
             var uri = request.TextDocument.Uri;
             var currentFilePath = uri.GetFileSystemPath();
 
-            var rawDumpPath = _configuration?.GetValue<string>("gsclsp:dumpPath");
+            var rawDumpPath = _indexer.DumpPath ?? _configuration?.GetValue<string>("gsclsp:dumpPath");
             string? normalizedDumpPath = GscIndexer.NormalizePath(rawDumpPath);
 
             // Use cached content instead of File.ReadAllLinesAsync
