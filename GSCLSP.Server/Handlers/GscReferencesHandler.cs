@@ -119,38 +119,18 @@ namespace GSCLSP.Server.Handlers
         private async Task<List<string>> ExtractIncludesAsync(string[] fileLines, CancellationToken cancellationToken)
         {
             var includePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            
+
             foreach (var line in fileLines)
             {
-                var trimmed = line.Trim();
-                
-                // Try #include and #using directives
-                if (trimmed.StartsWith("#include") || trimmed.StartsWith("#using"))
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!GscHandlerCommon.TryExtractDirectivePath(line, out var includePath))
+                    continue;
+
+                var resolvedPath = await _indexer.GetIncludePath(includePath);
+                if (!string.IsNullOrEmpty(resolvedPath))
                 {
-                    var match = DirectivePathRegex().Match(line);
-                    if (match.Success)
-                    {
-                        string includePath = match.Groups[1].Value.Trim();
-                        var resolvedPath = await _indexer.GetIncludePath(includePath);
-                        if (!string.IsNullOrEmpty(resolvedPath))
-                        {
-                            includePaths.Add(resolvedPath);
-                        }
-                    }
-                }
-                // Try #inline directives
-                else if (trimmed.StartsWith("#inline"))
-                {
-                    var match = InlinePathRegex().Match(line);
-                    if (match.Success)
-                    {
-                        string includePath = match.Groups[1].Value.Trim();
-                        var resolvedPath = await _indexer.GetIncludePath(includePath);
-                        if (!string.IsNullOrEmpty(resolvedPath))
-                        {
-                            includePaths.Add(resolvedPath);
-                        }
-                    }
+                    includePaths.Add(resolvedPath);
                 }
             }
 

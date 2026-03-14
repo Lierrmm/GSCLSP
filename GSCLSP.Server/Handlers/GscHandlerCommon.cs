@@ -1,7 +1,45 @@
+using static GSCLSP.Core.Models.RegexPatterns;
+
 namespace GSCLSP.Server.Handlers;
 
 internal static class GscHandlerCommon
 {
+    public static bool IsIncludeOrUsingDirective(string trimmedLine) =>
+        trimmedLine.StartsWith("#include", StringComparison.Ordinal) ||
+        trimmedLine.StartsWith("#using", StringComparison.Ordinal);
+
+    public static bool IsIncludeLikeDirective(string trimmedLine) =>
+        IsIncludeOrUsingDirective(trimmedLine) ||
+        trimmedLine.StartsWith("#inline", StringComparison.Ordinal);
+
+    public static bool TryExtractDirectivePath(string line, out string path, bool includeInline = true)
+    {
+        path = string.Empty;
+        var trimmed = line.Trim();
+
+        if (IsIncludeOrUsingDirective(trimmed))
+        {
+            var directiveMatch = DirectivePathRegex().Match(trimmed);
+            if (directiveMatch.Success)
+            {
+                path = directiveMatch.Groups[1].Value.Trim();
+                return !string.IsNullOrWhiteSpace(path);
+            }
+        }
+
+        if (includeInline && trimmed.StartsWith("#inline", StringComparison.Ordinal))
+        {
+            var inlineMatch = InlinePathRegex().Match(trimmed);
+            if (inlineMatch.Success)
+            {
+                path = inlineMatch.Groups[1].Value.Trim();
+                return !string.IsNullOrWhiteSpace(path);
+            }
+        }
+
+        return false;
+    }
+
     public static List<(int Start, int End)> GetCodeRanges(string line, ref bool inBlockComment)
     {
         var ranges = new List<(int Start, int End)>();

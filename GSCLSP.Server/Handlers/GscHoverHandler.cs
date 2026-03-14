@@ -39,15 +39,13 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
 
-        if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
+        if (GscHandlerCommon.IsIncludeLikeDirective(line.Trim()) &&
+            GscHandlerCommon.TryExtractDirectivePath(line, out var includedFile))
         {
             var parts = line.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2) return null;
+            if (parts.Length < 1) return null;
 
             var directive = parts[0];
-            string includedFile = parts[1].Trim().TrimEnd(';');
-            if (string.IsNullOrEmpty(includedFile)) return null;
-
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
             if (foundIncludePath == null) return null;
 

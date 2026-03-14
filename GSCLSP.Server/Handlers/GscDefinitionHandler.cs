@@ -39,11 +39,9 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
 
         var line = lines[request.Position.Line];
 
-        if (line.Trim().StartsWith("#include") || line.Trim().StartsWith("#using") || line.Trim().StartsWith("#inline"))
+        if (GscHandlerCommon.IsIncludeLikeDirective(line.Trim()) &&
+            GscHandlerCommon.TryExtractDirectivePath(line, out var includedFile))
         {
-            string includedFile = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
-            if (string.IsNullOrEmpty(includedFile)) return new DefinitionResult();
-
             var foundIncludePath = await _indexer.GetIncludePath(includedFile);
             if (foundIncludePath != null)
             {

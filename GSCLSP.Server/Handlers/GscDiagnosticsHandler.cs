@@ -12,12 +12,7 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
 {
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
 
-    private static readonly HashSet<string> ReservedWords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "if", "else", "for", "foreach", "while", "switch", "return", "wait",
-        "waittill", "waittillmatch", "waittillframeend", "notify", "endon",
-        "thread", "childthread", "break", "continue", "case", "default"
-    };
+    private static readonly HashSet<string> ReservedWords = GscLanguageKeywords.DiagnosticReservedWords;
 
     private readonly GscIndexer _indexer = indexer;
     private readonly ILanguageServerFacade _languageServer = languageServer;
@@ -162,14 +157,9 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var trimmed = line.Trim();
-            if (!trimmed.StartsWith("#include") && !trimmed.StartsWith("#using"))
+            if (!GscHandlerCommon.TryExtractDirectivePath(line, out var includePath, includeInline: false))
                 continue;
 
-            var match = DirectivePathRegex().Match(trimmed);
-            if (!match.Success) continue;
-
-            var includePath = match.Groups[1].Value.Trim();
             var resolvedPath = await _indexer.GetIncludePath(includePath);
             if (string.IsNullOrEmpty(resolvedPath) || !seen.Add(resolvedPath))
                 continue;

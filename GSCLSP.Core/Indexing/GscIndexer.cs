@@ -76,7 +76,7 @@ public partial class GscIndexer
         if (Directory.Exists(folderPath))
         {
             var files = Directory.GetFiles(folderPath, "*.*", SearchOption.AllDirectories)
-                .Where(s => s.EndsWith(".gsc") || s.EndsWith(".gsh"));
+                .Where(IsScriptFile);
 
             foreach (var file in files)
             {
@@ -93,47 +93,14 @@ public partial class GscIndexer
         if (string.IsNullOrWhiteSpace(newPath) || !Directory.Exists(newPath))
         {
             DumpPath = null;
-            _symbols.Clear();
-            _fileMaps.Clear();
-
-            lock (_scanCacheLock)
-            {
-                _scanFunctionCache.Clear();
-            }
-
-            lock (_localVarCacheLock)
-            {
-                _localVarCache.Clear();
-            }
-
-            lock (_macroCacheLock)
-            {
-                _macroCache.Clear();
-            }
-
+            ClearGlobalIndexAndCaches();
             return;
         }
 
         string cacheFile = Path.Combine(newPath, "symbols.json");
 
         DumpPath = newPath;
-        _symbols.Clear();
-        _fileMaps.Clear();
-
-        lock (_scanCacheLock)
-        {
-            _scanFunctionCache.Clear();
-        }
-
-        lock (_localVarCacheLock)
-        {
-            _localVarCache.Clear();
-        }
-
-        lock (_macroCacheLock)
-        {
-            _macroCache.Clear();
-        }
+        ClearGlobalIndexAndCaches();
 
         Task.Run(() =>
         {
@@ -215,10 +182,10 @@ public partial class GscIndexer
                     SymbolType.Function
                 );
                 fileMap.LocalSymbols.Add(symbol);
-                _symbols.Add(symbol); // Still keep global list for fast search
+                _symbols.Add(symbol);
             }
         }
-        _fileMaps[path.Replace("\\", "/")] = fileMap;
+        _fileMaps[NormalizePathKey(path)] = fileMap;
     }
 
     private static string CleanGscParams(string raw)
@@ -871,12 +838,12 @@ public partial class GscIndexer
         WorkspacePath = workspacePath;
 
         var files = Directory.GetFiles(workspacePath, "*.*", SearchOption.AllDirectories)
-            .Where(s => s.EndsWith(".gsc") || s.EndsWith(".gsh"));
+            .Where(IsScriptFile);
 
         foreach (var file in files)
         {
             var content = GetFileContent(file);
-            string normalizedPath = file.Replace("\\", "/").ToLower();
+            string normalizedPath = NormalizePathKey(file);
             var fileMap = new GscFileMap { FilePath = file };
 
             var includeMatches = IncludeRegex().Matches(content);
@@ -1021,8 +988,7 @@ public partial class GscIndexer
             return;
         }
 
-        if (!e.FullPath.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase) &&
-            !e.FullPath.EndsWith(".gsh", StringComparison.OrdinalIgnoreCase))
+        if (!IsScriptFile(e.FullPath))
             return;
 
         lock (_pendingChangesLock)
@@ -1068,87 +1034,19 @@ public partial class GscIndexer
 
         foreach (var filePath in changes)
         {
-            // Invalidate cache
-            _fileContentCache.Remove(filePath);
+            InvalidateFileCaches(filePath);
 
-            // Clear scan function cache entries for this file
-            lock (_scanCacheLock)
-            {
-                var keysToRemove = _scanFunctionCache.Keys
-                    .Where(k => k.StartsWith(filePath + "|", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                foreach (var key in keysToRemove)
-                    _scanFunctionCache.Remove(key);
-            }
-
-            lock (_localVarCacheLock)
-            {
-                var keysToRemove = _localVarCache.Keys
-                    .Where(k => k.StartsWith(filePath + "|", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-
-                foreach (var key in keysToRemove)
-                    _localVarCache.Remove(key);
-            }
-
-            lock (_macroCacheLock)
-            {
-                string macroKey = filePath.Replace("\\", "/").ToLower();
-                _macroCache.Remove(macroKey);
-            }
-
-            // Remove old symbols from this file
             updatedSymbols.RemoveAll(s => s.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
 
-            // Re-parse file if it still exists
             if (File.Exists(filePath))
             {
-                string normalizedPath = filePath.Replace("\\", "/").ToLower();
-                var fileMap = new GscFileMap { FilePath = filePath };
-                int lineNum = 0;
+                string normalizedPath = NormalizePathKey(filePath);
 
                 try
                 {
-                    using (var reader = new StreamReader(filePath))
-                    {
-                        string? line;
-                        while ((line = reader.ReadLine()) != null)
-                        {
-                            lineNum++;
-
-                            var includeMatch = IncludeRegex().Match(line);
-                            if (includeMatch.Success)
-                            {
-                                fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
-                                continue;
-                            }
-
-                            var inlineMatch = InlinePathRegex().Match(line);
-                            if (inlineMatch.Success)
-                            {
-                                fileMap.Inlines.Add(inlineMatch.Groups[1].Value.Replace("\\", "/"));
-                                continue;
-                            }
-
-                            var funcMatch = FunctionMultiLineRegex().Match(line);
-                            if (funcMatch.Success)
-                            {
-                                var symbol = new GscSymbol(
-                                    funcMatch.Groups["name"].Value,
-                                    filePath,
-                                    lineNum,
-                                    funcMatch.Groups["params"].Value,
-                                    SymbolType.Function
-                                );
-
-                                updatedSymbols.Add(symbol);
-                                fileMap.LocalSymbols.Add(symbol);
-                            }
-                        }
-                    }
-
-                    _workspaceFileMaps[normalizedPath] = fileMap;
+                    var parsed = ParseWorkspaceFileForIncrementalIndex(filePath);
+                    updatedSymbols.AddRange(parsed.Symbols);
+                    _workspaceFileMaps[normalizedPath] = parsed.FileMap;
                 }
                 catch (Exception ex)
                 {
@@ -1157,8 +1055,7 @@ public partial class GscIndexer
             }
             else
             {
-                // File was deleted
-                string normalizedPath = filePath.Replace("\\", "/").ToLower();
+                string normalizedPath = NormalizePathKey(filePath);
                 _workspaceFileMaps.Remove(normalizedPath);
             }
         }
@@ -1175,5 +1072,108 @@ public partial class GscIndexer
             if (content[i] == '\n') lineCount++;
         }
         return lineCount;
+    }
+
+    private static bool IsScriptFile(string path) =>
+        path.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase) ||
+        path.EndsWith(".gsh", StringComparison.OrdinalIgnoreCase);
+
+    private static string NormalizePathKey(string path) =>
+        path.Replace("\\", "/").ToLowerInvariant();
+
+    private void ClearGlobalIndexAndCaches()
+    {
+        _symbols.Clear();
+        _fileMaps.Clear();
+
+        lock (_scanCacheLock)
+        {
+            _scanFunctionCache.Clear();
+        }
+
+        lock (_localVarCacheLock)
+        {
+            _localVarCache.Clear();
+        }
+
+        lock (_macroCacheLock)
+        {
+            _macroCache.Clear();
+        }
+    }
+
+    private void InvalidateFileCaches(string filePath)
+    {
+        _fileContentCache.Remove(filePath);
+
+        lock (_scanCacheLock)
+        {
+            var keysToRemove = _scanFunctionCache.Keys
+                .Where(k => k.StartsWith(filePath + "|", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var key in keysToRemove)
+                _scanFunctionCache.Remove(key);
+        }
+
+        lock (_localVarCacheLock)
+        {
+            var keysToRemove = _localVarCache.Keys
+                .Where(k => k.StartsWith(filePath + "|", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var key in keysToRemove)
+                _localVarCache.Remove(key);
+        }
+
+        lock (_macroCacheLock)
+        {
+            _macroCache.Remove(NormalizePathKey(filePath));
+        }
+    }
+
+    private static (GscFileMap FileMap, List<GscSymbol> Symbols) ParseWorkspaceFileForIncrementalIndex(string filePath)
+    {
+        var fileMap = new GscFileMap { FilePath = filePath };
+        var symbols = new List<GscSymbol>();
+        int lineNum = 0;
+
+        using var reader = new StreamReader(filePath);
+        string? line;
+        while ((line = reader.ReadLine()) != null)
+        {
+            lineNum++;
+
+            var includeMatch = IncludeRegex().Match(line);
+            if (includeMatch.Success)
+            {
+                fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                continue;
+            }
+
+            var inlineMatch = InlinePathRegex().Match(line);
+            if (inlineMatch.Success)
+            {
+                fileMap.Inlines.Add(inlineMatch.Groups[1].Value.Replace("\\", "/"));
+                continue;
+            }
+
+            var funcMatch = FunctionMultiLineRegex().Match(line);
+            if (funcMatch.Success)
+            {
+                var symbol = new GscSymbol(
+                    funcMatch.Groups["name"].Value,
+                    filePath,
+                    lineNum,
+                    funcMatch.Groups["params"].Value,
+                    SymbolType.Function
+                );
+
+                symbols.Add(symbol);
+                fileMap.LocalSymbols.Add(symbol);
+            }
+        }
+
+        return (fileMap, symbols);
     }
 }

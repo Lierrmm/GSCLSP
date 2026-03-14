@@ -147,15 +147,10 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
 
         foreach (var line in lines)
         {
-            var trimmed = line.Trim();
-            if (!trimmed.StartsWith("#include") && !trimmed.StartsWith("#using"))
-                continue;
-
-            var parts = trimmed.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 2)
-                continue;
-
-            includes.Add(parts[1].Trim().TrimEnd(';'));
+            if (GscHandlerCommon.TryExtractDirectivePath(line, out var includePath, includeInline: false))
+            {
+                includes.Add(includePath.TrimEnd(';'));
+            }
         }
 
         return includes;
@@ -169,7 +164,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
         for (int i = 0; i < lines.Length; i++)
         {
             var trimmed = lines[i].Trim();
-            if (trimmed.StartsWith("#include") || trimmed.StartsWith("#using") || string.IsNullOrWhiteSpace(trimmed))
+            if (GscHandlerCommon.IsIncludeOrUsingDirective(trimmed) || string.IsNullOrWhiteSpace(trimmed))
             {
                 insertLine = i + 1;
                 continue;
