@@ -51,18 +51,7 @@
         "scopeName": "source.gsc",
         "path": "./syntaxes/gsc.tmLanguage.json"
       }
-    ],
-    "configuration": {
-      "type": "object",
-      "title": "GSC Intelligence",
-      "properties": {
-        "gsclsp.dumpPath": {
-          "type": "string",
-          "default": "",
-          "description": "Path to your MW2 Game Dump folder for navigation."
-        }
-      }
-    }
+    ]
   },
   "scripts": {
     "build": "bun run build.ts",

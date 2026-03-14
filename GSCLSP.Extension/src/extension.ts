@@ -1,4 +1,5 @@
 import * as path from "path";
+import * as fs from "fs/promises";
 
 import {
   type ExtensionContext,
@@ -8,6 +9,7 @@ import {
   commands,
   ProgressLocation,
   ExtensionMode,
+  type WorkspaceFolder,
 } from "vscode";
 import {
   LanguageClient,
@@ -18,7 +20,33 @@ import {
 
 let client: LanguageClient;
 
+async function ensureWorkspaceConfigFile(folder: WorkspaceFolder): Promise<void> {
+  if (folder.uri.scheme !== "file") {
+    return;
+  }
+
+  const configPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
+
+  try {
+    await fs.access(configPath);
+  } catch {
+    await fs.writeFile(configPath, "{}\n", "utf8");
+  }
+}
+
 export async function activate(context: ExtensionContext): Promise<void> {
+  for (const folder of workspace.workspaceFolders ?? []) {
+    await ensureWorkspaceConfigFile(folder);
+  }
+
+  context.subscriptions.push(
+    workspace.onDidChangeWorkspaceFolders(async (event) => {
+      for (const folder of event.added) {
+        await ensureWorkspaceConfigFile(folder);
+      }
+    }),
+  );
+
   let browseCommand = commands.registerCommand(
     "gsclsp.browseDumpPath",
     async () => {
@@ -41,12 +69,57 @@ export async function activate(context: ExtensionContext): Promise<void> {
           async (progress) => {
             progress.report({ message: "Re-indexing dump..." });
 
-            await workspace
-              .getConfiguration("gsclsp")
-              .update("dumpPath", newPath, true);
-            await client.sendNotification("custom/updateDumpPath", {
-              path: newPath,
-            });
+            const activeUri = window.activeTextEditor?.document.uri;
+            const targetWorkspace = activeUri
+              ? workspace.getWorkspaceFolder(activeUri)
+              : workspace.workspaceFolders?.[0];
+
+            if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
+              window.showErrorMessage(
+                "GSCLSP: Open a local workspace folder to save gsclsp.config.json",
+              );
+              return;
+            }
+
+            const configPath = path.join(
+              targetWorkspace.uri.fsPath,
+              "gsclsp.config.json",
+            );
+
+            try {
+              let config: { dumpPath?: string } = {};
+
+              try {
+                const existing = await fs.readFile(configPath, "utf8");
+                const parsed = JSON.parse(existing) as unknown;
+                if (parsed && typeof parsed === "object") {
+                  config = parsed as { dumpPath?: string };
+                }
+              } catch {
+                config = {};
+              }
+
+              config.dumpPath = newPath;
+              await fs.writeFile(
+                configPath,
+                JSON.stringify(config, null, 2),
+                "utf8",
+              );
+
+              await client.sendNotification("custom/updateDumpPath", {
+                path: newPath,
+              });
+
+              window.showInformationMessage(
+                `GSCLSP: Updated ${configPath}`,
+              );
+            } catch (error) {
+              const message =
+                error instanceof Error ? error.message : String(error);
+              window.showErrorMessage(
+                `GSCLSP: Failed to write gsclsp.config.json: ${message}`,
+              );
+            }
 
             return new Promise((resolve) => setTimeout(resolve, 2000));
           },
@@ -95,7 +168,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
     outputChannel,
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher("**/*.gsc"),
-      configurationSection: "gsclsp",
     },
   };
 

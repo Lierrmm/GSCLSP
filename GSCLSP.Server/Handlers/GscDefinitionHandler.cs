@@ -29,7 +29,7 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
     {
         var uri = request.TextDocument.Uri;
         var currentFilePath = uri.GetFileSystemPath();
-        var userDumpPath = _configuration?.GetValue<string>("gsclsp:dumpPath");
+        var userDumpPath = _indexer.DumpPath;
 
         var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(currentFilePath);
         if (string.IsNullOrEmpty(content)) return new DefinitionResult();
