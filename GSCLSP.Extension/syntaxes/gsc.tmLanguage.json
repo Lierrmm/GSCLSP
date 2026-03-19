@@ -19,6 +19,30 @@
       "include": "#ifdef"
     },
     {
+      "include": "#ifndef"
+    },
+    {
+      "include": "#elif"
+    },
+    {
+      "include": "#elifdef"
+    },
+    {
+      "include": "#elifndef"
+    },
+    {
+      "include": "#pragma"
+    },
+    {
+      "include": "#warning"
+    },
+    {
+      "include": "#error"
+    },
+    {
+      "include": "#line"
+    },
+    {
       "include": "#undef"
     },
     {
@@ -154,6 +178,142 @@
       },
       "end": "$"
     },
+    "ifndef": {
+      "comment": "Example: #ifndef MACRO_NAME",
+      "name": "meta.preprocessor.ifndef.gsc",
+      "begin": "(#ifndef)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.ifndef.gsc"
+        },
+        "2": {
+          "name": "constant.language.c"
+        }
+      },
+      "end": "$"
+    },
+    "elif": {
+      "comment": "Example: #elif MACRO_NAME == <CONSTANT>",
+      "name": "meta.preprocessor.elif.gsc",
+      "begin": "(#elif)\\s+",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.elif.gsc"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "match": "\\bdefined\\s*\\(([^)]+)\\)",
+          "name": "support.function.preprocessor.defined.gsc",
+          "captures": {
+            "1": {
+              "name": "constant.language.c"
+            }
+          }
+        },
+        {
+          "match": "\\b(?:[A-Za-z_][A-Za-z_0-9]*)\\b",
+          "name": "constant.language.c"
+        },
+        {
+          "match": "==|!=|<=|>=|<|>|&&|\\|\\||\\!|\\(|\\)|\\+|\\-|\\*|\\/|%",
+          "name": "keyword.operator.gsc"
+        },
+        {
+          "match": "\\b[0-9]+\\b",
+          "name": "constant.numeric.gsc"
+        }
+      ]
+    },
+    "elifdef": {
+      "comment": "Example: #elifdef MACRO_NAME",
+      "name": "meta.preprocessor.elifdef.gsc",
+      "begin": "(#elifdef)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.elifdef.gsc"
+        },
+        "2": {
+          "name": "constant.language.c"
+        }
+      },
+      "end": "$"
+    },
+    "elifndef": {
+      "comment": "Example: #elifndef MACRO_NAME",
+      "name": "meta.preprocessor.elifndef.gsc",
+      "begin": "(#elifndef)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.elifndef.gsc"
+        },
+        "2": {
+          "name": "constant.language.c"
+        }
+      },
+      "end": "$"
+    },
+    "pragma": {
+      "comment": "Example: #pragma once",
+      "name": "meta.preprocessor.pragma.gsc",
+      "begin": "(#pragma)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.pragma.gsc"
+        }
+      },
+      "end": "$"
+    },
+    "warning": {
+      "comment": "Example: #warning \"message\"",
+      "name": "meta.preprocessor.warning.gsc",
+      "begin": "(#warning)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.warning.gsc"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#strings"
+        }
+      ]
+    },
+    "error": {
+      "comment": "Example: #error \"message\"",
+      "name": "meta.preprocessor.error.gsc",
+      "begin": "(#error)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.error.gsc"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "include": "#strings"
+        }
+      ]
+    },
+    "line": {
+      "comment": "Example: #line 42",
+      "name": "meta.preprocessor.line.gsc",
+      "begin": "(#line)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.control.directive.line.gsc"
+        }
+      },
+      "end": "$",
+      "patterns": [
+        {
+          "match": "\\b[0-9]+\\b",
+          "name": "constant.numeric.gsc"
+        }
+      ]
+    },
     "undef": {
       "comment": "Example: #undef MACRO_NAME",
       "name": "meta.preprocessor.undef.gsc",
@@ -170,28 +330,23 @@
     },
     "else": {
       "comment": "Example: #else",
+      "match": "(#else)\\b",
       "name": "meta.preprocessor.else.gsc",
-      "begin": "(#else)\\s+([A-Za-z_][A-Za-z_0-9]*)",
-      "beginCaptures": {
+      "captures": {
         "1": {
           "name": "keyword.control.directive.else.gsc"
         }
-      },
-      "end": "$"
+      }
     },
     "endif": {
-      "comment": "Example: #endif MACRO_NAME",
+      "comment": "Example: #endif",
+      "match": "(#endif)\\b",
       "name": "meta.preprocessor.endif.gsc",
-      "begin": "(#endif)\\s+([A-Za-z_][A-Za-z_0-9]*)",
-      "beginCaptures": {
+      "captures": {
         "1": {
           "name": "keyword.control.directive.endif.gsc"
-        },
-        "2": {
-          "name": "constant.language.c"
         }
-      },
-      "end": "$"
+      }
     },
     "include": {
       "comment": "Example: #include maps\\mp\\gametypes",
