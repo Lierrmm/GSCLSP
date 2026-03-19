@@ -349,13 +349,16 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
             }
 
             if (trimmed == "{" || trimmed == "}" || trimmed.EndsWith(';'))
-                return false;
+            {
+                start++;
+                break;
+            }
 
-            break;
+            start--;
         }
 
         if (start < 0)
-            return false;
+            start = 0;
 
         int parenBalance = 0;
         int bracketBalance = 0;
