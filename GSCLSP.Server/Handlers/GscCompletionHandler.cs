@@ -49,20 +49,33 @@ namespace GSCLSP.Server.Handlers
                     request.Position
                 );
 
-                var directiveMapping = new[] { ("#include", "#include "), ("#using", "#using "), ("#inline", "#inline "), ("#define", "#define ") };
-                foreach (var (label, insert) in directiveMapping)
+                var directives = new[]
+                {
+                    "#include", "#using", "#inline", "#define", "#undef",
+                    "#ifdef", "#ifndef", "#if", "#elif", "#elifdef", "#elifndef",
+                    "#else", "#endif",
+                    "#pragma", "#warning", "#error", "#line",
+                    "#namespace", "#using_animtree"
+                };
+                foreach (var directive in directives)
                 {
                     completions.Add(new CompletionItem
                     {
-                        Label = label,
+                        Label = directive,
                         Kind = CompletionItemKind.Keyword,
-                        FilterText = label,
+                        FilterText = directive,
                         InsertTextFormat = InsertTextFormat.PlainText,
-                        TextEdit = new TextEditOrInsertReplaceEdit(new TextEdit { Range = directiveRange, NewText = insert }),
+                        TextEdit = new TextEditOrInsertReplaceEdit(new TextEdit { Range = directiveRange, NewText = directive + " " }),
                         Command = new Command { Name = "editor.action.triggerSuggest" }
                     });
                 }
                 return new CompletionList(completions);
+            }
+
+            // define doesn't need to include anything as its new macros
+            if (trimmedLine.StartsWith("#define "))
+            {
+                return new CompletionList();
             }
 
             if (trimmedLine.StartsWith("#include ") || trimmedLine.StartsWith("#using ") || trimmedLine.StartsWith("#inline "))
@@ -204,6 +217,11 @@ namespace GSCLSP.Server.Handlers
             foreach (var macro in macros)
             {
                 completions.Add(GscCompletionItemFactory.FromMacro(macro));
+            }
+
+            foreach (var define in GscCompletionItemFactory.BuiltInDefines)
+            {
+                completions.Add(define);
             }
 
             var funcName = GscIndexer.FindEnclosingFunctionName(currentFileLines, request.Position.Line);

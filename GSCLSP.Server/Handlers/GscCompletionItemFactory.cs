@@ -94,6 +94,28 @@ internal static class GscCompletionItemFactory
         };
     }
 
+    private static readonly string[] BuiltInDefineNames =
+    [
+        "__FILE__", "__LINE__", "__DATE__", "__TIME__",
+        "IW5", "IW6", "IW7", "IW8", "IW9",
+        "S1", "S2", "S4",
+        "H1", "H2",
+        "T6", "T7", "T8", "T9"
+    ];
+
+    public static readonly CompletionItem[] BuiltInDefines = BuiltInDefineNames.Select(name => new CompletionItem
+    {
+        Label = name,
+        LabelDetails = new CompletionItemLabelDetails
+        {
+            Description = "gsc-tool Define"
+        },
+        Kind = CompletionItemKind.Constant,
+        InsertText = name,
+        InsertTextFormat = InsertTextFormat.PlainText,
+        FilterText = name
+    }).ToArray();
+
     public static CompletionList ToFilteredList(IEnumerable<CompletionItem> items)
     {
         return new CompletionList(items
