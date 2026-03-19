@@ -54,6 +54,10 @@ jobs:
           }
           npm version $tag --no-git-tag-version
 
+      - name: Build extension
+        working-directory: GSCLSP.Extension
+        run: bun run build
+
       - name: Package extension
         working-directory: GSCLSP.Extension
         run: bun run package
