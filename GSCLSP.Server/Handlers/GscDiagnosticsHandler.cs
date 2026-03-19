@@ -192,6 +192,10 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
                         lineTokens[i].Text.Equals(function.Name, StringComparison.OrdinalIgnoreCase) &&
                         lineTokens[i + 1].Kind == TokenKind.OpenParen)
                     {
+                        // skip 1-line function definition erroring as recursive calls
+                        if (line == function.DefinitionLine && lineTokens[i].Column == function.NameColumn)
+                            continue;
+
                         // Ignore qualified calls like path::function(); they are not self-recursion.
                         if (i > 0 && lineTokens[i - 1].Kind == TokenKind.DoubleColon)
                             continue;
