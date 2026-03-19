@@ -296,7 +296,94 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         if (IsControlFlowHeaderLine(lineTokens) || IsInsideMultiLineControlFlowHeader(lines, lineIndex))
             return false;
 
+        if (IsStatementContinuedToNextLine(lineTokens) || IsInsideMultiLineExpression(lines, lineIndex))
+            return false;
+
         return true;
+    }
+
+    private static bool IsStatementContinuedToNextLine(List<Token> lineTokens)
+    {
+        int parenDepth = 0;
+        int bracketDepth = 0;
+
+        foreach (var token in lineTokens)
+        {
+            switch (token.Kind)
+            {
+                case TokenKind.OpenParen:
+                    parenDepth++;
+                    break;
+                case TokenKind.CloseParen:
+                    parenDepth--;
+                    break;
+                case TokenKind.OpenBracket:
+                    bracketDepth++;
+                    break;
+                case TokenKind.CloseBracket:
+                    bracketDepth--;
+                    break;
+            }
+        }
+
+        return parenDepth > 0 || bracketDepth > 0;
+    }
+
+    private static bool IsInsideMultiLineExpression(string[] lines, int lineIndex)
+    {
+        if (lineIndex <= 0)
+            return false;
+
+        int start = lineIndex;
+        while (start >= 0)
+        {
+            var trimmed = lines[start].Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("//", StringComparison.Ordinal))
+            {
+                start--;
+                continue;
+            }
+
+            if (trimmed == "{" || trimmed == "}" || trimmed.EndsWith(';'))
+                return false;
+
+            break;
+        }
+
+        if (start < 0)
+            return false;
+
+        int parenBalance = 0;
+        int bracketBalance = 0;
+
+        for (int i = start; i <= lineIndex; i++)
+        {
+            foreach (var c in lines[i])
+            {
+                if (c == '(') parenBalance++;
+                else if (c == ')') parenBalance--;
+                else if (c == '[') bracketBalance++;
+                else if (c == ']') bracketBalance--;
+            }
+        }
+
+        if (parenBalance > 0 || bracketBalance > 0)
+            return true;
+
+        var previousNonEmpty = lineIndex - 1;
+        while (previousNonEmpty >= 0)
+        {
+            var trimmed = lines[previousNonEmpty].Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("//", StringComparison.Ordinal))
+            {
+                previousNonEmpty--;
+                continue;
+            }
+
+            return trimmed.EndsWith(',');
+        }
+
+        return false;
     }
 
     private static bool IsInsideMultiLineControlFlowHeader(string[] lines, int lineIndex)
