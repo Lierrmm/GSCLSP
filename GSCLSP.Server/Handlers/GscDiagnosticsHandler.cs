@@ -629,15 +629,39 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
     private static bool IsFunctionDefinition(string[] lines, int lineIndex, int matchIndex, string functionName)
     {
         var line = lines[lineIndex];
-        if (line.Length == 0 || char.IsWhiteSpace(line[0])) return false;
-        if (matchIndex != 0) return false;
-        if (line.Contains(';')) return false;
+        var codeLine = StripTrailingLineComment(line);
 
-        var match = FunctionMultiLineRegex().Match(line);
+        if (codeLine.Length == 0 || char.IsWhiteSpace(codeLine[0])) return false;
+        if (matchIndex != 0) return false;
+        if (codeLine.Contains(';')) return false;
+
+        var match = FunctionMultiLineRegex().Match(codeLine);
         if (!match.Success || !match.Groups["name"].Value.Equals(functionName, StringComparison.OrdinalIgnoreCase))
             return false;
 
-        return line.Contains('{') || (lineIndex + 1 < lines.Length && lines[lineIndex + 1].TrimStart().StartsWith('{'));
+        return codeLine.Contains('{') || (lineIndex + 1 < lines.Length && StripTrailingLineComment(lines[lineIndex + 1]).TrimStart().StartsWith('{'));
+    }
+
+    private static string StripTrailingLineComment(string line)
+    {
+        if (string.IsNullOrEmpty(line))
+            return string.Empty;
+
+        var inString = false;
+
+        for (int i = 0; i < line.Length - 1; i++)
+        {
+            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString && line[i] == '/' && line[i + 1] == '/')
+                return line[..i].TrimEnd();
+        }
+
+        return line;
     }
 
     private static bool PathMatches(string filePath, string scriptPath)

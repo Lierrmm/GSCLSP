@@ -196,13 +196,15 @@ public partial class GscIndexer
             return false;
 
         var line = lines[lineIndex];
-        if (line.Length == 0 || char.IsWhiteSpace(line[0]))
+        var codeLine = StripTrailingLineComment(line);
+
+        if (codeLine.Length == 0 || char.IsWhiteSpace(codeLine[0]))
             return false;
 
-        if (line.Contains(';'))
+        if (codeLine.Contains(';'))
             return false;
 
-        var match = FunctionMultiLineRegex().Match(line);
+        var match = FunctionMultiLineRegex().Match(codeLine);
         if (!match.Success || match.Index != 0)
             return false;
 
@@ -210,13 +212,13 @@ public partial class GscIndexer
         if (GscLanguageKeywords.DiagnosticReservedWords.Contains(name))
             return false;
 
-        var trailing = line[(match.Index + match.Length)..].Trim();
+        var trailing = codeLine[(match.Index + match.Length)..].Trim();
         if (!string.IsNullOrEmpty(trailing) &&
             !trailing.StartsWith("{", StringComparison.Ordinal) &&
             !trailing.StartsWith("//", StringComparison.Ordinal))
             return false;
 
-        if (line.Contains('{'))
+        if (codeLine.Contains('{'))
         {
             functionMatch = match;
             return true;
@@ -224,7 +226,7 @@ public partial class GscIndexer
 
         for (int i = lineIndex + 1; i < lines.Length; i++)
         {
-            var trimmed = lines[i].Trim();
+            var trimmed = StripTrailingLineComment(lines[i]).Trim();
 
             if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("//", StringComparison.Ordinal))
                 continue;
@@ -244,6 +246,28 @@ public partial class GscIndexer
         }
 
         return false;
+    }
+
+    private static string StripTrailingLineComment(string line)
+    {
+        if (string.IsNullOrEmpty(line))
+            return string.Empty;
+
+        var inString = false;
+
+        for (int i = 0; i < line.Length - 1; i++)
+        {
+            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString && line[i] == '/' && line[i + 1] == '/')
+                return line[..i].TrimEnd();
+        }
+
+        return line;
     }
 
     private static string CleanGscParams(string raw)
@@ -382,28 +406,20 @@ public partial class GscIndexer
         {
             var lines = File.ReadAllLines(filePath);
 
-            // ^ Must be the absolute start of the line (no indentation for definitions)
-            // {name} The name
-            // \s*\( The parenthesis
-            // [^)]* The params
-            // \) Closing parenthesis
-            // \s*$ NOTHING else allowed on the line except whitespace
             string strictDefinitionPattern = $@"^{Regex.Escape(functionName)}\s*\(([^)]*)\)\s*$";
 
             for (int i = 0; i < lines.Length; i++)
             {
-                string line = lines[i]; // Don't trim yet, we need to check start of line
+                string line = lines[i];
+                string codeLine = StripTrailingLineComment(line);
 
-                // If it's indented, it's likely a call inside a function, not a definition
-                if (line.StartsWith(' ') || line.StartsWith('\t')) continue;
+                if (codeLine.StartsWith(' ') || codeLine.StartsWith('\t')) continue;
+                if (codeLine.Contains(';')) continue;
 
-                // If it contains a semicolon, it's definitely a call
-                if (line.Contains(';')) continue;
-
-                var match = Regex.Match(line, strictDefinitionPattern, RegexOptions.IgnoreCase);
+                var match = Regex.Match(codeLine, strictDefinitionPattern, RegexOptions.IgnoreCase);
                 if (match.Success)
                 {
-                    bool hasBrace = line.Contains('{') || (i + 1 < lines.Length && lines[i + 1].Trim().StartsWith('{'));
+                    bool hasBrace = codeLine.Contains('{') || (i + 1 < lines.Length && StripTrailingLineComment(lines[i + 1]).Trim().StartsWith('{'));
                     if (!hasBrace) continue;
 
                     List<string> commentLines = [];
