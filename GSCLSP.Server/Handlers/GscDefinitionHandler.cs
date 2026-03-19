@@ -119,12 +119,10 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
         if (symbol != null && symbol.FilePath != "Engine")
         {
             string targetPath = symbol.FilePath;
-            var shiftByIndex = true;
 
             if (resolution.Type == ResolutionType.Local && string.IsNullOrEmpty(pathFilter))
             {
                 targetPath = currentFilePath;
-                shiftByIndex = false;
             }
             else if (!Path.IsPathRooted(targetPath) && !string.IsNullOrEmpty(userDumpPath))
             {
@@ -132,7 +130,7 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
                 targetPath = Path.Combine(cleanDump, targetPath.Replace("/", "\\"));
             }
 
-            var lineIndex = Math.Max(0, (shiftByIndex ? symbol.LineNumber - 1 : symbol.LineNumber));
+            var lineIndex = Math.Max(0, symbol.LineNumber - 1);
             return new DefinitionResult(new Location
             {
                 Uri = DocumentUri.FromFileSystemPath(targetPath),

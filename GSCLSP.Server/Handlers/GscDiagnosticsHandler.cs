@@ -83,9 +83,10 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         var diagnostics = new List<Diagnostic>();
         var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         var muteConfig = ParseMuteConfig(lines);
+        var devBlockMask = BuildDevBlockMask(lines);
 
         var localFunctions = GetLocalFunctions(text);
-        var includedFiles = await GetIncludedFilesAsync(lines, cancellationToken);
+        var includedFiles = await GetIncludedFilesAsync(lines, cancellationToken, devBlockMask);
 
         var lexer = new GscLexer();
         var lexed = lexer.Lex(text);
@@ -98,6 +99,9 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (devBlockMask[lineIndex])
+                continue;
 
             if (!tokensByLine.TryGetValue(lineIndex, out var lineTokens) || lineTokens.Count == 0)
                 continue;
@@ -149,7 +153,7 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
             }
         }
 
-        diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig));
+        diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, devBlockMask));
 
         return diagnostics;
     }
@@ -157,7 +161,8 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
     private static List<Diagnostic> CollectRecursiveFunctionWarnings(
         string[] lines,
         IReadOnlyDictionary<int, List<Token>> tokensByLine,
-        MuteConfig muteConfig)
+        MuteConfig muteConfig,
+        bool[] devBlockMask)
     {
         var diagnostics = new List<Diagnostic>();
 
@@ -175,6 +180,9 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
 
             for (int line = bodyStart; line <= bodyEnd; line++)
             {
+                if (line >= 0 && line < devBlockMask.Length && devBlockMask[line])
+                    continue;
+
                 if (!tokensByLine.TryGetValue(line, out var lineTokens) || lineTokens.Count < 2)
                     continue;
 
@@ -371,14 +379,18 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         return result;
     }
 
-    private async Task<List<IncludedFileScope>> GetIncludedFilesAsync(string[] lines, CancellationToken cancellationToken)
+    private async Task<List<IncludedFileScope>> GetIncludedFilesAsync(string[] lines, CancellationToken cancellationToken, bool[]? devBlockMask = null)
     {
         var result = new List<IncludedFileScope>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var line in lines)
+        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
+            var line = lines[lineIndex];
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (devBlockMask != null && lineIndex < devBlockMask.Length && devBlockMask[lineIndex])
+                continue;
 
             if (!GscHandlerCommon.TryExtractDirectivePath(line, out var includePath, includeInline: false))
                 continue;
@@ -418,7 +430,12 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
                 .Any(s => PathMatches(s.FilePath, qualifiedPath));
         }
 
-        return includedFiles.Any(f => f.Functions.Contains(functionName));
+        if (includedFiles.Any(f => f.Functions.Contains(functionName)))
+            return true;
+
+        // Fallback to globally indexed functions to avoid unresolved false positives
+        // when symbols are known from workspace/dump but not yet in include scope.
+        return FindCandidateSymbols(functionName).Any();
     }
 
     private IEnumerable<GscSymbol> FindCandidateSymbols(string functionName)
@@ -604,6 +621,35 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
             end--;
 
         return (start, end);
+    }
+
+    private static bool[] BuildDevBlockMask(string[] lines)
+    {
+        var mask = new bool[lines.Length];
+        var inDevBlock = false;
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var trimmed = lines[i].Trim();
+
+            if (!inDevBlock && trimmed.StartsWith("/#", StringComparison.Ordinal))
+            {
+                inDevBlock = true;
+                mask[i] = true;
+                continue;
+            }
+
+            if (inDevBlock)
+            {
+                mask[i] = true;
+                if (trimmed.StartsWith("#/", StringComparison.Ordinal))
+                {
+                    inDevBlock = false;
+                }
+            }
+        }
+
+        return mask;
     }
 
     private sealed record IncludedFileScope(string Path, HashSet<string> Functions);

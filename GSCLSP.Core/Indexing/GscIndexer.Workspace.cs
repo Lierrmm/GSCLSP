@@ -248,7 +248,7 @@ public partial class GscIndexer
         {
             if (content[i] == '\n') lineCount++;
         }
-        return lineCount;
+        return lineCount + 1;
     }
 
     private static bool IsScriptFile(string path) =>
