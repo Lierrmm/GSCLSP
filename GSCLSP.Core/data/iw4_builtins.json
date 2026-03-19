@@ -5641,6 +5641,46 @@
     "target": "self"
   },
   {
+    "name": "max",
+    "category": "Math",
+    "summary": "Returns whichever of <a> or <b> is larger",
+    "args": [
+      {
+        "name": "a",
+        "type": "number",
+        "required": true,
+        "description": "1 :  <a> A float or integer value"
+      },
+      {
+        "name": "b",
+        "type": "number",
+        "required": true,
+        "description": "1 :  <b> A float or integer value"
+      }
+    ],
+    "target": "self"
+  },
+  {
+    "name": "min",
+    "category": "Math",
+    "summary": "Returns whichever of <a> or <b> is smaller",
+    "args": [
+      {
+        "name": "a",
+        "type": "number",
+        "required": true,
+        "description": "1 :  <a> A float or integer value"
+      },
+      {
+        "name": "b",
+        "type": "number",
+        "required": true,
+        "description": "1 :  <b> A float or integer value"
+      }
+    ],
+    "target": "self"
+  },
+  {
     "name": "closeingamemenu",
     "category": "Menus",
     "summary": "close the in game menu for this client.",

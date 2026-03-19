@@ -1,5 +1,6 @@
 ﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Parsing;
+using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -31,14 +32,6 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var line = lines[request.Position.Line];
 
-        bool inBlockComment = false;
-        for (int l = 0; l < request.Position.Line; l++)
-            GscHandlerCommon.GetCodeRanges(lines[l], ref inBlockComment);
-
-        var codeRanges = GscHandlerCommon.GetCodeRanges(line, ref inBlockComment);
-
-        if (!GscHandlerCommon.IsInCode(codeRanges, request.Position.Character)) return null;
-
         if (GscHandlerCommon.IsIncludeLikeDirective(line.Trim()) &&
             GscHandlerCommon.TryExtractDirectivePath(line, out var includedFile))
         {
@@ -53,6 +46,12 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
+
+        var lexed = GscLexingHelper.Lex(content);
+        var token = GscLexingHelper.GetTokenAtOrBeforePosition(lexed.Tokens, request.Position.Line, request.Position.Character);
+
+        if (token is null || !IsHoverableToken(token.Value))
+            return null;
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
         if (identifier.StartsWith("::")) identifier = identifier[2..];
@@ -112,6 +111,16 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         }
 
         return null;
+    }
+
+    private static bool IsHoverableToken(Token token)
+    {
+        return token.Kind is not TokenKind.Whitespace
+            and not TokenKind.Comment
+            and not TokenKind.String
+            and not TokenKind.Directive
+            and not TokenKind.BadToken
+            and not TokenKind.EndOfFile;
     }
 
     private static Hover? FindLocalVariable(string filePath, string[] lines, string identifier, int hoverLine)

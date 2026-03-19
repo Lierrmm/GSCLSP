@@ -6,7 +6,7 @@ namespace GSCLSP.Server.Handlers;
 
 internal static class GscCompletionItemFactory
 {
-    public static CompletionItem FromSymbol(GscSymbol symbol, CompletionItemKind kind, string detailSource)
+    public static CompletionItem FromSymbol(GscSymbol symbol, CompletionItemKind kind, string detailSource, bool appendSemicolon = false)
     {
         var argList = (symbol.Parameters ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -28,6 +28,11 @@ internal static class GscCompletionItemFactory
         else
         {
             insertText = $"{symbol.Name}($0)";
+        }
+
+        if (appendSemicolon)
+        {
+            insertText += ";";
         }
 
         var paramString = string.IsNullOrWhiteSpace(symbol.Parameters)

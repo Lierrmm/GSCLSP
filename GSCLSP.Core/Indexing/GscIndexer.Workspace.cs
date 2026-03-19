@@ -23,39 +23,11 @@ public partial class GscIndexer
 
         foreach (var file in files)
         {
-            var content = GetFileContent(file);
             string normalizedPath = NormalizePathKey(file);
-            var fileMap = new GscFileMap { FilePath = file };
+            var parsed = ParseWorkspaceFileForIncrementalIndex(file);
 
-            var includeMatches = IncludeRegex().Matches(content);
-            foreach (Match inc in includeMatches)
-            {
-                fileMap.Includes.Add(inc.Groups[1].Value.Replace("\\", "/"));
-            }
-
-            var inlineMatches = InlinePathRegex().Matches(content);
-            foreach (Match inl in inlineMatches)
-            {
-                fileMap.Inlines.Add(inl.Groups[1].Value.Replace("\\", "/"));
-            }
-
-            var matches = FunctionMultiLineRegex().Matches(content);
-
-            foreach (Match match in matches)
-            {
-                var symbol = new GscSymbol(
-                    match.Groups[1].Value,
-                    file,
-                    GetLineNumberFromIndex(content, match.Index),
-                    match.Groups[2].Value,
-                    SymbolType.Function
-                );
-
-                localSymbols.Add(symbol);
-                fileMap.LocalSymbols.Add(symbol);
-            }
-
-            _workspaceFileMaps[normalizedPath] = fileMap;
+            localSymbols.AddRange(parsed.Symbols);
+            _workspaceFileMaps[normalizedPath] = parsed.FileMap;
         }
 
         WorkspaceSymbols = localSymbols;
@@ -248,7 +220,7 @@ public partial class GscIndexer
         {
             if (content[i] == '\n') lineCount++;
         }
-        return lineCount;
+        return lineCount + 1;
     }
 
     private static bool IsScriptFile(string path) =>
@@ -313,13 +285,12 @@ public partial class GscIndexer
     {
         var fileMap = new GscFileMap { FilePath = filePath };
         var symbols = new List<GscSymbol>();
-        int lineNum = 0;
+        var lines = File.ReadAllLines(filePath);
 
-        using var reader = new StreamReader(filePath);
-        string? line;
-        while ((line = reader.ReadLine()) != null)
+        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
-            lineNum++;
+            var line = lines[lineIndex];
+            int lineNum = lineIndex + 1;
 
             var includeMatch = IncludeRegex().Match(line);
             if (includeMatch.Success)
@@ -335,20 +306,19 @@ public partial class GscIndexer
                 continue;
             }
 
-            var funcMatch = FunctionMultiLineRegex().Match(line);
-            if (funcMatch.Success)
-            {
-                var symbol = new GscSymbol(
-                    funcMatch.Groups["name"].Value,
-                    filePath,
-                    lineNum,
-                    funcMatch.Groups["params"].Value,
-                    SymbolType.Function
-                );
+            if (!IsFunctionDefinitionLine(lines, lineIndex, out var funcMatch))
+                continue;
 
-                symbols.Add(symbol);
-                fileMap.LocalSymbols.Add(symbol);
-            }
+            var symbol = new GscSymbol(
+                funcMatch.Groups["name"].Value,
+                filePath,
+                lineNum,
+                CleanGscParams(funcMatch.Groups["params"].Value),
+                SymbolType.Function
+            );
+
+            symbols.Add(symbol);
+            fileMap.LocalSymbols.Add(symbol);
         }
 
         return (fileMap, symbols);

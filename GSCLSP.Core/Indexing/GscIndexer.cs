@@ -146,12 +146,12 @@ public partial class GscIndexer
     private void ParseFile(string path)
     {
         var fileMap = new GscFileMap { FilePath = path };
-        var lines = File.ReadLines(path);
-        int lineNum = 0;
+        var lines = File.ReadAllLines(path);
 
-        foreach (var line in lines)
+        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
-            lineNum++;
+            var line = lines[lineIndex];
+            var lineNum = lineIndex + 1;
 
             var includeMatch = IncludeRegex().Match(line);
             if (includeMatch.Success)
@@ -167,34 +167,113 @@ public partial class GscIndexer
                 continue;
             }
 
-            var funcMatch = FunctionMultiLineRegex().Match(line);
-            if (funcMatch.Success)
-            {
-                var name = funcMatch.Groups["name"].Value;
-                var rawParams = funcMatch.Groups["params"].Value;
-                var cleanParams = CleanGscParams(rawParams);
+            if (!IsFunctionDefinitionLine(lines, lineIndex, out var funcMatch))
+                continue;
 
-                var symbol = new GscSymbol(
-                    name,
-                    path,
-                    lineNum,
-                    cleanParams,
-                    SymbolType.Function
-                );
-                fileMap.LocalSymbols.Add(symbol);
-                _symbols.Add(symbol);
-            }
+            var name = funcMatch.Groups["name"].Value;
+            var rawParams = funcMatch.Groups["params"].Value;
+            var cleanParams = CleanGscParams(rawParams);
+
+            var symbol = new GscSymbol(
+                name,
+                path,
+                lineNum,
+                cleanParams,
+                SymbolType.Function
+            );
+            fileMap.LocalSymbols.Add(symbol);
+            _symbols.Add(symbol);
         }
+
         _fileMaps[NormalizePathKey(path)] = fileMap;
+    }
+
+    private static bool IsFunctionDefinitionLine(string[] lines, int lineIndex, out Match functionMatch)
+    {
+        functionMatch = Match.Empty;
+
+        if (lineIndex < 0 || lineIndex >= lines.Length)
+            return false;
+
+        var line = lines[lineIndex];
+        var codeLine = StripTrailingLineComment(line);
+
+        if (codeLine.Length == 0 || char.IsWhiteSpace(codeLine[0]))
+            return false;
+
+        if (codeLine.Contains(';'))
+            return false;
+
+        var match = FunctionMultiLineRegex().Match(codeLine);
+        if (!match.Success || match.Index != 0)
+            return false;
+
+        var name = match.Groups["name"].Value;
+        if (GscLanguageKeywords.DiagnosticReservedWords.Contains(name))
+            return false;
+
+        var trailing = codeLine[(match.Index + match.Length)..].Trim();
+        if (!string.IsNullOrEmpty(trailing) &&
+            !trailing.StartsWith("{", StringComparison.Ordinal) &&
+            !trailing.StartsWith("//", StringComparison.Ordinal))
+            return false;
+
+        if (codeLine.Contains('{'))
+        {
+            functionMatch = match;
+            return true;
+        }
+
+        for (int i = lineIndex + 1; i < lines.Length; i++)
+        {
+            var trimmed = StripTrailingLineComment(lines[i]).Trim();
+
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("//", StringComparison.Ordinal))
+                continue;
+
+            if (trimmed.StartsWith("/*", StringComparison.Ordinal) ||
+                trimmed.StartsWith("*", StringComparison.Ordinal) ||
+                trimmed.EndsWith("*/", StringComparison.Ordinal))
+                continue;
+
+            if (trimmed.StartsWith("{", StringComparison.Ordinal))
+            {
+                functionMatch = match;
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private static string StripTrailingLineComment(string line)
+    {
+        if (string.IsNullOrEmpty(line))
+            return string.Empty;
+
+        var inString = false;
+
+        for (int i = 0; i < line.Length - 1; i++)
+        {
+            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
+            {
+                inString = !inString;
+                continue;
+            }
+
+            if (!inString && line[i] == '/' && line[i + 1] == '/')
+                return line[..i].TrimEnd();
+        }
+
+        return line;
     }
 
     private static string CleanGscParams(string raw)
     {
-        // Remove single line comments //
         string noComments = CommentRegex().Replace(raw, "");
-        // Remove multi-line comments /* */
         noComments = MultilineCommentRegex().Replace(noComments, "");
-        // Replace all whitespace (newlines/tabs) with a single space
         string flat = WhiteSpaceTabRegex().Replace(noComments, " ").Trim();
         return flat;
     }
@@ -327,28 +406,20 @@ public partial class GscIndexer
         {
             var lines = File.ReadAllLines(filePath);
 
-            // ^ Must be the absolute start of the line (no indentation for definitions)
-            // {name} The name
-            // \s*\( The parenthesis
-            // [^)]* The params
-            // \) Closing parenthesis
-            // \s*$ NOTHING else allowed on the line except whitespace
             string strictDefinitionPattern = $@"^{Regex.Escape(functionName)}\s*\(([^)]*)\)\s*$";
 
             for (int i = 0; i < lines.Length; i++)
             {
-                string line = lines[i]; // Don't trim yet, we need to check start of line
+                string line = lines[i];
+                string codeLine = StripTrailingLineComment(line);
 
-                // If it's indented, it's likely a call inside a function, not a definition
-                if (line.StartsWith(' ') || line.StartsWith('\t')) continue;
+                if (codeLine.StartsWith(' ') || codeLine.StartsWith('\t')) continue;
+                if (codeLine.Contains(';')) continue;
 
-                // If it contains a semicolon, it's definitely a call
-                if (line.Contains(';')) continue;
-
-                var match = Regex.Match(line, strictDefinitionPattern, RegexOptions.IgnoreCase);
+                var match = Regex.Match(codeLine, strictDefinitionPattern, RegexOptions.IgnoreCase);
                 if (match.Success)
                 {
-                    bool hasBrace = line.Contains('{') || (i + 1 < lines.Length && lines[i + 1].Trim().StartsWith('{'));
+                    bool hasBrace = codeLine.Contains('{') || (i + 1 < lines.Length && StripTrailingLineComment(lines[i + 1]).Trim().StartsWith('{'));
                     if (!hasBrace) continue;
 
                     List<string> commentLines = [];
@@ -433,10 +504,10 @@ public partial class GscIndexer
     {
         for (int i = cursorLine; i >= 0; i--)
         {
-            if (lines[i].Length == 0 || char.IsWhiteSpace(lines[i][0])) continue;
-            var match = FunctionMultiLineRegex().Match(lines[i]);
-            if (match.Success) return match.Groups["name"].Value;
+            if (IsFunctionDefinitionLine(lines, i, out var match))
+                return match.Groups["name"].Value;
         }
+
         return null;
     }
 
@@ -465,7 +536,7 @@ public partial class GscIndexer
         int funcDefLine = -1;
         for (int i = cursorLine; i >= 0; i--)
         {
-            if (lines[i].Length > 0 && !char.IsWhiteSpace(lines[i][0]) && FunctionMultiLineRegex().IsMatch(lines[i]))
+            if (IsFunctionDefinitionLine(lines, i, out _))
             {
                 funcDefLine = i;
                 break;

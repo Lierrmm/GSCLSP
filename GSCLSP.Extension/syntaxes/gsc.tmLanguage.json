@@ -67,6 +67,11 @@
           "name": "comment.block.gsc"
         },
         {
+          "begin": "/#",
+          "end": "#/",
+          "name": "comment.block.gsc"
+        },
+        {
           "begin": "//",
           "end": "\\n",
           "name": "comment.line.double-slash.gsc"
