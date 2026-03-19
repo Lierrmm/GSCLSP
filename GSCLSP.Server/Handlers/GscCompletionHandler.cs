@@ -78,6 +78,24 @@ namespace GSCLSP.Server.Handlers
                 return new CompletionList();
             }
 
+            if (trimmedLine.StartsWith("#ifdef ") || trimmedLine.StartsWith("#ifndef ") ||
+                trimmedLine.StartsWith("#elifdef ") || trimmedLine.StartsWith("#elifndef ") ||
+                trimmedLine.StartsWith("#undef "))
+            {
+                var visibleMacros = _indexer.GetAllVisibleMacros(currentFilePath);
+                foreach (var macro in visibleMacros)
+                {
+                    completions.Add(GscCompletionItemFactory.FromMacro(macro));
+                }
+
+                foreach (var define in GscCompletionItemFactory.BuiltInDefines)
+                {
+                    completions.Add(define);
+                }
+
+                return GscCompletionItemFactory.ToFilteredList(completions);
+            }
+
             if (trimmedLine.StartsWith("#include ") || trimmedLine.StartsWith("#using ") || trimmedLine.StartsWith("#inline "))
             {
                 bool isInline = trimmedLine.StartsWith("#inline ");
