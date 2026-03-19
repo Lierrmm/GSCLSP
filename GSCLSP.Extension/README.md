@@ -1,6 +1,6 @@
 # GSCLSP (GSC Language Support)
 
-Language support for `.gsc` / `.gsh` files powered by the `GSCLSP.Server` language server.
+Language support for `.gsc` / `.gsh` files powered by the `GSCLSP` language server.
 
 ## Features
 
@@ -9,7 +9,7 @@ Language support for `.gsc` / `.gsh` files powered by the `GSCLSP.Server` langua
   - Engine built-ins
   - Include-aware suggestions
   - Macro and local variable completions
-  - Context-aware call insertion (adds `;` when appropriate)
+  - Context-aware call insertion
 
 - **Go to Definition**
   - Local functions
@@ -70,13 +70,3 @@ Example:
   - Opens folder picker
   - Updates `gsclsp.config.json`
   - Notifies the server to re-index dump symbols
-
-## Requirements
-
-- VS Code `^1.80.0`
-- Windows (bundled server executable is `GSCLSP.Server.exe`)
-
-## File Types
-
-- `.gsc`
-- `.gsh`

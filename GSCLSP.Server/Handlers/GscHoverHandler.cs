@@ -47,7 +47,6 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
 
-        var lexer = new GscLexer();
         var lexed = GscLexingHelper.Lex(content);
         var token = GscLexingHelper.GetTokenAtOrBeforePosition(lexed.Tokens, request.Position.Line, request.Position.Character);
 

@@ -234,6 +234,9 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
             if (line.Length == 0 || char.IsWhiteSpace(line[0]))
                 continue;
 
+            if (line.TrimEnd().EndsWith(';'))
+                continue;
+
             var match = FunctionMultiLineRegex().Match(line);
             if (!match.Success)
                 continue;

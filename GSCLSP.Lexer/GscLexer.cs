@@ -97,8 +97,8 @@ public sealed class GscLexer
 
         return new LexerResult
         {
-            Tokens = _tokens.ToArray(),
-            Diagnostics = _diagnostics.ToArray()
+            Tokens = [.. _tokens],
+            Diagnostics = [.. _diagnostics]
         };
     }
 
