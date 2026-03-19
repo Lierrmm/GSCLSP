@@ -15,4 +15,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\GSCLSP.Lexer\GSCLSP.Lexer.csproj" />
+  </ItemGroup>
+
 </Project>

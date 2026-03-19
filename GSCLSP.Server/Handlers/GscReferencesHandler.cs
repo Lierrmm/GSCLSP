@@ -1,12 +1,11 @@
 ﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Parsing;
+using GSCLSP.Lexer;
 using Microsoft.Extensions.Configuration;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Text.RegularExpressions;
-using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
 {
@@ -14,29 +13,6 @@ namespace GSCLSP.Server.Handlers
     {
         private readonly GscIndexer _indexer = indexer;
         private readonly IConfiguration _configuration = configuration;
-        private static readonly Dictionary<string, Regex> _regexCache = [];
-        private static readonly object _regexCacheLock = new();
-
-        private static Regex GetCachedRegex(string identifier)
-        {
-            // Check cache first
-            lock (_regexCacheLock)
-            {
-                if (_regexCache.TryGetValue(identifier, out var cached))
-                    return cached;
-            }
-
-            // Create and cache new regex
-            var pattern = $@"\b{Regex.Escape(identifier)}\b";
-            var regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-            lock (_regexCacheLock)
-            {
-                _regexCache[identifier] = regex;
-            }
-
-            return regex;
-        }
 
         public async Task<LocationContainer> Handle(ReferenceParams request, CancellationToken cancellationToken)
         {
@@ -46,10 +22,9 @@ namespace GSCLSP.Server.Handlers
             var rawDumpPath = _indexer.DumpPath ?? _configuration?.GetValue<string>("gsclsp:dumpPath");
             string? normalizedDumpPath = GscIndexer.NormalizePath(rawDumpPath);
 
-            // Use cached content instead of File.ReadAllLinesAsync
             string currentContent = _indexer.GetFileContent(currentFilePath);
             if (string.IsNullOrEmpty(currentContent)) return new LocationContainer();
-            
+
             var currentFileLines = currentContent.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
             var line = currentFileLines[request.Position.Line];
             string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character);
@@ -58,10 +33,9 @@ namespace GSCLSP.Server.Handlers
             if (string.IsNullOrEmpty(identifier)) return new LocationContainer();
 
             var locations = new List<Location>();
-            var searchRegex = GetCachedRegex(identifier);
 
             // Search current file
-            SearchFileWithRegex(currentFilePath, currentFileLines, searchRegex, locations);
+            SearchFileWithLexer(currentFilePath, currentContent, identifier, locations);
 
             // Search included files
             var includedPaths = await ExtractIncludesAsync(currentFileLines, cancellationToken);
@@ -71,14 +45,14 @@ namespace GSCLSP.Server.Handlers
                 {
                     if (File.Exists(includePath))
                     {
-                        var includedLines = await File.ReadAllLinesAsync(includePath, cancellationToken);
-                        SearchFileWithRegex(includePath, includedLines, searchRegex, locations);
+                        var includedContent = await File.ReadAllTextAsync(includePath, cancellationToken);
+                        SearchFileWithLexer(includePath, includedContent, identifier, locations);
                     }
                 }
                 catch { }
             }
 
-            // Search entire workspace using cached content instead of re-reading from disk
+            // Search entire workspace using cached content
             if (!string.IsNullOrEmpty(normalizedDumpPath) && Directory.Exists(normalizedDumpPath))
             {
                 var gscFiles = Directory.EnumerateFiles(normalizedDumpPath, "*.?sc", SearchOption.AllDirectories);
@@ -88,12 +62,10 @@ namespace GSCLSP.Server.Handlers
                     if (file.Equals(currentFilePath, StringComparison.OrdinalIgnoreCase)) return;
                     try
                     {
-                        // Use cached content instead of File.ReadAllLines() - eliminates disk I/O
                         string content = _indexer.GetFileContent(file);
                         if (!string.IsNullOrEmpty(content))
                         {
-                            var fileLines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-                            SearchFileWithRegex(file, fileLines, searchRegex, locations);
+                            SearchFileWithLexer(file, content, identifier, locations);
                         }
                     }
                     catch { }
@@ -137,15 +109,20 @@ namespace GSCLSP.Server.Handlers
             return [.. includePaths];
         }
 
-        private static void SearchFileWithRegex(string filePath, string[] lines, Regex regex, List<Location> locations)
+        private static void SearchFileWithLexer(string filePath, string content, string identifier, List<Location> locations)
         {
-            for (int i = 0; i < lines.Length; i++)
+            var lexer = new GscLexer();
+            var result = lexer.Lex(content);
+
+            foreach (var token in result.Tokens)
             {
-                var matches = regex.Matches(lines[i]);
-                foreach (Match match in matches)
-                {
-                    AddLocationIfUnique(locations, filePath, i, match.Index, match.Length);
-                }
+                if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                    continue;
+
+                if (!token.Text.Equals(identifier, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                AddLocationIfUnique(locations, filePath, token.Line, token.Column, token.Length);
             }
         }
 

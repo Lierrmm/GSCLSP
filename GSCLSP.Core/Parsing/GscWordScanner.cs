@@ -1,4 +1,6 @@
-﻿namespace GSCLSP.Core.Parsing;
+﻿using GSCLSP.Lexer;
+
+namespace GSCLSP.Core.Parsing;
 
 public static class GscWordScanner
 {
@@ -13,9 +15,35 @@ public static class GscWordScanner
         // Adjust index if cursor is at the end of the line
         int index = characterIndex;
         if (index >= line.Length && index > 0) index--;
+        if (index < 0 || index >= line.Length) return "";
 
-        // If the current character isn't a valid part of an identifier, 
-        // try checking the character immediately to the left.
+        // Use lexer to avoid scanning inside comments/strings/directives and to validate token context.
+        var lexer = new GscLexer();
+        var tokenResult = lexer.Lex(line);
+        var tokenIndex = FindTokenIndex(tokenResult.Tokens, index);
+        if (tokenIndex < 0) return "";
+
+        var token = tokenResult.Tokens[tokenIndex];
+        if (!IsIdentifierContextToken(token))
+        {
+            // try one char left, matching existing cursor behavior
+            if (index > 0)
+            {
+                tokenIndex = FindTokenIndex(tokenResult.Tokens, index - 1);
+                if (tokenIndex < 0 || !IsIdentifierContextToken(tokenResult.Tokens[tokenIndex]))
+                {
+                    return "";
+                }
+
+                index--;
+            }
+            else
+            {
+                return "";
+            }
+        }
+
+        // Preserve previous contiguous identifier semantics for paths like maps\mp\foo::bar.
         if (!GscIdentifierChars.Contains(line[index]))
         {
             if (index > 0 && GscIdentifierChars.Contains(line[index - 1]))
@@ -39,6 +67,27 @@ public static class GscWordScanner
             end++;
         }
 
-        return line.Substring(start, end - start).Trim();
+        return line[start..end].Trim();
+    }
+
+    private static int FindTokenIndex(IReadOnlyList<Token> tokens, int index)
+    {
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.Length == 0) continue;
+
+            if (index >= token.Start && index < token.Start + token.Length)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool IsIdentifierContextToken(Token token)
+    {
+        return token.Kind is TokenKind.Identifier or TokenKind.Keyword or TokenKind.DoubleColon;
     }
 }

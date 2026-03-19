@@ -1,23 +1,82 @@
-# GSC Language Support
+# GSCLSP (GSC Language Support)
 
-A high-performance Language Server for GSC scripting, featuring deep engine integration and lightning-fast symbol indexing.
+Language support for `.gsc` / `.gsh` files powered by the `GSCLSP.Server` language server.
 
 ## Features
 
-- **Engine Built-ins**: Full support for 980+ engine functions with auto-completion.
-- **Global Symbol Indexing**: Instant access to over 18,000 game symbols and function definitions.
-- **Workspace Intelligence**: Understands your project structure for seamless navigation.
+- **Code completion**
+  - Local/workspace/dump symbols
+  - Engine built-ins
+  - Include-aware suggestions
+  - Macro and local variable completions
+  - Context-aware call insertion (adds `;` when appropriate)
 
-## Quick Start
+- **Go to Definition**
+  - Local functions
+  - Included/dump symbols
+  - Include/using/inline directive path targets
+  - Macro definitions
 
-1. Install the extension.
-2. Open your GSC project folder.
-3. The server will automatically index your files and the global symbol database.
+- **Find References**
+  - Lexer-based reference matching for better accuracy
+
+- **Hover**
+  - Function signatures and docs
+  - Built-in, macro, and local variable info
+  - Directive include path preview
+
+- **Diagnostics**
+  - Unresolved function calls (`gsclsp.unresolvedFunction`)
+  - Missing semicolon (`gsclsp.missingSemicolon`)
+  - Recursive function warning (`gsclsp.recursiveFunction`)
+
+- **Code Actions**
+  - Quick fix to insert `#include ...` for unresolved functions
+
+## Diagnostic Mute Comments
+
+Warnings can be muted either:
+
+- at the **top of the file**, or
+- on the **line above** the affected line
+
+Supported format:
+
+- `// gsclsp-disable: recursive-function`
+- `// gsclsp-disable: missing-semicolon`
+- `// gsclsp-disable: recursive, semicolon`
+- `// gsclsp-disable: all`
+
+Aliases supported:
+
+- `recursive` -> `recursive-function`
+- `semicolon` -> `missing-semicolon`
+
+## Project Setup
+
+When you open a workspace, the extension ensures a `gsclsp.config.json` file exists in the workspace root.
+
+Example:
+
+```json
+{
+  "dumpPath": "D:\\your\\gsc_dump"
+}
+```
+
+## Command
+
+- `GSC: Set Dump Folder Path` (`gsclsp.browseDumpPath`)
+  - Opens folder picker
+  - Updates `gsclsp.config.json`
+  - Notifies the server to re-index dump symbols
 
 ## Requirements
 
-- VS Code v1.80.0+
+- VS Code `^1.80.0`
+- Windows (bundled server executable is `GSCLSP.Server.exe`)
 
-## Extension Settings
+## File Types
 
-- `gsclsp.dumpPath`: (Optional) Path to a custom GSC Dump
+- `.gsc`
+- `.gsh`

@@ -1,5 +1,5 @@
 ﻿using GSCLSP.Core.Indexing;
-using GSCLSP.Core.Models;
+using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -16,10 +16,6 @@ namespace GSCLSP.Server.Handlers
 
         public async Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
-#if DEBUG
-            var sw = Stopwatch.StartNew();
-#endif
-
             var completions = new List<CompletionItem>();
             var uri = request.TextDocument.Uri;
             var currentFilePath = uri.GetFileSystemPath();
@@ -29,6 +25,17 @@ namespace GSCLSP.Server.Handlers
 
             if (request.Position.Line >= currentFileLines.Length) return new CompletionList();
             var line = currentFileLines[request.Position.Line];
+
+            var lexer = new GscLexer();
+            var lexed = GscLexingHelper.Lex(content);
+            var token = GscLexingHelper.GetTokenAtOrBeforePosition(lexed.Tokens, request.Position.Line, request.Position.Character);
+
+            if (token is { Kind: TokenKind.Comment or TokenKind.String })
+            {
+                return new CompletionList();
+            }
+
+            var appendSemicolon = !GscLexingHelper.IsInsideFunctionArgumentList(lexed.Tokens, request.Position.Line, request.Position.Character);
 
             int safeLength = Math.Min(request.Position.Character, line.Length);
             string lineUntilCursor = line[..safeLength];
@@ -154,7 +161,7 @@ namespace GSCLSP.Server.Handlers
 
                 foreach (var symbol in filteredSymbols)
                 {
-                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Global Function"));
+                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Global Function", appendSemicolon));
                 }
                 return GscCompletionItemFactory.ToFilteredList(completions);
             }
@@ -164,12 +171,13 @@ namespace GSCLSP.Server.Handlers
                 bool isThisFile = symbol.FilePath.Equals(currentFilePath, StringComparison.OrdinalIgnoreCase);
                 completions.Add(GscCompletionItemFactory.FromSymbol(symbol,
                     isThisFile ? CompletionItemKind.Field : CompletionItemKind.Function,
-                    isThisFile ? "Local Function" : "Project Function"));
+                    isThisFile ? "Local Function" : "Project Function",
+                    appendSemicolon));
             }
 
             foreach (var symbol in _indexer.Symbols)
             {
-                completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Dump Function"));
+                completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Dump Function", appendSemicolon));
             }
 
             var includesSet = _fileIncludesCache.GetOrAdd(currentFilePath, _ => ParseIncludes(currentFileLines));
@@ -178,18 +186,18 @@ namespace GSCLSP.Server.Handlers
             {
                 foreach (var symbol in _indexer.WorkspaceSymbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
-                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, "via #include"));
+                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, "via #include", appendSemicolon));
                 }
 
                 foreach (var symbol in _indexer.Symbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
-                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, "via #include"));
+                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, "via #include", appendSemicolon));
                 }
             }
 
             foreach (var builtIn in _indexer.BuiltIns.GetAll())
             {
-                completions.Add(GscCompletionItemFactory.FromSymbol(builtIn, CompletionItemKind.Function, "Engine Built-in"));
+                completions.Add(GscCompletionItemFactory.FromSymbol(builtIn, CompletionItemKind.Function, "Engine Built-in", appendSemicolon));
             }
 
             var macros = _indexer.GetAllVisibleMacros(currentFilePath);
@@ -207,11 +215,6 @@ namespace GSCLSP.Server.Handlers
                     completions.Add(GscCompletionItemFactory.FromLocalVariable(localVar));
                 }
             }
-
-#if DEBUG
-            sw.Stop();
-            Console.Error.WriteLine($"GSCLSP: GscCompletionHandler completed in {sw.Elapsed.TotalMilliseconds:N2}ms");
-#endif
 
             return GscCompletionItemFactory.ToFilteredList(completions);
         }
