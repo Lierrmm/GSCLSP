@@ -43,4 +43,22 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))?(?<name>[a-zA-Z_]\w*)\s*\(", RegexOptions.Compiled)]
     public static partial Regex CallSiteRegex();
+
+    [GeneratedRegex(@"(?<lhs>[a-zA-Z_][\w.]*)\s*=\s*(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))(?<name>[a-zA-Z_]\w*)\s*;", RegexOptions.Compiled)]
+    public static partial Regex FunctionPointerAssignmentRegex();
+
+    [GeneratedRegex(@"\[\[\s*(?<target>[^\]]+?)\s*\]\]\s*\(", RegexOptions.Compiled)]
+    public static partial Regex FunctionPointerCallRegex();
+
+    [GeneratedRegex(@"gsclsp-ignore\s*(?::|=)?\s*semicolon\b", RegexOptions.CultureInvariant)]
+    public static partial Regex MuteSemicolonRegex();
+
+    [GeneratedRegex(@"gsclsp-ignore\s*(?::|=)?\s*recursive\b", RegexOptions.CultureInvariant)]
+    public static partial Regex MuteRecursiveRegex();
+
+    [GeneratedRegex(@"gsclsp-ignore\s*(?::|=)?\s*unresolved\b", RegexOptions.CultureInvariant)]
+    public static partial Regex MuteUnresolvedRegex();
+
+    [GeneratedRegex(@"gsclsp-ignore\s*(?::|=)?\s*unused\b", RegexOptions.CultureInvariant)]
+    public static partial Regex MuteUnusedRegex();
 }
