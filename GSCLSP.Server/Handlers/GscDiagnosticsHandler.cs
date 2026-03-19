@@ -293,10 +293,57 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         if (last is TokenKind.Semicolon or TokenKind.OpenBrace or TokenKind.CloseBrace or TokenKind.Colon)
             return false;
 
-        if (IsControlFlowHeaderLine(lineTokens))
+        if (IsControlFlowHeaderLine(lineTokens) || IsInsideMultiLineControlFlowHeader(lines, lineIndex))
             return false;
 
         return true;
+    }
+
+    private static bool IsInsideMultiLineControlFlowHeader(string[] lines, int lineIndex)
+    {
+        if (lineIndex <= 0)
+            return false;
+
+        for (int start = lineIndex; start >= 0; start--)
+        {
+            var trimmed = lines[start].Trim();
+            if (string.IsNullOrEmpty(trimmed))
+                continue;
+
+            if (trimmed.StartsWith("//", StringComparison.Ordinal))
+                continue;
+
+            if (trimmed == "{" || trimmed == "}" || trimmed.EndsWith(';'))
+                return false;
+
+            if (!StartsControlFlowHeader(trimmed))
+                continue;
+
+            var parenBalance = 0;
+            for (int i = start; i <= lineIndex; i++)
+            {
+                foreach (var c in lines[i])
+                {
+                    if (c == '(') parenBalance++;
+                    else if (c == ')') parenBalance--;
+                }
+            }
+
+            return parenBalance >= 0;
+        }
+
+        return false;
+    }
+
+    private static bool StartsControlFlowHeader(string trimmed)
+    {
+        return trimmed.StartsWith("if", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("else if", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("else", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("for", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("foreach", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("while", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("switch", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsControlFlowHeaderLine(List<Token> lineTokens)
