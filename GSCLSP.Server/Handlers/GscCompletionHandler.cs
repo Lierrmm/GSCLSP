@@ -72,8 +72,8 @@ namespace GSCLSP.Server.Handlers
                 return new CompletionList(completions);
             }
 
-            // define doesn't need to include anything as its new macros
-            if (trimmedLine.StartsWith("#define "))
+            // doesn't need to include anything as its just the macro
+            if (trimmedLine.StartsWith("#define ") || trimmedLine.StartsWith("#else") || trimmedLine.StartsWith("#endif"))
             {
                 return new CompletionList();
             }
