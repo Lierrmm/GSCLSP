@@ -865,7 +865,7 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
 
         var isValid = builtIn.IsVariadic
             ? argCount >= min
-            : (!max.HasValue || (argCount >= min && argCount <= max.Value));
+            : (argCount >= min && (!max.HasValue || argCount <= max.Value));
 
         if (isValid)
             return;
