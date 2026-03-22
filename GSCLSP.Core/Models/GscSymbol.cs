@@ -8,5 +8,8 @@ public record GscSymbol(
     int LineNumber,
     string Parameters,
     SymbolType Type,
-    string Documentation = ""
+    string Documentation = "",
+    int? MinArgs = null,
+    int? MaxArgs = null,
+    bool IsVariadic = false
 );

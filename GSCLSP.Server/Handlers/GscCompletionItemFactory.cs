@@ -6,21 +6,45 @@ namespace GSCLSP.Server.Handlers;
 
 internal static class GscCompletionItemFactory
 {
+    private static readonly HashSet<string> VariadicBuiltInNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "iprintln",
+        "iprintlnbold"
+    };
+
     public static CompletionItem FromSymbol(GscSymbol symbol, CompletionItemKind kind, string detailSource, bool appendSemicolon = false)
     {
-        var argList = (symbol.Parameters ?? "")
+        var parsedArgs = (symbol.Parameters ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries)
             .Select(a => a.Trim())
             .Where(a => !string.IsNullOrEmpty(a))
             .ToList();
 
+        var isEngineBuiltIn = symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase);
+        var isVariadic = symbol.IsVariadic || (isEngineBuiltIn && VariadicBuiltInNames.Contains(symbol.Name));
+
+        var requiredArgCount = isEngineBuiltIn
+            ? Math.Max(0, symbol.MinArgs ?? parsedArgs.Count)
+            : parsedArgs.Count;
+
+        if (isEngineBuiltIn && isVariadic)
+            requiredArgCount = Math.Max(1, requiredArgCount);
+
+        string GetArgName(int index)
+        {
+            if (index < parsedArgs.Count && !string.IsNullOrWhiteSpace(parsedArgs[index]))
+                return parsedArgs[index].Trim('[', ']');
+
+            return $"arg{index}";
+        }
+
         string insertText;
-        if (argList.Count > 0)
+        if (requiredArgCount > 0)
         {
             var snippetParts = new List<string>();
-            for (int i = 0; i < argList.Count; i++)
+            for (int i = 0; i < requiredArgCount; i++)
             {
-                string paramName = argList[i].Replace("}", "\\}").Trim();
+                string paramName = GetArgName(i).Replace("}", "\\}").Trim();
                 snippetParts.Add($"${{{i + 1}:{paramName}}}");
             }
             insertText = $"{symbol.Name}({string.Join(", ", snippetParts)})";
@@ -35,16 +59,14 @@ internal static class GscCompletionItemFactory
             insertText += ";";
         }
 
-        var paramString = string.IsNullOrWhiteSpace(symbol.Parameters)
-            ? "()"
-            : $"({symbol.Parameters.Trim()})";
+        var paramString = BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
 
         return new CompletionItem
         {
             Label = symbol.Name,
             LabelDetails = new CompletionItemLabelDetails
             {
-                Detail = $"{paramString}",
+                Detail = paramString,
                 Description = detailSource
             },
             Kind = kind,
@@ -57,6 +79,44 @@ internal static class GscCompletionItemFactory
             InsertTextFormat = InsertTextFormat.Snippet,
             FilterText = symbol.Name
         };
+    }
+
+    private static string BuildParamDetail(GscSymbol symbol, List<string> parsedArgs, Func<int, string> getArgName, bool isVariadic)
+    {
+        if (symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase))
+        {
+            var min = Math.Max(0, symbol.MinArgs ?? 0);
+            var maxFromSymbol = symbol.MaxArgs ?? parsedArgs.Count;
+            var max = Math.Max(min, maxFromSymbol);
+
+            if (isVariadic)
+            {
+                var requiredParts = Enumerable.Range(0, Math.Max(1, min)).Select(getArgName);
+                return $"({string.Join(", ", requiredParts)}, ...args)";
+            }
+
+            if (min == max)
+            {
+                if (max == 0) return "()";
+                var parts = Enumerable.Range(0, max).Select(getArgName);
+                return $"({string.Join(", ", parts)})";
+            }
+
+            var required = min == 0
+                ? string.Empty
+                : string.Join(", ", Enumerable.Range(0, min).Select(getArgName));
+
+            var optional = string.Join(", ", Enumerable.Range(min, max - min).Select(i => $"[{getArgName(i)}]"));
+
+            if (string.IsNullOrEmpty(required))
+                return $"({optional})";
+
+            return $"({required}, {optional})";
+        }
+
+        return string.IsNullOrWhiteSpace(symbol.Parameters)
+            ? "()"
+            : $"({symbol.Parameters.Trim()})";
     }
 
     public static CompletionItem FromMacro(GscIndexer.MacroDefinition macro)

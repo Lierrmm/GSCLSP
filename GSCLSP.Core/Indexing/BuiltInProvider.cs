@@ -5,6 +5,12 @@ namespace GSCLSP.Core.Indexing;
 
 public class BuiltInProvider
 {
+    private static readonly HashSet<string> VariadicBuiltIns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "iprintln",
+        "iprintlnbold"
+    };
+
     private readonly Dictionary<string, GscSymbol> _builtInFunctions = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, GscSymbol> _builtInMethods = new(StringComparer.OrdinalIgnoreCase);
 
@@ -63,19 +69,25 @@ public class BuiltInProvider
             if (string.IsNullOrWhiteSpace(name))
                 continue;
 
-            var parms = ReadArgs(element);
+            var minArgs = ReadIntProperty(element, "minArgs");
+            var maxArgs = ReadIntProperty(element, "maxArgs");
+            var isVariadic = VariadicBuiltIns.Contains(name);
+            var parms = ReadArgs(element, name, minArgs, maxArgs, isVariadic);
 
             target[name] = new GscSymbol(
                 name,
                 "Engine",
                 0,
                 parms,
-                symbolType
+                symbolType,
+                MinArgs: minArgs,
+                MaxArgs: maxArgs,
+                IsVariadic: isVariadic
             );
         }
     }
 
-    private static string ReadArgs(JsonElement element)
+    private static string ReadArgs(JsonElement element, string builtinName, int? minArgs, int? maxArgs, bool isVariadic)
     {
         if (element.TryGetProperty("args", out var argsElement) && argsElement.ValueKind == JsonValueKind.Array)
         {
@@ -106,15 +118,19 @@ public class BuiltInProvider
                 return string.Join(", ", argNames);
         }
 
-        // Compact format support: no args array, infer placeholders from arity metadata.
-        var maxArgs = ReadIntProperty(element, "maxArgs");
-        var minArgs = ReadIntProperty(element, "minArgs");
-        var inferredCount = Math.Max(maxArgs ?? 0, minArgs ?? 0);
+        var required = Math.Max(0, minArgs ?? 0);
 
-        if (inferredCount <= 0)
+        if (isVariadic)
+        {
+            var requiredForVariadic = Math.Max(1, required);
+            var requiredArgs = Enumerable.Range(0, requiredForVariadic).Select(i => $"arg{i}");
+            return string.Join(", ", requiredArgs.Append("...args"));
+        }
+
+        if (required <= 0)
             return string.Empty;
 
-        return string.Join(", ", Enumerable.Range(0, inferredCount).Select(i => $"arg{i}"));
+        return string.Join(", ", Enumerable.Range(0, required).Select(i => $"arg{i}"));
     }
 
     private static int? ReadIntProperty(JsonElement element, string propertyName)
