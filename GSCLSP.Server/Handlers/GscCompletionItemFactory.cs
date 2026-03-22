@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -12,7 +13,42 @@ internal static class GscCompletionItemFactory
         "iprintlnbold"
     };
 
+    private sealed class SymbolCompletionCache
+    {
+        public required string ParamDetail { get; init; }
+        public required string InsertText { get; init; }
+        public required string InsertTextWithSemicolon { get; init; }
+        public required string FileNameForDoc { get; init; }
+    }
+
+    private static readonly ConditionalWeakTable<GscSymbol, SymbolCompletionCache> _symbolCache = new();
+
     public static CompletionItem FromSymbol(GscSymbol symbol, CompletionItemKind kind, string detailSource, bool appendSemicolon = false)
+    {
+        var cached = _symbolCache.GetValue(symbol, static s => BuildSymbolCache(s));
+        var insertText = appendSemicolon ? cached.InsertTextWithSemicolon : cached.InsertText;
+
+        return new CompletionItem
+        {
+            Label = symbol.Name,
+            LabelDetails = new CompletionItemLabelDetails
+            {
+                Detail = cached.ParamDetail,
+                Description = detailSource
+            },
+            Kind = kind,
+            Documentation = new StringOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = $"**Source:** `{cached.FileNameForDoc}`"
+            }),
+            InsertText = insertText,
+            InsertTextFormat = InsertTextFormat.Snippet,
+            FilterText = symbol.Name
+        };
+    }
+
+    private static SymbolCompletionCache BuildSymbolCache(GscSymbol symbol)
     {
         var parsedArgs = (symbol.Parameters ?? "")
             .Split(',', StringSplitOptions.RemoveEmptyEntries)
@@ -41,7 +77,7 @@ internal static class GscCompletionItemFactory
         string insertText;
         if (requiredArgCount > 0)
         {
-            var snippetParts = new List<string>();
+            var snippetParts = new List<string>(requiredArgCount);
             for (int i = 0; i < requiredArgCount; i++)
             {
                 string paramName = GetArgName(i).Replace("}", "\\}").Trim();
@@ -54,30 +90,14 @@ internal static class GscCompletionItemFactory
             insertText = $"{symbol.Name}($0)";
         }
 
-        if (appendSemicolon)
-        {
-            insertText += ";";
-        }
+        var paramDetail = BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
 
-        var paramString = BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
-
-        return new CompletionItem
+        return new SymbolCompletionCache
         {
-            Label = symbol.Name,
-            LabelDetails = new CompletionItemLabelDetails
-            {
-                Detail = paramString,
-                Description = detailSource
-            },
-            Kind = kind,
-            Documentation = new StringOrMarkupContent(new MarkupContent
-            {
-                Kind = MarkupKind.Markdown,
-                Value = $"**Source:** `{Path.GetFileName(symbol.FilePath)}`"
-            }),
+            ParamDetail = paramDetail,
             InsertText = insertText,
-            InsertTextFormat = InsertTextFormat.Snippet,
-            FilterText = symbol.Name
+            InsertTextWithSemicolon = insertText + ";",
+            FileNameForDoc = Path.GetFileName(symbol.FilePath)
         };
     }
 
@@ -178,9 +198,10 @@ internal static class GscCompletionItemFactory
 
     public static CompletionList ToFilteredList(IEnumerable<CompletionItem> items)
     {
-        return new CompletionList(items
-            .OrderByDescending(x => x.LabelDetails?.Description?.Contains("Project"))
-            .GroupBy(x => x.Label)
-            .Select(x => x.First()));
+        var seen = new Dictionary<string, CompletionItem>(StringComparer.Ordinal);
+        foreach (var item in items.OrderByDescending(x => x.LabelDetails?.Description?.Contains("Project")))
+            seen.TryAdd(item.Label, item);
+
+        return new CompletionList(seen.Values);
     }
 }
