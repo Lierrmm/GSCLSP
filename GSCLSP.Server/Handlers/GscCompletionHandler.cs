@@ -1,4 +1,5 @@
 ﻿using GSCLSP.Core.Indexing;
+using GSCLSP.Core.Models;
 using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -226,9 +227,19 @@ namespace GSCLSP.Server.Handlers
                 }
             }
 
-            foreach (var builtIn in _indexer.BuiltIns.GetAll())
+            var preferBuiltInMethods = IsMethodCallCompletionContext(lineUntilCursor);
+
+            foreach (var builtIn in _indexer.BuiltIns.GetAll(preferBuiltInMethods))
             {
-                completions.Add(GscCompletionItemFactory.FromSymbol(builtIn, CompletionItemKind.Function, "Engine Built-in", appendSemicolon));
+                var kind = builtIn.Type == SymbolType.Method
+                    ? CompletionItemKind.Method
+                    : CompletionItemKind.Function;
+
+                var source = builtIn.Type == SymbolType.Method
+                    ? "Engine Built-in Method"
+                    : "Engine Built-in Function";
+
+                completions.Add(GscCompletionItemFactory.FromSymbol(builtIn, kind, source, appendSemicolon));
             }
 
             var macros = _indexer.GetAllVisibleMacros(currentFilePath);
@@ -279,6 +290,46 @@ namespace GSCLSP.Server.Handlers
                 DocumentSelector = TextDocumentSelector.ForLanguage("gsc"),
                 TriggerCharacters = new Container<string>(":", ".", "#", "\\")
             };
+        }
+
+        private static bool IsMethodCallCompletionContext(string lineUntilCursor)
+        {
+            if (string.IsNullOrWhiteSpace(lineUntilCursor))
+                return false;
+
+            var i = lineUntilCursor.Length - 1;
+
+            while (i >= 0 && char.IsWhiteSpace(lineUntilCursor[i]))
+                i--;
+
+            if (i < 0)
+                return false;
+
+            var calleeEnd = i;
+            while (i >= 0 && (char.IsLetterOrDigit(lineUntilCursor[i]) || lineUntilCursor[i] == '_'))
+                i--;
+
+            if (calleeEnd == i)
+                return false;
+
+            var whitespaceCount = 0;
+            while (i >= 0 && char.IsWhiteSpace(lineUntilCursor[i]))
+            {
+                whitespaceCount++;
+                i--;
+            }
+
+            if (whitespaceCount == 0 || i < 0)
+                return false;
+
+            if (lineUntilCursor[i] is ')' or ']')
+                return true;
+
+            var callerEnd = i;
+            while (i >= 0 && (char.IsLetterOrDigit(lineUntilCursor[i]) || lineUntilCursor[i] == '_'))
+                i--;
+
+            return callerEnd != i;
         }
     }
 }

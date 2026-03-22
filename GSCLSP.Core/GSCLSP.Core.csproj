@@ -10,6 +10,9 @@
     <None Update="data\iw4_builtins.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="data\old_iw4_builtins.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
     <None Update="data\symbols.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
