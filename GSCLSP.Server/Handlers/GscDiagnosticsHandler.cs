@@ -14,9 +14,11 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
     public const string MissingSemicolonWarningCode = "gsclsp.missingSemicolon";
+    public const string InvalidBuiltinArgCountDiagnosticCode = "gsclsp.invalidBuiltinArgCount";
 
     private const string RecursiveWarningMuteKey = "recursive-function";
     private const string MissingSemicolonMuteKey = "missing-semicolon";
+    private const string BuiltinArgCountMuteKey = "builtin-arg-count";
 
     private static readonly HashSet<string> ReservedWords = GscLanguageKeywords.DiagnosticReservedWords;
 
@@ -133,7 +135,10 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
                             new Position(lineIndex, functionToken.Column),
                             new Position(lineIndex, functionToken.Column + functionToken.Length))
                     });
+                    continue;
                 }
+
+                AddBuiltInArgDiagnostics(diagnostics, lineTokens, i, lineIndex, functionToken, muteConfig);
             }
 
             if (ShouldWarnForMissingSemicolon(lines, lineIndex, lineTokens) &&
@@ -761,6 +766,12 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
             if (normalized is "semicolon" or "missing-semicolon")
             {
                 keys.Add(MissingSemicolonMuteKey);
+                continue;
+            }
+
+            if (normalized is "builtin-arg-count" or "builtin-args" or "arity")
+            {
+                keys.Add(BuiltinArgCountMuteKey);
             }
         }
 
@@ -827,4 +838,120 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
     private sealed record IncludedFileScope(string Path, HashSet<string> Functions);
     private sealed record FunctionDefinition(string Name, int DefinitionLine, int NameColumn, int BraceLine);
     private sealed record MuteConfig(HashSet<string> TopOfFileMutes, Dictionary<int, HashSet<string>> LineMutes);
+
+    private void AddBuiltInArgDiagnostics(
+        List<Diagnostic> diagnostics,
+        List<Token> lineTokens,
+        int functionTokenIndex,
+        int lineIndex,
+        Token functionToken,
+        MuteConfig muteConfig)
+    {
+        if (IsMuted(muteConfig, BuiltinArgCountMuteKey, lineIndex))
+            return;
+
+        var functionName = functionToken.Text;
+        var preferMethodBuiltIn = IsMethodStyleInvocation(lineTokens, functionTokenIndex);
+        var builtIn = _indexer.BuiltIns.GetBuiltIn(functionName, preferMethodBuiltIn);
+
+        if (builtIn == null || !builtIn.MinArgs.HasValue)
+            return;
+
+        if (!TryCountCallArguments(lineTokens, functionTokenIndex + 1, out var argCount))
+            return;
+
+        var min = Math.Max(0, builtIn.MinArgs ?? 0);
+        var max = builtIn.MaxArgs.HasValue ? Math.Max(min, builtIn.MaxArgs.Value) : (int?)null;
+
+        var isValid = builtIn.IsVariadic
+            ? argCount >= min
+            : (!max.HasValue || (argCount >= min && argCount <= max.Value));
+
+        if (isValid)
+            return;
+
+        var expected = builtIn.IsVariadic
+            ? $"at least {min}"
+            : max.HasValue && min != max.Value
+                ? $"{min} to {max.Value}"
+                : min.ToString();
+
+        diagnostics.Add(new Diagnostic
+        {
+            Severity = DiagnosticSeverity.Warning,
+            Source = "gsclsp",
+            Code = InvalidBuiltinArgCountDiagnosticCode,
+            Data = functionName,
+            Message = $"Built-in '{functionName}' expects {expected} argument(s), but got {argCount}.",
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                new Position(lineIndex, functionToken.Column),
+                new Position(lineIndex, functionToken.Column + functionToken.Length))
+        });
+    }
+
+    private static bool IsMethodStyleInvocation(List<Token> lineTokens, int functionTokenIndex)
+    {
+        if (functionTokenIndex <= 0)
+            return false;
+
+        var previous = lineTokens[functionTokenIndex - 1];
+
+        return previous.Kind is TokenKind.Identifier
+            or TokenKind.Keyword
+            or TokenKind.CloseParen
+            or TokenKind.CloseBracket;
+    }
+
+    private static bool TryCountCallArguments(List<Token> lineTokens, int openParenTokenIndex, out int argCount)
+    {
+        argCount = 0;
+
+        if (openParenTokenIndex < 0 || openParenTokenIndex >= lineTokens.Count)
+            return false;
+
+        if (lineTokens[openParenTokenIndex].Kind != TokenKind.OpenParen)
+            return false;
+
+        int depthParen = 1;
+        int depthBracket = 0;
+        int depthBrace = 0;
+        int commas = 0;
+        bool hasTopLevelToken = false;
+
+        for (int i = openParenTokenIndex + 1; i < lineTokens.Count; i++)
+        {
+            var kind = lineTokens[i].Kind;
+
+            if (kind == TokenKind.OpenParen) { depthParen++; continue; }
+            if (kind == TokenKind.CloseParen)
+            {
+                depthParen--;
+                if (depthParen == 0)
+                {
+                    argCount = hasTopLevelToken ? commas + 1 : 0;
+                    return true;
+                }
+                continue;
+            }
+
+            if (kind == TokenKind.OpenBracket) { depthBracket++; continue; }
+            if (kind == TokenKind.CloseBracket) { depthBracket = Math.Max(0, depthBracket - 1); continue; }
+            if (kind == TokenKind.OpenBrace) { depthBrace++; continue; }
+            if (kind == TokenKind.CloseBrace) { depthBrace = Math.Max(0, depthBrace - 1); continue; }
+
+            bool isTopLevel = depthParen == 1 && depthBracket == 0 && depthBrace == 0;
+            if (!isTopLevel)
+                continue;
+
+            if (kind == TokenKind.Comma)
+            {
+                commas++;
+                continue;
+            }
+
+            hasTopLevelToken = true;
+        }
+
+        return false;
+    }
 }
