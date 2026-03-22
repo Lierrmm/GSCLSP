@@ -2,23 +2,19 @@
 using GSCLSP.Server.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using OmniSharp.Extensions.LanguageServer.Server;
+
+#if DEBUG // Dumping built-in argument usage from a folder of decompiled GSC files. Adjust paths as needed.
+using GSCLSP.Core.Tools;
+await BuiltinArgScanner.InferArgsAsync(
+    dumpFolder: @"D:\Xbox360\code\gsc\MW2 Dump",
+    builtinsJsonPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\iw4_builtins.json", matchesLogPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\output.json");
+
+return;
+#endif
 
 var indexer = new GscIndexer();
 var documentStore = new GscDocumentStore();
-
-string basePath = AppDomain.CurrentDomain.BaseDirectory;
-string builtInPath = Path.Combine(basePath, "data", "iw4_builtins.json");
-
-try
-{
-    indexer.BuiltIns.LoadBuiltIns(builtInPath);
-}
-catch (Exception ex)
-{
-    Console.Error.WriteLine($"GSCLSP Init Error: {ex.Message}");
-}
 
 var server = await LanguageServer.From(options =>
     options
@@ -49,8 +45,11 @@ var server = await LanguageServer.From(options =>
                 var serverIndexer = server.Services.GetService<GscIndexer>();
                 serverIndexer?.IndexWorkspace(workspacePath);
             }
+            else
+            {
+                indexer.UpdateSettingDumpPath(null);
+            }
 
-            indexer.UpdateSettingDumpPath(null);
             return Task.CompletedTask;
         })
 );

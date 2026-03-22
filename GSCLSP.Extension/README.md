@@ -29,6 +29,7 @@ Language support for `.gsc` / `.gsh` files powered by the `GSCLSP` language serv
   - Unresolved function calls (`gsclsp.unresolvedFunction`)
   - Missing semicolon (`gsclsp.missingSemicolon`)
   - Recursive function warning (`gsclsp.recursiveFunction`)
+  - Built-in argument count warning (`gsclsp.invalidBuiltinArgCount`)
 
 - **Code Actions**
   - Quick fix to insert `#include ...` for unresolved functions
@@ -44,13 +45,15 @@ Supported format:
 
 - `// gsclsp-disable: recursive-function`
 - `// gsclsp-disable: missing-semicolon`
-- `// gsclsp-disable: recursive, semicolon`
+- `// gsclsp-disable: builtin-arg-count`
+- `// gsclsp-disable: recursive, semicolon, builtin-args`
 - `// gsclsp-disable: all`
 
 Aliases supported:
 
 - `recursive` -> `recursive-function`
 - `semicolon` -> `missing-semicolon`
+- `builtin-args` or `arity` -> `builtin-arg-count`
 
 ## Project Setup
 

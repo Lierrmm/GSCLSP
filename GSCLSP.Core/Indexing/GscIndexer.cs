@@ -303,7 +303,7 @@ public partial class GscIndexer
         return null;
     }
 
-    public GscResolution ResolveFunction(string callingFilePath, string functionName)
+    public GscResolution ResolveFunction(string callingFilePath, string functionName, bool preferMethodBuiltIn = false)
     {
         string normalizedCallingPath = Uri.UnescapeDataString(callingFilePath)
             .Replace("file:///", "")
@@ -321,7 +321,7 @@ public partial class GscIndexer
         }
 
         // Built-ins like 'distance' or 'isDefined' override everything except local definitions.
-        var builtIn = BuiltIns.GetBuiltIn(functionName);
+        var builtIn = BuiltIns.GetBuiltIn(functionName, preferMethodBuiltIn);
         if (builtIn != null)
         {
             return new GscResolution(builtIn, ResolutionType.Global);
@@ -729,7 +729,8 @@ public partial class GscIndexer
             ? parsed.FunctionName
             : $"{parsed.Path}::{parsed.FunctionName}";
 
-        return ResolveFunction(contextPath, lookupName);
+        var isMethodStyleCall = !string.IsNullOrWhiteSpace(parsed.Caller);
+        return ResolveFunction(contextPath, lookupName, isMethodStyleCall);
     }
 
     public void FindReferences(string functionName)
@@ -819,21 +820,22 @@ public partial class GscIndexer
 
     private void ApplyConfiguredDumpPath()
     {
-        var (hasWorkspaceConfig, workspaceDumpPath) = TryReadWorkspaceDumpPath(WorkspacePath);
-        var resolvedDumpPath = ResolveDumpPathValue(_settingDumpPath, WorkspacePath, hasWorkspaceConfig, workspaceDumpPath);
+        var (hasWorkspaceConfig, workspaceConfig) = TryReadWorkspaceConfig(WorkspacePath);
+        var resolvedDumpPath = ResolveDumpPathValue(_settingDumpPath, WorkspacePath, hasWorkspaceConfig, workspaceConfig?.DumpPath);
 
         if (hasWorkspaceConfig)
         {
-            if (string.IsNullOrWhiteSpace(workspaceDumpPath))
+            if (string.IsNullOrWhiteSpace(workspaceConfig?.DumpPath))
                 Console.Error.WriteLine("GSCLSP: gsclsp.config.json found with no dumpPath. Clearing dump index.");
             else
-                Console.Error.WriteLine($"GSCLSP: dumpPath from gsclsp.config.json -> {workspaceDumpPath}");
+                Console.Error.WriteLine($"GSCLSP: dumpPath from gsclsp.config.json -> {workspaceConfig.DumpPath}");
         }
         else
         {
             Console.Error.WriteLine("GSCLSP: gsclsp.config.json not found. Dump index disabled unless configured.");
         }
 
+        LoadConfiguredBuiltIns(hasWorkspaceConfig, workspaceConfig?.Game);
         UpdateDumpPath(resolvedDumpPath);
     }
 
@@ -854,7 +856,51 @@ public partial class GscIndexer
         return clean;
     }
 
-    private static (bool HasConfigFile, string? DumpPath) TryReadWorkspaceDumpPath(string? workspacePath)
+    private void LoadConfiguredBuiltIns(bool hasWorkspaceConfig, string? workspaceGame)
+    {
+        var game = ResolveGameValue(hasWorkspaceConfig, workspaceGame);
+        var normalizedGame = string.IsNullOrWhiteSpace(game)
+            ? "iw4"
+            : game.Trim().ToLowerInvariant();
+
+        var basePath = AppDomain.CurrentDomain.BaseDirectory;
+        var dataPath = Path.Combine(basePath, "data");
+
+        var requestedPath = Path.Combine(dataPath, $"{normalizedGame}_builtins.json");
+        var fallbackPath = Path.Combine(dataPath, "iw4_builtins.json");
+
+        if (File.Exists(requestedPath))
+        {
+            BuiltIns.LoadBuiltIns(requestedPath);
+            Console.Error.WriteLine($"GSCLSP: loaded built-ins for game '{normalizedGame}'.");
+            return;
+        }
+
+        if (!normalizedGame.Equals("iw4", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.Error.WriteLine($"GSCLSP: built-ins for game '{normalizedGame}' not found. Falling back to iw4_builtins.json.");
+        }
+
+        if (File.Exists(fallbackPath))
+        {
+            BuiltIns.LoadBuiltIns(fallbackPath);
+            return;
+        }
+
+        Console.Error.WriteLine("GSCLSP: no built-ins file found (expected data/iw4_builtins.json).");
+    }
+
+    private static string ResolveGameValue(bool hasWorkspaceConfig, string? workspaceGame)
+    {
+        if (hasWorkspaceConfig && !string.IsNullOrWhiteSpace(workspaceGame))
+            return workspaceGame.Trim();
+
+        return "iw4";
+    }
+
+    private sealed record WorkspaceConfig(string? DumpPath, string? Game);
+
+    private static (bool HasConfigFile, WorkspaceConfig? Config) TryReadWorkspaceConfig(string? workspacePath)
     {
         if (string.IsNullOrWhiteSpace(workspacePath) || !Directory.Exists(workspacePath))
             return (false, null);
@@ -863,10 +909,10 @@ public partial class GscIndexer
         if (!File.Exists(configPath))
             return (false, null);
 
-        return (true, ReadDumpPathFromFile(configPath));
+        return (true, ReadWorkspaceConfigFromFile(configPath));
     }
 
-    private static string? ReadDumpPathFromFile(string filePath)
+    private static WorkspaceConfig? ReadWorkspaceConfigFromFile(string filePath)
     {
         if (!File.Exists(filePath))
             return null;
@@ -879,8 +925,16 @@ public partial class GscIndexer
             if (root.ValueKind != JsonValueKind.Object)
                 return null;
 
+            string? dumpPath = null;
+            string? game = null;
+
             if (root.TryGetProperty("dumpPath", out var directDumpPath) && directDumpPath.ValueKind == JsonValueKind.String)
-                return directDumpPath.GetString();
+                dumpPath = directDumpPath.GetString();
+
+            if (root.TryGetProperty("game", out var gameProperty) && gameProperty.ValueKind == JsonValueKind.String)
+                game = gameProperty.GetString();
+
+            return new WorkspaceConfig(dumpPath, game);
         }
         catch { }
 
