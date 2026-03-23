@@ -25,6 +25,7 @@ public sealed class GscLexer
         _column = 0;
         _tokens.Clear();
         _diagnostics.Clear();
+        _tokens.EnsureCapacity(Math.Max(_tokens.Count, (_source.Length / 3) + 1));
 
         while (!IsAtEnd)
         {
@@ -72,7 +73,7 @@ public sealed class GscLexer
                 ReadIdentifier();
                 var text = Slice(start);
                 var kind = Keywords.Contains(text) ? TokenKind.Keyword : TokenKind.Identifier;
-                AddToken(kind, start, line, column);
+                AddToken(kind, text, start, line, column);
                 continue;
             }
 
@@ -352,6 +353,11 @@ public sealed class GscLexer
     private void AddToken(TokenKind kind, int start, int line, int column)
     {
         var text = Slice(start);
+        _tokens.Add(new Token(kind, text, start, _position - start, line, column));
+    }
+
+    private void AddToken(TokenKind kind, string text, int start, int line, int column)
+    {
         _tokens.Add(new Token(kind, text, start, _position - start, line, column));
     }
 
