@@ -18,7 +18,7 @@ internal static class GscCompletionItemFactory
         public required string ParamDetail { get; init; }
         public required string InsertText { get; init; }
         public required string InsertTextWithSemicolon { get; init; }
-        public required string FileNameForDoc { get; init; }
+        public required StringOrMarkupContent Documentation { get; init; }
     }
 
     private static readonly ConditionalWeakTable<GscSymbol, SymbolCompletionCache> _symbolCache = new();
@@ -26,7 +26,6 @@ internal static class GscCompletionItemFactory
     public static CompletionItem FromSymbol(GscSymbol symbol, CompletionItemKind kind, string detailSource, bool appendSemicolon = false)
     {
         var cached = _symbolCache.GetValue(symbol, static s => BuildSymbolCache(s));
-        var insertText = appendSemicolon ? cached.InsertTextWithSemicolon : cached.InsertText;
 
         return new CompletionItem
         {
@@ -37,12 +36,8 @@ internal static class GscCompletionItemFactory
                 Description = detailSource
             },
             Kind = kind,
-            Documentation = new StringOrMarkupContent(new MarkupContent
-            {
-                Kind = MarkupKind.Markdown,
-                Value = $"**Source:** `{cached.FileNameForDoc}`"
-            }),
-            InsertText = insertText,
+            Documentation = cached.Documentation,
+            InsertText = appendSemicolon ? cached.InsertTextWithSemicolon : cached.InsertText,
             InsertTextFormat = InsertTextFormat.Snippet,
             FilterText = symbol.Name
         };
@@ -50,11 +45,7 @@ internal static class GscCompletionItemFactory
 
     private static SymbolCompletionCache BuildSymbolCache(GscSymbol symbol)
     {
-        var parsedArgs = (symbol.Parameters ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(a => a.Trim())
-            .Where(a => !string.IsNullOrEmpty(a))
-            .ToList();
+        var parsedArgs = ParseArgs(symbol.Parameters);
 
         var isEngineBuiltIn = symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase);
         var isVariadic = symbol.IsVariadic || (isEngineBuiltIn && VariadicBuiltInNames.Contains(symbol.Name));
@@ -90,15 +81,51 @@ internal static class GscCompletionItemFactory
             insertText = $"{symbol.Name}($0)";
         }
 
-        var paramDetail = BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
+        var paramDetail = GetParameterDetail(symbol, parsedArgs);
 
         return new SymbolCompletionCache
         {
             ParamDetail = paramDetail,
             InsertText = insertText,
             InsertTextWithSemicolon = insertText + ";",
-            FileNameForDoc = Path.GetFileName(symbol.FilePath)
+            Documentation = new StringOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = $"**Source:** `{Path.GetFileName(symbol.FilePath)}`"
+            })
         };
+    }
+
+    internal static string GetSignatureText(GscSymbol symbol, List<string>? parsedArgs = null)
+    {
+        var parameterDetail = GetParameterDetail(symbol, parsedArgs);
+        return $"{symbol.Name}{parameterDetail}";
+    }
+
+    internal static string GetParameterDetail(GscSymbol symbol, List<string>? parsedArgs = null)
+    {
+        parsedArgs ??= ParseArgs(symbol.Parameters);
+
+        var isEngineBuiltIn = symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase);
+        var isVariadic = symbol.IsVariadic || (isEngineBuiltIn && VariadicBuiltInNames.Contains(symbol.Name));
+
+        string GetArgName(int index)
+        {
+            if (index < parsedArgs.Count && !string.IsNullOrWhiteSpace(parsedArgs[index]))
+                return parsedArgs[index].Trim('[', ']');
+
+            return $"arg{index}";
+        }
+
+        return BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
+    }
+
+    private static List<string> ParseArgs(string? parameters)
+    {
+        return [.. (parameters ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(a => a.Trim())
+            .Where(a => !string.IsNullOrEmpty(a))];
     }
 
     private static string BuildParamDetail(GscSymbol symbol, List<string> parsedArgs, Func<int, string> getArgName, bool isVariadic)
@@ -198,10 +225,26 @@ internal static class GscCompletionItemFactory
 
     public static CompletionList ToFilteredList(IEnumerable<CompletionItem> items)
     {
-        var seen = new Dictionary<string, CompletionItem>(StringComparer.Ordinal);
-        foreach (var item in items.OrderByDescending(x => x.LabelDetails?.Description?.Contains("Project")))
-            seen.TryAdd(item.Label, item);
+        var itemList = items as IList<CompletionItem> ?? [.. items];
+        var seen = new Dictionary<string, CompletionItem>(itemList.Count, StringComparer.Ordinal);
+
+        for (int i = 0; i < itemList.Count; i++)
+        {
+            var item = itemList[i];
+            if (IsProjectItem(item))
+                seen.TryAdd(item.Label, item);
+        }
+
+        for (int i = 0; i < itemList.Count; i++)
+        {
+            var item = itemList[i];
+            if (!IsProjectItem(item))
+                seen.TryAdd(item.Label, item);
+        }
 
         return new CompletionList(seen.Values);
+
+        static bool IsProjectItem(CompletionItem item)
+            => item.LabelDetails?.Description?.Contains("Project", StringComparison.Ordinal) == true;
     }
 }

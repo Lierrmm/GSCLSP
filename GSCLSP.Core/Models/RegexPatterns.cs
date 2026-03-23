@@ -5,42 +5,45 @@ namespace GSCLSP.Core.Models;
 public partial class RegexPatterns
 {
 
-    [GeneratedRegex(@"^#include\s+([\w\\]+)(;?)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^#include\s+([\w\\]+)(;?)")]
     public static partial Regex IncludeRegex();
 
-    [GeneratedRegex(@"([\w\\]+)::$", RegexOptions.Compiled)]
+    [GeneratedRegex(@"([\w\\]+)::$")]
     public static partial Regex NameSpaceRegex();
 
-    [GeneratedRegex(@"^(?<name>[a-zA-Z_]\w*)\s*\((?<params>[^)]*)\)", RegexOptions.Multiline | RegexOptions.Compiled)]
+    [GeneratedRegex(@"^(?<name>[a-zA-Z_]\w*)\s*\((?<params>[^)]*)\)", RegexOptions.Multiline)]
     public static partial Regex FunctionMultiLineRegex();
 
-    [GeneratedRegex(@"(Summary|Example|MandatoryArg|OptionalArg|Module|CallOn|SPMP):", RegexOptions.Compiled)]
+    [GeneratedRegex(@"(Summary|Example|MandatoryArg|OptionalArg|Module|CallOn|SPMP):")]
     public static partial Regex DocRegex();
 
-    [GeneratedRegex(@"^#(?:include|using)\s+([\w\\]+)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^#(?:include|using)\s+([\w\\]+)")]
     public static partial Regex DirectivePathRegex();
 
-    [GeneratedRegex(@"^#inline\s+([\w\\]+(?:\.\w+)?)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^#inline\s+([\w\\]+(?:\.\w+)?)")]
     public static partial Regex InlinePathRegex();
 
-    [GeneratedRegex(@"([\w\\]*\\[\w\\]+)::", RegexOptions.Compiled)]
+    [GeneratedRegex(@"([\w\\]*\\[\w\\]+)::")]
     public static partial Regex NamespacePathRegex();
 
-    [GeneratedRegex(@"//.*", RegexOptions.Compiled)]
+    [GeneratedRegex(@"//.*")]
     public static partial Regex CommentRegex();
 
-    [GeneratedRegex(@"/\*.*?\*/", RegexOptions.Singleline | RegexOptions.Compiled)]
+    [GeneratedRegex(@"/\*.*?\*/", RegexOptions.Singleline)]
     public static partial Regex MultilineCommentRegex();
 
-    [GeneratedRegex(@"\s+", RegexOptions.Compiled)]
+    [GeneratedRegex(@"\s+")]
     public static partial Regex WhiteSpaceTabRegex();
 
-    [GeneratedRegex(@"(?:(\w+)\s+)?(?:([\w\\]+)::)?(\w+)\s*\((.*)\)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"(?:(\w+)\s+)?(?:([\w\\]+)::)?(\w+)\s*\((.*)\)")]
     public static partial Regex CallRegex();
 
-    [GeneratedRegex(@"^\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;", RegexOptions.Compiled)]
+    [GeneratedRegex(@"^\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;")]
     public static partial Regex LocalVarAssignmentRegex();
 
-    [GeneratedRegex(@"(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))?(?<name>[a-zA-Z_]\w*)\s*\(", RegexOptions.Compiled)]
+    [GeneratedRegex(@"(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))?(?<name>[a-zA-Z_]\w*)\s*\(")]
     public static partial Regex CallSiteRegex();
+
+    [GeneratedRegex(@"\b(?<name>[A-Za-z_]\w*)\s*\(")]
+    public static partial Regex CallFuncRegex();
 }

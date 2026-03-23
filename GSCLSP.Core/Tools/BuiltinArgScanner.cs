@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Tools;
 
@@ -260,7 +261,4 @@ public static partial class BuiltinArgScanner
         int Column,
         string Snippet,
         string ArgsText);
-
-    [GeneratedRegex(@"\b(?<name>[A-Za-z_]\w*)\s*\(", RegexOptions.Compiled)]
-    private static partial Regex CallFuncRegex();
 }
