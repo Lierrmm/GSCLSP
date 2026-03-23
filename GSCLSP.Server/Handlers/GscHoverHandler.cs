@@ -80,10 +80,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
                 }
             }
 
-            var signature = $"{symbol.Name}( {symbol.Parameters} )";
-
-            if (string.IsNullOrEmpty(symbol.Parameters))
-                signature = $"{symbol.Name}()";
+            var signature = GscCompletionItemFactory.GetSignatureText(symbol);
 
             var contentValue = $"```gsc\n{signature}\n```\n";
 

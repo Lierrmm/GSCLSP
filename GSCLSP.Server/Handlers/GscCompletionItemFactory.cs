@@ -50,11 +50,7 @@ internal static class GscCompletionItemFactory
 
     private static SymbolCompletionCache BuildSymbolCache(GscSymbol symbol)
     {
-        var parsedArgs = (symbol.Parameters ?? "")
-            .Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(a => a.Trim())
-            .Where(a => !string.IsNullOrEmpty(a))
-            .ToList();
+        var parsedArgs = ParseArgs(symbol.Parameters);
 
         var isEngineBuiltIn = symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase);
         var isVariadic = symbol.IsVariadic || (isEngineBuiltIn && VariadicBuiltInNames.Contains(symbol.Name));
@@ -90,7 +86,7 @@ internal static class GscCompletionItemFactory
             insertText = $"{symbol.Name}($0)";
         }
 
-        var paramDetail = BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
+        var paramDetail = GetParameterDetail(symbol);
 
         return new SymbolCompletionCache
         {
@@ -99,6 +95,37 @@ internal static class GscCompletionItemFactory
             InsertTextWithSemicolon = insertText + ";",
             FileNameForDoc = Path.GetFileName(symbol.FilePath)
         };
+    }
+
+    internal static string GetSignatureText(GscSymbol symbol)
+    {
+        var parameterDetail = GetParameterDetail(symbol);
+        return $"{symbol.Name}{parameterDetail}";
+    }
+
+    internal static string GetParameterDetail(GscSymbol symbol)
+    {
+        var parsedArgs = ParseArgs(symbol.Parameters);
+        var isEngineBuiltIn = symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase);
+        var isVariadic = symbol.IsVariadic || (isEngineBuiltIn && VariadicBuiltInNames.Contains(symbol.Name));
+
+        string GetArgName(int index)
+        {
+            if (index < parsedArgs.Count && !string.IsNullOrWhiteSpace(parsedArgs[index]))
+                return parsedArgs[index].Trim('[', ']');
+
+            return $"arg{index}";
+        }
+
+        return BuildParamDetail(symbol, parsedArgs, GetArgName, isVariadic);
+    }
+
+    private static List<string> ParseArgs(string? parameters)
+    {
+        return [.. (parameters ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(a => a.Trim())
+            .Where(a => !string.IsNullOrEmpty(a))];
     }
 
     private static string BuildParamDetail(GscSymbol symbol, List<string> parsedArgs, Func<int, string> getArgName, bool isVariadic)
