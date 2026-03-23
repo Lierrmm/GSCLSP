@@ -81,7 +81,7 @@ internal static class GscCompletionItemFactory
             insertText = $"{symbol.Name}($0)";
         }
 
-        var paramDetail = GetParameterDetail(symbol);
+        var paramDetail = GetParameterDetail(symbol, parsedArgs);
 
         return new SymbolCompletionCache
         {
@@ -96,15 +96,16 @@ internal static class GscCompletionItemFactory
         };
     }
 
-    internal static string GetSignatureText(GscSymbol symbol)
+    internal static string GetSignatureText(GscSymbol symbol, List<string>? parsedArgs = null)
     {
-        var parameterDetail = GetParameterDetail(symbol);
+        var parameterDetail = GetParameterDetail(symbol, parsedArgs);
         return $"{symbol.Name}{parameterDetail}";
     }
 
-    internal static string GetParameterDetail(GscSymbol symbol)
+    internal static string GetParameterDetail(GscSymbol symbol, List<string>? parsedArgs = null)
     {
-        var parsedArgs = ParseArgs(symbol.Parameters);
+        parsedArgs ??= ParseArgs(symbol.Parameters);
+
         var isEngineBuiltIn = symbol.FilePath.Equals("Engine", StringComparison.OrdinalIgnoreCase);
         var isVariadic = symbol.IsVariadic || (isEngineBuiltIn && VariadicBuiltInNames.Contains(symbol.Name));
 

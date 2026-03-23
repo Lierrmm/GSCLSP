@@ -25,7 +25,7 @@ public sealed class GscLexer
         _column = 0;
         _tokens.Clear();
         _diagnostics.Clear();
-        _tokens.EnsureCapacity(Math.Max(_tokens.Count, (_source.Length / 3) + 1));
+        _tokens.EnsureCapacity((_source.Length / 3) + 1);
 
         while (!IsAtEnd)
         {
