@@ -1,6 +1,5 @@
 using GSCLSP.Core.Models;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Indexing;
