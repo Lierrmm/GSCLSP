@@ -63,7 +63,7 @@
     "@types/node": "^25.3.3",
     "@types/vscode": "^1.75.0",
     "@vscode/vsce": "latest",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.0"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
