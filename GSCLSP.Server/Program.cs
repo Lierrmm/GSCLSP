@@ -7,8 +7,8 @@ using OmniSharp.Extensions.LanguageServer.Server;
 #if DEBUG // Dumping built-in argument usage from a folder of decompiled GSC files. Adjust paths as needed.
 using GSCLSP.Core.Tools;
 await BuiltinArgScanner.InferArgsAsync(
-    dumpFolder: @"D:\Xbox360\code\gsc\MW2 Dump",
-    builtinsJsonPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\iw4_builtins.json", matchesLogPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\output.json");
+    dumpFolder: @"G:\Games\MS-IW5\raw\dump\gsc",
+    builtinsJsonPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\iw5_builtins.json", matchesLogPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\output_iw5.json");
 
 return;
 #endif

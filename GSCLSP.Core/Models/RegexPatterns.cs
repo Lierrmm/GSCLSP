@@ -46,4 +46,10 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"\b(?<name>[A-Za-z_]\w*)\s*\(")]
     public static partial Regex CallFuncRegex();
+
+    [GeneratedRegex(@"\b(?<name>(?:[A-Za-z_]\w*|0[xX][0-9A-Fa-f]+|\d+))\s*\(")]
+    public static partial Regex BuiltinCallRegex();
+
+    [GeneratedRegex(@"\{\s*0x(?<id>[0-9A-Fa-f]+)\s*,\s*""(?<name>[^""]+)""\s*\}", RegexOptions.Compiled)]
+    public static partial Regex GscToolRegex();
 }

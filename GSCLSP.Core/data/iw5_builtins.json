@@ -1,0 +1,3769 @@
+{
+  "functions": [
+    {
+      "args": [],
+      "category": "common",
+      "name": "14"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "15"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "16"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "17"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "18"
+    },
+    {
+      "category": "common",
+      "name": "precacheturret",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "2"
+    },
+    {
+      "category": "common",
+      "name": "spawnturret",
+      "minArgs": 3,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "20"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "21"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "38"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "39"
+    },
+    {
+      "category": "common",
+      "name": "isdefined",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "isstring",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "setdvar",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "setdynamicdvar",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "setdvarifuninitialized",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "45"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "46"
+    },
+    {
+      "category": "common",
+      "name": "getdvar",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "getdvarint",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "getdvarfloat",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "getdvarvector",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "gettime",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "52"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "53"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "81"
+    },
+    {
+      "category": "common",
+      "name": "getanimlength",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "animhasnotetrack",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "getnotetracktimes",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "spawn",
+      "minArgs": 2,
+      "maxArgs": 5
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "86"
+    },
+    {
+      "category": "common",
+      "name": "spawnloopingsound",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "bullettrace",
+      "minArgs": 3,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "bullettracepassed",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "sighttracepassed",
+      "minArgs": 4,
+      "maxArgs": 5
+    },
+    {
+      "category": "common",
+      "name": "physicstrace",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "playerphysicstrace",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "getgroundposition",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "121"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "122"
+    },
+    {
+      "category": "common",
+      "name": "getnorthyaw",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "150"
+    },
+    {
+      "category": "common",
+      "name": "setslowmotion",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "randomint",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "randomfloat",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "randomintrange",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "randomfloatrange",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "sin",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "cos",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "158"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "159"
+    },
+    {
+      "category": "common",
+      "name": "acos",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "161"
+    },
+    {
+      "category": "common",
+      "name": "int",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "float",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "abs",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "min",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "max",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "floor",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "ceil",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "201"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "202"
+    },
+    {
+      "category": "common",
+      "name": "sqrt",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "204"
+    },
+    {
+      "category": "common",
+      "name": "clamp",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "206"
+    },
+    {
+      "category": "common",
+      "name": "angleclamp180",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "vectorfromlinetopoint",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "pointonsegmentnearesttopoint",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "distance",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "distance2d",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "distancesquared",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "length",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "lengthsquared",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "215"
+    },
+    {
+      "category": "common",
+      "name": "vectordot",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "vectornormalize",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "vectortoangles",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "vectortoyaw",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "249"
+    },
+    {
+      "category": "common",
+      "name": "anglestoup",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "anglestoright",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "anglestoforward",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "253"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "254"
+    },
+    {
+      "category": "common",
+      "name": "issubstr",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "256"
+    },
+    {
+      "category": "common",
+      "name": "getsubstr",
+      "minArgs": 2,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "tolower",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "strtok",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "stricmp",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "261"
+    },
+    {
+      "category": "common",
+      "name": "ambientstop",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precachemodel",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precacheshellshock",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precacheitem",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precacheshader",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precachestring",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precachemenu",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precacherumble",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precachelocationselector",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precacheleaderboards",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precacheheadicon",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "precachefxontag",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "precachetag",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "loadfx",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "playfx",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "playfxontag",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "stopfxontag",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "playloopedfx",
+      "minArgs": 6,
+      "maxArgs": 6
+    },
+    {
+      "category": "common",
+      "name": "spawnfx",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "triggerfx",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "playfxontagforclients",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "physicsexplosionsphere",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "347"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "348"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "349"
+    },
+    {
+      "category": "common",
+      "name": "setexpfog",
+      "minArgs": 7,
+      "maxArgs": 14
+    },
+    {
+      "category": "common",
+      "name": "isexplosivedamagemod",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "radiusdamage",
+      "minArgs": 4,
+      "maxArgs": 7
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "353"
+    },
+    {
+      "category": "common",
+      "name": "glassradiusdamage",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "earthquake",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "356"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "386"
+    },
+    {
+      "category": "common",
+      "name": "weaponfiretime",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "weaponclipsize",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "389"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "390"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "391"
+    },
+    {
+      "category": "common",
+      "name": "weaponinheritsperks",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "393"
+    },
+    {
+      "category": "common",
+      "name": "weapontype",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "weaponclass",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "weaponinventorytype",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "438"
+    },
+    {
+      "category": "common",
+      "name": "weaponmaxammo",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "weaponaltweaponname",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "441"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "442"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "443"
+    },
+    {
+      "category": "common",
+      "name": "getvehiclenode",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "getvehiclenodearray",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "446"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "447"
+    },
+    {
+      "category": "common",
+      "name": "precachevehicle",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "spawnvehicle",
+      "minArgs": 6,
+      "maxArgs": 6
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "450"
+    },
+    {
+      "category": "common",
+      "name": "vehicle_getspawnerarray",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "playrumbleonposition",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "410"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "411"
+    },
+    {
+      "category": "common",
+      "name": "soundexists",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "413"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "414"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "415"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "416"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "417"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "418"
+    },
+    {
+      "category": "common",
+      "name": "setminimap",
+      "minArgs": 5,
+      "maxArgs": 5
+    },
+    {
+      "category": "common",
+      "name": "setthermalbodymaterial",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "getarraykeys",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "422"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "396"
+    },
+    {
+      "category": "common",
+      "name": "sortbydistance",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "tablelookup",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "tablelookupbyrow",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "tablelookupistring",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "401"
+    },
+    {
+      "category": "common",
+      "name": "tablelookuprownum",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "getmissileowner",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "magicbullet",
+      "minArgs": 3,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "405"
+    },
+    {
+      "category": "common",
+      "name": "averagepoint",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "averagenormal",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "423"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "424"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "425"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "426"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "427"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "428"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "429"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "430"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "5373848064"
+    },
+    {
+      "category": "builtin",
+      "name": "iprintlnbold",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "logstring",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "getent",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "getentarray",
+      "minArgs": 0,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "spawnplane",
+      "minArgs": 3,
+      "maxArgs": 5
+    },
+    {
+      "category": "builtin",
+      "name": "spawnstruct",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "spawnhelicopter",
+      "minArgs": 5,
+      "maxArgs": 5
+    },
+    {
+      "category": "builtin",
+      "name": "isalive",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "isspawner",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "missile_createattractorent",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "373"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "374"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "375"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "376"
+    },
+    {
+      "category": "builtin",
+      "name": "playsoundatpos",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "precachesound",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "newhudelem",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "newclienthudelem",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "newteamhudelem",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "381"
+    },
+    {
+      "category": "builtin",
+      "name": "precachefxteamthermal",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "isplayer",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "384"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "57"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "58"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "385"
+    },
+    {
+      "category": "builtin",
+      "name": "setwinningteam",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "312"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "313"
+    },
+    {
+      "category": "builtin",
+      "name": "getteamscore",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "setteamscore",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "setclientnamemode",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "317"
+    },
+    {
+      "category": "builtin",
+      "name": "getteamplayersalive",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "logprint",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "320"
+    },
+    {
+      "category": "builtin",
+      "name": "obituary",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "category": "builtin",
+      "name": "positionwouldtelefrag",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "canspawn",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "324"
+    },
+    {
+      "category": "builtin",
+      "name": "precachestatusicon",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "precacheminimapicon",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "precachempanim",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "map_restart",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "exitlevel",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "331"
+    },
+    {
+      "category": "builtin",
+      "name": "makedvarserverinfo",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "333"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "334"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "335"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "336"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "337"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "338"
+    },
+    {
+      "category": "builtin",
+      "name": "setplayerteamrank",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "builtin",
+      "name": "endparty",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "setteamradar",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "getteamradar",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "setteamradarstrength",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "344"
+    },
+    {
+      "category": "builtin",
+      "name": "getuavstrengthmin",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getuavstrengthmax",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getuavstrengthlevelneutral",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getuavstrengthlevelshowenemyfastsweep",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getuavstrengthlevelshowenemydirectional",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "blockteamradar",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "unblockteamradar",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "268"
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "269"
+    },
+    {
+      "category": "builtin",
+      "name": "setmatchdata",
+      "minArgs": 2,
+      "maxArgs": 6
+    },
+    {
+      "category": "builtin",
+      "name": "getmatchdata",
+      "minArgs": 1,
+      "maxArgs": 5
+    },
+    {
+      "category": "builtin",
+      "name": "sendmatchdata",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "273"
+    },
+    {
+      "category": "builtin",
+      "name": "setmatchdatadef",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "setmatchclientip",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "setmatchdataid",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "setclientmatchdata",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "builtin",
+      "name": "getclientmatchdata",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "setclientmatchdatadef",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "sendclientmatchdata",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getbuildversion",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getbuildnumber",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getsystemtime",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "getmatchrulesdata",
+      "minArgs": 2,
+      "maxArgs": 8
+    },
+    {
+      "category": "builtin",
+      "name": "isusingmatchrulesdata",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "kick",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "issplitscreen",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "setmapcenter",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "setgameendtime",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "visionsetnaked",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "visionsetnight",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "visionsetmissilecam",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "visionsetthermal",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "visionsetpain",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "builtin",
+      "name": "endlobby",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "builtin",
+      "name": "setac130ambience",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "getmapcustom",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "builtin",
+      "name": "updateskill",
+      "minArgs": 4,
+      "maxArgs": 4
+    },
+    {
+      "category": "builtin",
+      "name": "spawnsighttrace",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "builtin",
+      "name": "incrementcounter",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "builtin",
+      "name": "225"
+    },
+    {
+      "category": "objectives",
+      "name": "objective_delete",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "objectives",
+      "name": "objective_state",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "objectives",
+      "name": "objective_icon",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "objectives",
+      "name": "objective_position",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "objectives",
+      "name": "436"
+    },
+    {
+      "category": "objectives",
+      "name": "objective_onentity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "objectives",
+      "name": "objective_team",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "objectives",
+      "name": "objective_player",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "objectives",
+      "name": "objective_playerteam",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "objectives",
+      "name": "objective_playerenemyteam",
+      "minArgs": 2,
+      "maxArgs": 2
+    }
+  ],
+  "game": "iw5",
+  "generated_on": 1774595509,
+  "methods": [
+    {
+      "category": "common",
+      "name": "attachshieldmodel",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "detach",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "detachshieldmodel",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "moveshieldmodel",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "detachall",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "getattachsize",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "getattachmodelname",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "getattachtagname",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32835",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "hidepart",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32837",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32838",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "showpart",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32840",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "linkto",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32842",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "unlink",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "islinked",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32868",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "playerlinkto",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32886",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "playerlinkweaponviewtodelta",
+      "target": "entity",
+      "minArgs": 7,
+      "maxArgs": 8
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32888",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32889",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "playerlinkedoffsetenable",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32916",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "playerlinkedsetviewznear",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "playerlinkedsetusebaseangleforviewclamp",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32919",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32920",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "geteye",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "istouching",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "stoploopsound",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32924",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "playrumbleonentity",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32926",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "stoprumble",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "delete",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setmodel",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "laseron",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "laseroff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32932",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32933",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "thermalvisionon",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "thermalvisionoff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32803",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32768",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "thermalvisionfofoverlayon",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "thermalvisionfofoverlayoff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "autospotoverlayon",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "autospotoverlayoff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setcontents",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "makeusable",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "makeunusable",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setcursorhint",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "sethintstring",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "forceusehinton",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "forceusehintoff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32970",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32971",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "willneverchange",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32973",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32974",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "isfiringturret",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32976",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32977",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32978",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "remotecontrolturret",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "remotecontrolturretoff",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "shootturret",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "32982",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setsentryowner",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "setsentrycarrier",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "setturretminimapvisible",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "settargetentity",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33010",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "cleartargetentity",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "getturrettarget",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33013",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33014",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33015",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33049",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33050",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setturretteam",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "maketurretsolid",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33053",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "maketurretinoperable",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33082",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setrightarc",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "setleftarc",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "settoparc",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "setbottomarc",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33087",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setdefaultdroppitch",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33089",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "turretfiredisable",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "turretfireenable",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setturretmodechangewait",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33123",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "getstance",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setstance",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "itemweaponsetammo",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 4
+    },
+    {
+      "category": "common",
+      "name": "getammocount",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "gettagorigin",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "gettagangles",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "shellshock",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "stunplayer",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "stopshellshock",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33133",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setdepthoffield",
+      "target": "entity",
+      "minArgs": 6,
+      "maxArgs": 6
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33135",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33136",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33168",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33169",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "viewkick",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33171",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "getentitynumber",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "getentityvelocity",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "enablegrenadetouchdamage",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33175",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33176",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33207",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "radiusdamage",
+      "target": "entity",
+      "minArgs": 4,
+      "maxArgs": 7
+    },
+    {
+      "category": "common",
+      "name": "detonate",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "damageconetrace",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "sightconetrace",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "missile_settargetent",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "missile_settargetpos",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33214",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "missile_setflightmodedirect",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33216",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "getlightintensity",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setlightintensity",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "isragdoll",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "setmovespeedscale",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "cameralinkto",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "common",
+      "name": "cameraunlink",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "controlslinkto",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "controlsunlink",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "makevehiclesolidcapsule",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33254",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "remotecontrolvehicle",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "remotecontrolvehicleoff",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "isfiringvehicleturret",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33259",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33260",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33261",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33262",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33263",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33264",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "remotecamerasoundscapeoff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "radarjamon",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "common",
+      "name": "radarjamoff",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33268",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33269",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "worldpointinreticle_circle",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "common",
+      "name": "getpointinbounds",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33272",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33273",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setweaponhudiconoverride",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33275",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "setempjammed",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33277",
+      "target": "entity"
+    },
+    {
+      "category": "common",
+      "name": "isitemunlocked",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "common",
+      "name": "getplayerdata",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 6
+    },
+    {
+      "category": "common",
+      "name": "setplayerdata",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 5
+    },
+    {
+      "args": [],
+      "category": "common",
+      "name": "33307",
+      "target": "entity"
+    },
+    {
+      "category": "player",
+      "name": "buttonpressed",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "sayall",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "sayteam",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "player",
+      "name": "33312",
+      "target": "entity"
+    },
+    {
+      "category": "player",
+      "name": "setspawnweapon",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "dropitem",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "dropscavengerbag",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "finishplayerdamage",
+      "target": "entity",
+      "minArgs": 11,
+      "maxArgs": 11
+    },
+    {
+      "category": "player",
+      "name": "suicide",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "closeingamemenu",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "iprintln",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 3
+    },
+    {
+      "category": "player",
+      "name": "iprintlnbold",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "player",
+      "name": "spawn",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 5
+    },
+    {
+      "args": [],
+      "category": "player",
+      "name": "33346",
+      "target": "entity"
+    },
+    {
+      "category": "player",
+      "name": "cloneplayer",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "player",
+      "name": "33348",
+      "target": "entity"
+    },
+    {
+      "category": "player",
+      "name": "allowspectateteam",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "player",
+      "name": "getguid",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "getxuid",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "ishost",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "getspectatingplayer",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "predictstreampos",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "player",
+      "name": "updatescores",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "updatedmscores",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "setrank",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "player",
+      "name": "setcardtitle",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "setcardicon",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "setcardnameplate",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "setcarddisplayslot",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "player",
+      "name": "kc_regweaponforfxremoval",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "player",
+      "name": "laststandrevive",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "setspectatedefaults",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "player",
+      "name": "getthirdpersoncrosshairoffset",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "disableweaponpickup",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "enableweaponpickup",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "issplitscreenplayer",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "player",
+      "name": "issplitscreenplayerprimary",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33400",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33401",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33402",
+      "target": "entity"
+    },
+    {
+      "category": "scriptent",
+      "name": "movegravity",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33404",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33405",
+      "target": "entity"
+    },
+    {
+      "category": "scriptent",
+      "name": "rotateto",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "scriptent",
+      "name": "rotatepitch",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "scriptent",
+      "name": "rotateyaw",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "scriptent",
+      "name": "rotateroll",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "scriptent",
+      "name": "addpitch",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptent",
+      "name": "addyaw",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptent",
+      "name": "addroll",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33413",
+      "target": "entity"
+    },
+    {
+      "category": "scriptent",
+      "name": "rotatevelocity",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "category": "scriptent",
+      "name": "solid",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "scriptent",
+      "name": "notsolid",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "scriptent",
+      "name": "setcandamage",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptent",
+      "name": "setcanradiusdamage",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptent",
+      "name": "physicslaunchclient",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "category": "scriptent",
+      "name": "physicslaunchserver",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33352",
+      "target": "entity"
+    },
+    {
+      "category": "scriptent",
+      "name": "clonebrushmodeltoscriptmodel",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptent",
+      "name": "scriptmodelplayanim",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "scriptent",
+      "name": "33355",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "attachpath",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33358",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "startpath",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33360",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33361",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "vehicle_finishdamage",
+      "target": "entity",
+      "minArgs": 12,
+      "maxArgs": 12
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "vehicle_setspeed",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 3
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33364",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33365",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "vehicle_getspeed",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33367",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33368",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33369",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33370",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33371",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33372",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33373",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33374",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33375",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33376",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setyawspeed",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33378",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setmaxpitchroll",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33380",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setturningability",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33316",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "sethoverparams",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33318",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33319",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33320",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33321",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33322",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33323",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setneargoalnotifydist",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setvehgoalpos",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setgoalyaw",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "cleargoalyaw",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "settargetyaw",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "cleartargetyaw",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33330",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33331",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setturrettargetent",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33333",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "vehicle_canturrettargetpoint",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 3
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setlookatent",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "clearlookatent",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "setvehweapon",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "fireweapon",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 4
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "vehicleturretcontrolon",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "vehicleturretcontroloff",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33281",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33282",
+      "target": "entity"
+    },
+    {
+      "category": "scriptvehicle",
+      "name": "dospawn",
+      "target": "entity",
+      "minArgs": 2,
+      "maxArgs": 2
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33284",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33285",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33286",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33287",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33288",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33289",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "scriptvehicle",
+      "name": "33290",
+      "target": "entity"
+    },
+    {
+      "category": "heli",
+      "name": "setdamagestate",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "hud",
+      "name": "clearalltextafterhudelem",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "hud",
+      "name": "setshader",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "hud",
+      "name": "settargetent",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "hud",
+      "name": "cleartargetent",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "hud",
+      "name": "settimer",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32956",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32957",
+      "target": "entity"
+    },
+    {
+      "category": "hud",
+      "name": "settenthstimer",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32959",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32960",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32961",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32962",
+      "target": "entity"
+    },
+    {
+      "category": "hud",
+      "name": "setvalue",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "hud",
+      "name": "setwaypoint",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 4
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32965",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32891",
+      "target": "entity"
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32892",
+      "target": "entity"
+    },
+    {
+      "category": "hud",
+      "name": "fadeovertime",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "hud",
+      "name": "scaleovertime",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "hud",
+      "name": "moveovertime",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "args": [],
+      "category": "hud",
+      "name": "32896",
+      "target": "entity"
+    },
+    {
+      "category": "hud",
+      "name": "destroy",
+      "target": "entity",
+      "minArgs": 0,
+      "maxArgs": 0
+    },
+    {
+      "category": "hud",
+      "name": "setpulsefx",
+      "target": "entity",
+      "minArgs": 3,
+      "maxArgs": 3
+    },
+    {
+      "category": "hud",
+      "name": "setplayernamestring",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    },
+    {
+      "category": "hud",
+      "name": "changefontscaleovertime",
+      "target": "entity",
+      "minArgs": 1,
+      "maxArgs": 1
+    }
+  ],
+  "source": "vm_table_dump",
+  "version": 1
+}
