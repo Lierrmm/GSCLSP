@@ -1,8 +1,6 @@
 # GSCLSP: GSC Language Server Protocol
 
-![Visual Studio Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/bbe-tools.gsclsp?style=flat-square&logo=visual-studio-code)
-![Visual Studio Marketplace Installs](https://img.shields.io/visual-studio-marketplace/i/bbe-tools.gsclsp?style=flat-square)
-![Visual Studio Marketplace Rating](https://img.shields.io/visual-studio-marketplace/r/bbe-tools.gsclsp?style=flat-square)
+![Visual Studio Marketplace Version](https://img.shields.io/badge/VS-Install_Extension-blue?link=https://marketplace.visualstudio.com%2Fitems%3FitemName%3Dbbe-tools.gsclsp)
 
 The core engine behind the GSC Language Support extension. This repository contains both the .NET 10 Language Server and the TypeScript VS Code client.
 
