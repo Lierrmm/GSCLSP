@@ -404,99 +404,154 @@ public partial class GscIndexer
     {
         try
         {
-            var lines = File.ReadAllLines(filePath);
+            if (!File.Exists(filePath))
+                return null;
 
-            string strictDefinitionPattern = $@"^{Regex.Escape(functionName)}\s*\(([^)]*)\)\s*$";
+            // Read all lines once. We need random access to scan backwards for comments.
+            var lines = File.ReadAllLines(filePath);
+            if (lines.Length == 0) return null;
+
+            var fnName = functionName ?? string.Empty;
+            var fnLen = fnName.Length;
 
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i];
                 string codeLine = StripTrailingLineComment(line);
 
-                if (codeLine.StartsWith(' ') || codeLine.StartsWith('\t')) continue;
-                if (codeLine.Contains(';')) continue;
+                if (string.IsNullOrEmpty(codeLine))
+                    continue;
 
-                var match = Regex.Match(codeLine, strictDefinitionPattern, RegexOptions.IgnoreCase);
-                if (match.Success)
+                // Skip indented lines (not top-level function defs) and lines with semicolons
+                if (char.IsWhiteSpace(codeLine[0]))
+                    continue;
+
+                if (codeLine.Contains(';'))
+                    continue;
+
+                // Quick reject: line must start with function name (case-insensitive)
+                if (fnLen == 0 || codeLine.Length < fnLen)
+                    continue;
+
+                if (!codeLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                // Next character after name should be whitespace or '('
+                if (codeLine.Length == fnLen)
+                    continue;
+
+                int pos = fnLen;
+                // skip whitespace
+                while (pos < codeLine.Length && char.IsWhiteSpace(codeLine[pos])) pos++;
+                if (pos >= codeLine.Length || codeLine[pos] != '(')
+                    continue;
+
+                // Find closing ')' on the same line
+                int closeParen = codeLine.IndexOf(')', pos + 1);
+                if (closeParen < 0)
+                    continue;
+
+                // Extract parameters substring
+                string paramsText = codeLine[(pos + 1)..closeParen].Trim();
+
+                // Ensure function has a body: either '{' on same line or next non-comment line starts with '{'
+                bool hasBrace = codeLine.Contains('{');
+                if (!hasBrace)
                 {
-                    bool hasBrace = codeLine.Contains('{') || (i + 1 < lines.Length && StripTrailingLineComment(lines[i + 1]).Trim().StartsWith('{'));
-                    if (!hasBrace) continue;
-
-                    List<string> commentLines = [];
-                    bool inBlockComment = false;
-                    bool foundComment = false;
-
-                    for (int j = i - 1; j >= 0; j--)
+                    int nextLine = i + 1;
+                    while (nextLine < lines.Length)
                     {
-                        string prevLine = lines[j].Trim();
-
-                        if (string.IsNullOrWhiteSpace(prevLine))
-                            break;
-
-                        if (prevLine.EndsWith("*/", StringComparison.Ordinal))
-                        {
-                            inBlockComment = true;
-                            foundComment = true;
-                            prevLine = prevLine.Replace("*/", "");
-                        }
-
-                        if (prevLine.StartsWith("//", StringComparison.Ordinal))
-                        {
-                            foundComment = true;
-                            string cleanLine = prevLine
-                                .TrimStart('/', '*', ' ')
-                                .Replace("\"", "")
-                                .Replace("ScriptDocBegin", "")
-                                .Replace("ScriptDocEnd", "")
-                                .Trim();
-
-                            if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("==="))
-                                commentLines.Insert(0, cleanLine);
-
-                            continue;
-                        }
-
-                        if (inBlockComment || prevLine.StartsWith("/*", StringComparison.Ordinal))
-                        {
-                            foundComment = true;
-                            string cleanLine = prevLine
-                                .Replace("/*", "")
-                                .Replace("*/", "")
-                                .TrimStart('*', ' ')
-                                .Replace("\"", "")
-                                .Replace("ScriptDocBegin", "")
-                                .Replace("ScriptDocEnd", "")
-                                .Trim();
-
-                            if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("==="))
-                                commentLines.Insert(0, cleanLine);
-
-                            if (prevLine.StartsWith("/*", StringComparison.Ordinal))
-                                break;
-
-                            continue;
-                        }
-
-                        if (foundComment)
-                            break;
-
+                        var nextCode = StripTrailingLineComment(lines[nextLine]).Trim();
+                        if (string.IsNullOrEmpty(nextCode)) { nextLine++; continue; }
+                        if (nextCode.StartsWith("/*") || nextCode.StartsWith("*")) { nextLine++; continue; }
+                        hasBrace = nextCode.StartsWith("{");
                         break;
                     }
-
-                    string doc = string.Join("  \n", commentLines);
-
-                    return new GscSymbol(
-                        Name: functionName,
-                        FilePath: filePath,
-                        LineNumber: i + 1,
-                        Parameters: match.Groups[1].Value.Trim(),
-                        Type: SymbolType.Function,
-                        Documentation: doc
-                    );
                 }
+
+                if (!hasBrace) continue;
+
+                // Collect documentation comments immediately above definition
+                List<string>? commentLines = null;
+                bool inBlockComment = false;
+                bool foundComment = false;
+
+                for (int j = i - 1; j >= 0; j--)
+                {
+                    string prevRaw = lines[j];
+                    string prevLine = prevRaw.Trim();
+
+                    if (string.IsNullOrWhiteSpace(prevLine))
+                        break;
+
+                    if (prevLine.EndsWith("*/", StringComparison.Ordinal))
+                    {
+                        inBlockComment = true;
+                        foundComment = true;
+                        prevLine = prevLine.Substring(0, prevLine.Length - 2);
+                    }
+
+                    if (prevLine.StartsWith("//", StringComparison.Ordinal))
+                    {
+                        foundComment = true;
+                        commentLines ??= [];
+                        string cleanLine = prevLine
+                            .TrimStart('/', '*', ' ')
+                            .Replace("\"", "")
+                            .Replace("ScriptDocBegin", "")
+                            .Replace("ScriptDocEnd", "")
+                            .Trim();
+
+                        if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("==="))
+                            commentLines.Insert(0, cleanLine);
+
+                        continue;
+                    }
+
+                    if (inBlockComment || prevLine.StartsWith("/*", StringComparison.Ordinal))
+                    {
+                        foundComment = true;
+                        commentLines ??= [];
+                        string cleanLine = prevLine
+                            .Replace("/*", "")
+                            .Replace("*/", "")
+                            .TrimStart('*', ' ')
+                            .Replace("\"", "")
+                            .Replace("ScriptDocBegin", "")
+                            .Replace("ScriptDocEnd", "")
+                            .Trim();
+
+                        if (!string.IsNullOrWhiteSpace(cleanLine) && !cleanLine.StartsWith("==="))
+                            commentLines.Insert(0, cleanLine);
+
+                        if (prevLine.StartsWith("/*", StringComparison.Ordinal))
+                            break;
+
+                        continue;
+                    }
+
+                    if (foundComment)
+                        break;
+
+                    break;
+                }
+
+                string doc = commentLines != null && commentLines.Count > 0
+                    ? string.Join("  \n", commentLines)
+                    : string.Empty;
+
+                return new GscSymbol(
+                    Name: fnName,
+                    FilePath: filePath,
+                    LineNumber: i + 1,
+                    Parameters: paramsText,
+                    Type: SymbolType.Function,
+                    Documentation: doc
+                );
             }
         }
         catch { }
+
         return null;
     }
 

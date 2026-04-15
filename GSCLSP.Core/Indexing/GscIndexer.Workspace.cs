@@ -52,7 +52,7 @@ public partial class GscIndexer
         }
 
         sw.Stop();
-        Console.Error.WriteLine($"GSCLSP: Scan cache pre-warmed in {sw.Elapsed.TotalMilliseconds:N2}ms");
+        Console.Error.WriteLine($"GSCLSP: Scan cache pre-warmed {symbols.Count} symbols in {sw.Elapsed.TotalMilliseconds:N2}ms");
     }
 
     public string GetFileContent(string filePath)
