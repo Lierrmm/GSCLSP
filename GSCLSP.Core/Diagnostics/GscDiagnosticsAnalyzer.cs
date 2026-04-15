@@ -246,7 +246,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             if (!IsSemicolonRequiredDirective(lines[lineIndex]))
                 return false;
 
-            return !lines[lineIndex].TrimEnd().EndsWith(';');
+            return !StripTrailingLineComment(lines[lineIndex]).TrimEnd().EndsWith(';');
         }
 
         if (IsFunctionDefinitionLine(lines, lineIndex, lineTokens))
@@ -624,24 +624,16 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
     private static string StripTrailingLineComment(string line)
     {
-        if (string.IsNullOrEmpty(line))
-            return string.Empty;
+        int blockStart = line.IndexOf("/*", StringComparison.Ordinal);
+        int lineStart = line.IndexOf("//", StringComparison.Ordinal);
 
-        var inString = false;
+        int cut = -1;
+        if (lineStart >= 0 && (blockStart < 0 || lineStart < blockStart))
+            cut = lineStart;
+        else if (blockStart >= 0)
+            cut = blockStart;
 
-        for (int i = 0; i < line.Length - 1; i++)
-        {
-            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
-            {
-                inString = !inString;
-                continue;
-            }
-
-            if (!inString && line[i] == '/' && line[i + 1] == '/')
-                return line[..i].TrimEnd();
-        }
-
-        return line;
+        return cut < 0 ? line : line[..cut];
     }
 
     private static bool PathMatches(string filePath, string scriptPath)
@@ -892,8 +884,17 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         for (int i = openParenTokenIndex + 1; i < lineTokens.Count; i++)
         {
             var kind = lineTokens[i].Kind;
+            bool wasTopLevel = depthParen == 1 && depthBracket == 0 && depthBrace == 0;
 
-            if (kind == TokenKind.OpenParen) { depthParen++; continue; }
+            if (kind == TokenKind.OpenParen) 
+            { 
+                if (wasTopLevel) 
+                    hasTopLevelToken = true; 
+                
+                depthParen++; 
+                continue; 
+            }
+
             if (kind == TokenKind.CloseParen)
             {
                 depthParen--;
@@ -905,9 +906,24 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
                 continue;
             }
 
-            if (kind == TokenKind.OpenBracket) { depthBracket++; continue; }
+            if (kind == TokenKind.OpenBracket) 
+            { 
+                if (wasTopLevel) 
+                    hasTopLevelToken = true; 
+    
+                depthBracket++; 
+                continue; 
+            }
+
             if (kind == TokenKind.CloseBracket) { depthBracket = Math.Max(0, depthBracket - 1); continue; }
-            if (kind == TokenKind.OpenBrace) { depthBrace++; continue; }
+            if (kind == TokenKind.OpenBrace) 
+            { 
+                if (wasTopLevel) 
+                    hasTopLevelToken = true; 
+                
+                depthBrace++; 
+                continue; 
+            }
             if (kind == TokenKind.CloseBrace) { depthBrace = Math.Max(0, depthBrace - 1); continue; }
 
             bool isTopLevel = depthParen == 1 && depthBracket == 0 && depthBrace == 0;
