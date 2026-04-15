@@ -243,7 +243,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
         if (lineTokens[0].Kind == TokenKind.Directive)
         {
-            if (IsSemicolonOptionalDirective(lines[lineIndex]))
+            if (!IsSemicolonRequiredDirective(lines[lineIndex]))
                 return false;
 
             return !lines[lineIndex].TrimEnd().EndsWith(';');
@@ -265,12 +265,13 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         return true;
     }
 
-    private static bool IsSemicolonOptionalDirective(string line)
+    private static bool IsSemicolonRequiredDirective(string line)
     {
         var trimmed = line.TrimStart();
 
-        return trimmed.StartsWith("#inline", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#define", StringComparison.OrdinalIgnoreCase);
+        return trimmed.StartsWith("#include", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#inline", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#namespace", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsStatementContinuedToNextLine(List<Token> lineTokens)
