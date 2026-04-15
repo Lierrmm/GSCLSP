@@ -11,7 +11,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
     private readonly GscDocumentStore _documentStore = documentStore;
     private readonly GscDiagnosticsHandler _diagnosticsHandler = diagnosticsHandler;
 
-    public async Task<CommandOrCodeActionContainer> Handle(CodeActionParams request, CancellationToken cancellationToken)
+    public async Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken cancellationToken)
     {
         var uri = request.TextDocument.Uri;
         var text = _documentStore.Get(uri);

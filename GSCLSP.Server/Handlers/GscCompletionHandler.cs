@@ -257,9 +257,11 @@ namespace GSCLSP.Server.Handlers
             if (funcName != null)
             {
                 var locals = GscIndexer.GetLocalVariables(currentFilePath, funcName, currentFileLines, request.Position.Line);
+                var seenLocals = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var localVar in locals)
                 {
-                    completions.Add(GscCompletionItemFactory.FromLocalVariable(localVar));
+                    if (seenLocals.Add(localVar.Name))
+                        completions.Add(GscCompletionItemFactory.FromLocalVariable(localVar));
                 }
             }
 

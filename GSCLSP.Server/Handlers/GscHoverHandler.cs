@@ -4,6 +4,7 @@ using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using static GSCLSP.Core.Indexing.GscIndexer;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
@@ -39,7 +40,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             if (parts.Length < 1) return null;
 
             var directive = parts[0];
-            var foundIncludePath = await _indexer.GetIncludePath(includedFile);
+            var foundIncludePath = await _indexer.GetIncludePathAsync(includedFile);
             if (foundIncludePath == null) return null;
 
             var contentValue = $"### {directive}\n`{foundIncludePath}`";
@@ -50,11 +51,20 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var lexed = GscLexingHelper.Lex(content);
         var token = GscLexingHelper.GetTokenAtOrBeforePosition(lexed.Tokens, request.Position.Line, request.Position.Character);
 
-        if (token is null || !IsHoverableToken(token.Value))
+        var lineTrimmed = line.TrimStart();
+        var isOnMacroDefinition = lineTrimmed.StartsWith("#define", StringComparison.Ordinal);
+
+        if (!isOnMacroDefinition && (token is null || !IsHoverableToken(token.Value)))
             return null;
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
         if (identifier.StartsWith("::")) identifier = identifier[2..];
+
+        if (string.IsNullOrEmpty(identifier) && isOnMacroDefinition)
+        {
+            identifier = ExtractMacroNameAtCursor(line, request.Position.Character);
+        }
+
         if (string.IsNullOrEmpty(identifier)) return null;
 
         var macroHover = FindMacroDefinition(filePath, identifier);
@@ -110,6 +120,23 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         return null;
     }
 
+    private static string ExtractMacroNameAtCursor(string line, int cursorChar)
+    {
+        var trimmed = line.TrimStart();
+        if (!trimmed.StartsWith("#define", StringComparison.Ordinal)) return string.Empty;
+
+        int leading = line.Length - trimmed.Length;
+        var afterDefine = trimmed[7..];
+        int nameStart = leading + 7 + (afterDefine.Length - afterDefine.TrimStart().Length);
+        int nameEnd = nameStart;
+        while (nameEnd < line.Length && (char.IsLetterOrDigit(line[nameEnd]) || line[nameEnd] == '_'))
+            nameEnd++;
+
+        if (nameEnd <= nameStart) return string.Empty;
+        if (cursorChar < nameStart || cursorChar > nameEnd) return string.Empty;
+        return line.Substring(nameStart, nameEnd - nameStart);
+    }
+
     private static bool IsHoverableToken(Token token)
     {
         return token.Kind is not TokenKind.Whitespace
@@ -126,15 +153,40 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         if (funcName == null) return null;
 
         var locals = GscIndexer.GetLocalVariables(filePath, funcName, lines, hoverLine);
-        var localVar = locals.FirstOrDefault(v => v.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase));
-        if (localVar == null) return null;
+        var matching = locals
+            .Where(v => v.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        var comment = GetLeadingComment(lines, localVar.Line - 1);
+        if (matching.Count == 0) return null;
 
-        var contentValue = $"```gsc\n{localVar.Name} = {localVar.Value}\n```\n";
-        if (!string.IsNullOrEmpty(comment))
-            contentValue += $"{comment}\n\n";
-        contentValue += $"---\n**Line:** {localVar.Line}";
+        var paramEntry = matching.FirstOrDefault(v => v.Value == "parameter");
+        string contentValue;
+        List<LocalVariable> reassignments;
+
+        if (paramEntry != null)
+        {
+            contentValue = $"```gsc\n{paramEntry.Name}\n```\n";
+            contentValue += $"---\n`Function parameter`\n\n**Line:** {paramEntry.Line}";
+            reassignments = [.. matching.Where(v => v != paramEntry)];
+        }
+        else
+        {
+            var localVar = matching[0];
+            var comment = GetLeadingComment(lines, localVar.Line - 1);
+
+            contentValue = $"```gsc\n{localVar.Name} = {localVar.Value}\n```\n";
+            if (!string.IsNullOrEmpty(comment))
+                contentValue += $"{comment}\n\n";
+            contentValue += $"---\n`Variable`\n\n**Line:** {localVar.Line}";
+            reassignments = [.. matching.Skip(1)];
+        }
+
+        if (reassignments.Count > 0)
+        {
+            contentValue += "\n\n";
+            foreach (var r in reassignments)
+                contentValue += $"*- value gets reassigned at line {r.Line}*\n\n";
+        }
 
         var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };

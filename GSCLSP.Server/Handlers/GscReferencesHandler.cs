@@ -14,7 +14,7 @@ namespace GSCLSP.Server.Handlers
         private readonly GscIndexer _indexer = indexer;
         private readonly IConfiguration _configuration = configuration;
 
-        public async Task<LocationContainer> Handle(ReferenceParams request, CancellationToken cancellationToken)
+        public async Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken cancellationToken)
         {
             var uri = request.TextDocument.Uri;
             var currentFilePath = uri.GetFileSystemPath();
@@ -99,7 +99,7 @@ namespace GSCLSP.Server.Handlers
                 if (!GscHandlerCommon.TryExtractDirectivePath(line, out var includePath))
                     continue;
 
-                var resolvedPath = await _indexer.GetIncludePath(includePath);
+                var resolvedPath = await _indexer.GetIncludePathAsync(includePath);
                 if (!string.IsNullOrEmpty(resolvedPath))
                 {
                     includePaths.Add(resolvedPath);

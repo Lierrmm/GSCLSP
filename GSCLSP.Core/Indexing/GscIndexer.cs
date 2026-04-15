@@ -102,7 +102,7 @@ public partial class GscIndexer
         DumpPath = newPath;
         ClearGlobalIndexAndCaches();
 
-        Task.Run(() =>
+        Task _ = Task.Run(() =>
         {
             if (File.Exists(cacheFile))
             {
@@ -278,7 +278,7 @@ public partial class GscIndexer
         return flat;
     }
 
-    public async Task<string?> GetIncludePath(string includeString)
+    public async Task<string?> GetIncludePathAsync(string includeString)
     {
         if (string.IsNullOrWhiteSpace(includeString)) return null;
 
@@ -589,11 +589,13 @@ public partial class GscIndexer
     private static List<LocalVariable> ScanLocalVariablesForFunction(string[] lines, int cursorLine)
     {
         int funcDefLine = -1;
+        Match? funcMatch = null;
         for (int i = cursorLine; i >= 0; i--)
         {
-            if (IsFunctionDefinitionLine(lines, i, out _))
+            if (IsFunctionDefinitionLine(lines, i, out var m))
             {
                 funcDefLine = i;
+                funcMatch = m;
                 break;
             }
         }
@@ -618,7 +620,29 @@ public partial class GscIndexer
             if (depth == 0) { funcEnd = i; break; }
         }
 
-        var variables = new Dictionary<string, LocalVariable>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<LocalVariable>();
+        var paramNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (funcMatch is { Success: true })
+        {
+            var rawParams = funcMatch.Groups["params"].Value;
+            foreach (var part in rawParams.Split(','))
+            {
+                var paramName = part.Trim().TrimStart('&', '*').Trim();
+                if (string.IsNullOrEmpty(paramName)) continue;
+
+                int space = paramName.IndexOfAny([' ', '\t']);
+                if (space > 0) paramName = paramName[..space];
+
+                if (!System.Text.RegularExpressions.Regex.IsMatch(paramName, @"^[A-Za-z_]\w*$"))
+                    continue;
+                if (GscLanguageKeywords.LocalVariableReservedWords.Contains(paramName)) continue;
+
+                if (paramNames.Add(paramName))
+                    result.Add(new LocalVariable(paramName, "parameter", funcDefLine + 1));
+            }
+        }
+
         for (int i = braceStart; i <= funcEnd; i++)
         {
             var match = LocalVarAssignmentRegex().Match(lines[i]);
@@ -629,13 +653,10 @@ public partial class GscIndexer
 
             if (GscLanguageKeywords.LocalVariableReservedWords.Contains(name)) continue;
 
-            if (!variables.ContainsKey(name))
-            {
-                variables[name] = new LocalVariable(name, value, i + 1);
-            }
+            result.Add(new LocalVariable(name, value, i + 1));
         }
 
-        return [.. variables.Values];
+        return result;
     }
 
     public static List<MacroDefinition> GetFileMacros(string filePath)

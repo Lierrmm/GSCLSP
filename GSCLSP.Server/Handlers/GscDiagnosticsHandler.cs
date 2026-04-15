@@ -112,7 +112,7 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
             if (!GscHandlerCommon.TryExtractDirectivePath(line, out var includePath, includeInline: false))
                 continue;
 
-            var resolvedPath = await _indexer.GetIncludePath(includePath);
+            var resolvedPath = await _indexer.GetIncludePathAsync(includePath);
             if (string.IsNullOrEmpty(resolvedPath) || !seen.Add(resolvedPath))
                 continue;
 

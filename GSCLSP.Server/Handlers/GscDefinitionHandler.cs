@@ -25,7 +25,7 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
         };
     }
 
-    public async Task<DefinitionResult> Handle(DefinitionParams request, CancellationToken cancellationToken)
+    public async Task<DefinitionResult?> Handle(DefinitionParams request, CancellationToken cancellationToken)
     {
         var uri = request.TextDocument.Uri;
         var currentFilePath = uri.GetFileSystemPath();
@@ -42,7 +42,7 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
         if (GscHandlerCommon.IsIncludeLikeDirective(line.Trim()) &&
             GscHandlerCommon.TryExtractDirectivePath(line, out var includedFile))
         {
-            var foundIncludePath = await _indexer.GetIncludePath(includedFile);
+            var foundIncludePath = await _indexer.GetIncludePathAsync(includedFile);
             if (foundIncludePath != null)
             {
                 return new DefinitionResult(new Location

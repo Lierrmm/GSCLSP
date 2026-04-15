@@ -34,6 +34,7 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscCompletionHandler>()
         .WithHandler<GscReferencesHandler>()
         .WithHandler<GscCodeActionHandler>()
+        .WithHandler<GscRenameHandler>()
         .OnInitialize((server, request, token) =>
         {
             var workspacePath = request.RootPath
