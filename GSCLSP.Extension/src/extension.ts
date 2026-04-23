@@ -87,8 +87,8 @@ async function readTargetGame(): Promise<string | undefined> {
 async function updateStatusBar(): Promise<void> {
   if (!targetGameStatusBar) return;
   const game = (await readTargetGame()) ?? "iw4";
-  targetGameStatusBar.text = `$(chip) GSC: ${game.toUpperCase()}`;
-  targetGameStatusBar.tooltip = "Click to change the GSC target game";
+  targetGameStatusBar.text = `$(chip) GSC Target Game: ${game.toUpperCase()}`;
+  targetGameStatusBar.tooltip = "Click to change the target game for GSC";
   targetGameStatusBar.show();
 }
 
