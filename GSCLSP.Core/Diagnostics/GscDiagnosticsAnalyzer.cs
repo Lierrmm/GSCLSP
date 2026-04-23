@@ -107,18 +107,25 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         }
 
         diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, devBlockMask));
-        diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig));
+        diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, devBlockMask));
 
         return diagnostics;
     }
 
-    private static List<Diagnostic> CollectEarlyReturnWarnings(string[] lines, IReadOnlyList<Token> tokens, MuteConfig muteConfig)
+    private static List<Diagnostic> CollectEarlyReturnWarnings(
+        string[] lines,
+        IReadOnlyList<Token> tokens,
+        MuteConfig muteConfig,
+        bool[] devBlockMask)
     {
         var diagnostics = new List<Diagnostic>();
         var result = GscDeadCodeAnalyzer.Analyze(lines, tokens);
 
         foreach (var er in result.EarlyReturns)
         {
+            if (er.Line >= 0 && er.Line < devBlockMask.Length && devBlockMask[er.Line])
+                continue;
+
             if (IsMuted(muteConfig, EarlyReturnMuteKey, er.Line)) continue;
 
             diagnostics.Add(new Diagnostic
@@ -769,6 +776,12 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             if (normalized is "builtin-arg-count" or "builtin-args" or "arity")
             {
                 keys.Add(BuiltinArgCountMuteKey);
+                continue;
+            }
+
+            if (normalized is "early-return" or "early-returns" or "unreachable")
+            {
+                keys.Add(EarlyReturnMuteKey);
             }
         }
 

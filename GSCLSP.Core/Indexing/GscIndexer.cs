@@ -966,7 +966,8 @@ public partial class GscIndexer
             {
                 // Clear stale (previous game's) built-ins so they don't bleed into diagnostics until the fetch completes.
                 BuiltIns.LoadNameOnlyBuiltIns([], []);
-                Console.Error.WriteLine($"GSCLSP: no cache for '{normalizedGame}'; fetching from gsc-tool.");
+                Console.Error.WriteLine($"GSCLSP: No cache for '{normalizedGame}', fetching from gsc-tool...");
+                if (gameChanged) GameChanged?.Invoke(normalizedGame);
                 _ = RefreshGscToolBuiltInsAsync(normalizedGame);
             }
             return;
@@ -985,6 +986,7 @@ public partial class GscIndexer
         }
 
         Console.Error.WriteLine("GSCLSP: No builtins file found, expected data/iw4_builtins.json");
+        if (gameChanged) GameChanged?.Invoke(normalizedGame);
     }
 
     private async Task RefreshGscToolBuiltInsAsync(string game)
@@ -999,9 +1001,27 @@ public partial class GscIndexer
         if (!string.Equals(CurrentGame, game, StringComparison.OrdinalIgnoreCase))
             return;
 
+        var previousFunctions = BuiltIns.GetAll()
+            .Where(symbol => symbol.Type == SymbolType.Function)
+            .Select(symbol => symbol.Name)
+            .ToArray();
+        var previousMethods = BuiltIns.GetAll(preferMethodsFirst: true)
+            .Where(symbol => symbol.Type == SymbolType.Method)
+            .Select(symbol => symbol.Name)
+            .ToArray();
+        var builtInsChanged = !BuiltInNamesEqual(previousFunctions, fetched.Functions)
+            || !BuiltInNamesEqual(previousMethods, fetched.Methods);
+
         BuiltIns.LoadNameOnlyBuiltIns(fetched.Functions, fetched.Methods);
         await Console.Error.WriteLineAsync($"GSCLSP: Refreshed gsc-tool built-ins for game '{game}'.");
-        GameChanged?.Invoke(game);
+        if (builtInsChanged)
+            GameChanged?.Invoke(game);
+    }
+
+    private static bool BuiltInNamesEqual(IEnumerable<string> left, IEnumerable<string> right)
+    {
+        return new HashSet<string>(left, StringComparer.OrdinalIgnoreCase)
+            .SetEquals(right);
     }
 
     private static string ResolveGameValue(bool hasWorkspaceConfig, string? workspaceGame)
