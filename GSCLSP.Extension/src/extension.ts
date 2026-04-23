@@ -128,6 +128,9 @@ async function selectTargetGameCommand(): Promise<void> {
   const config = await readWorkspaceConfig(folder);
   config.game = chosen;
   await writeWorkspaceConfig(folder, config);
+  await client.sendNotification("custom/updateTargetGame", {
+    targetGame: chosen,
+  });
   await updateStatusBar();
   window.showInformationMessage(`GSCLSP: Target game set to \"${chosen.toUpperCase()}\"`);
 }
@@ -148,8 +151,9 @@ function handleInactiveRegions(params: InactiveRegionsParams): void {
   const uri = Uri.parse(params.uri);
   const key = uri.toString();
 
+  // server sends 1-based line numbers but VS Code Range expects 0-based indices
   const ranges = params.ranges.map(
-    (r) => new Range(r.start, 0, r.end, Number.MAX_SAFE_INTEGER),
+    (r) => new Range(r.start - 1, 0, r.end - 1, Number.MAX_SAFE_INTEGER),
   );
   inactiveRangesByUri.set(key, ranges);
 
@@ -339,6 +343,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   const configWatcher = workspace.createFileSystemWatcher("**/gsclsp.config.json");
   configWatcher.onDidChange(() => updateStatusBar());
   configWatcher.onDidCreate(() => updateStatusBar());
+  configWatcher.onDidDelete(() => updateStatusBar());
   context.subscriptions.push(configWatcher);
 
   inactiveDecoration = window.createTextEditorDecorationType({
@@ -349,6 +354,12 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   context.subscriptions.push(
     client.onNotification("custom/inactiveRegions", handleInactiveRegions),
+  );
+
+  context.subscriptions.push(
+    workspace.onDidCloseTextDocument((doc) => {
+      inactiveRangesByUri.delete(doc.uri.toString());
+    }),
   );
 
   context.subscriptions.push(

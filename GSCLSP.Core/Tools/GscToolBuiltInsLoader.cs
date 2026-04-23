@@ -93,7 +93,9 @@ public static class GscToolBuiltInsLoader
     {
         foreach (var url in urls)
         {
+            ct.ThrowIfCancellationRequested();
             try { return await http.GetStringAsync(url, ct); }
+            catch (OperationCanceledException) { throw; }
             catch { }
         }
         return null;

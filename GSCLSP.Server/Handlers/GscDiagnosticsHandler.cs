@@ -9,7 +9,7 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
-public partial class GscDiagnosticsHandler
+public class GscDiagnosticsHandler
 {
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
@@ -20,6 +20,7 @@ public partial class GscDiagnosticsHandler
     private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
     private readonly ILanguageServerFacade _languageServer;
     private readonly GscDocumentStore _documentStore;
+    private CancellationTokenSource? _republishCancellationTokenSource;
 
     public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore)
     {
@@ -28,14 +29,46 @@ public partial class GscDiagnosticsHandler
         _documentStore = documentStore;
         _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
 
-        _indexer.GameChanged += _ => RepublishAllOpenDocuments();
+        _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
     }
 
-    private void RepublishAllOpenDocuments()
+    private void StartRepublishAllOpenDocuments()
     {
-        foreach (var (uri, text) in _documentStore.OpenDocuments)
+        var cancellationTokenSource = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _republishCancellationTokenSource, cancellationTokenSource);
+        previous?.Cancel();
+        previous?.Dispose();
+
+        _ = RepublishAllOpenDocuments(cancellationTokenSource.Token);
+    }
+
+    private async Task RepublishAllOpenDocuments(CancellationToken cancellationToken)
+    {
+        var tasks = _documentStore.OpenDocuments
+            .Select(document => RepublishDocumentAsync(document.Key, document.Value, cancellationToken))
+            .ToArray();
+
+        try
         {
-            _ = PublishAsync(uri, text, CancellationToken.None);
+            await Task.WhenAll(tasks);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task RepublishDocumentAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await PublishAsync(uri, text, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"GSCLSP: failed to republish diagnostics for '{uri}': {ex}");
         }
     }
 
@@ -49,23 +82,30 @@ public partial class GscDiagnosticsHandler
             Diagnostics = new Container<Diagnostic>(diagnostics)
         });
 
-        PublishInactiveRegions(uri, text);
+        await PublishInactiveRegionsAsync(uri, text, cancellationToken);
     }
 
-    public void PublishInactiveRegions(DocumentUri uri, string text)
+    public async Task PublishInactiveRegionsAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
     {
-        var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-        var ifdefRanges = GscInactiveRegionAnalyzer.Analyze(lines, _indexer.CurrentGame);
+        var ranges = await Task.Run(() =>
+        {
+            var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+            var lexed = new GSCLSP.Lexer.GscLexer().Lex(text);
+            var ifdefRanges = GscInactiveRegionAnalyzer.Analyze(lines, _indexer.CurrentGame);
+            var deadCode = GscDeadCodeAnalyzer.Analyze(lines, lexed.Tokens);
 
-        var lexed = new GSCLSP.Lexer.GscLexer().Lex(text);
-        var deadCode = GscDeadCodeAnalyzer.Analyze(lines, lexed.Tokens);
+            return ifdefRanges
+                .Concat(deadCode.DeadRanges)
+                .Select(r => new { start = r.StartLine, end = r.EndLine })
+                .ToArray();
+        }, cancellationToken);
 
-        var combined = ifdefRanges.Concat(deadCode.DeadRanges);
+        cancellationToken.ThrowIfCancellationRequested();
 
         _languageServer.SendNotification("custom/inactiveRegions", new
         {
             uri = uri.ToString(),
-            ranges = combined.Select(r => new { start = r.StartLine, end = r.EndLine }).ToArray()
+            ranges
         });
     }
 
