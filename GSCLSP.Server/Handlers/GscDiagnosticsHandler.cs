@@ -55,12 +55,17 @@ public partial class GscDiagnosticsHandler
     public void PublishInactiveRegions(DocumentUri uri, string text)
     {
         var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
-        var ranges = GscInactiveRegionAnalyzer.Analyze(lines, _indexer.CurrentGame);
+        var ifdefRanges = GscInactiveRegionAnalyzer.Analyze(lines, _indexer.CurrentGame);
+
+        var lexed = new GSCLSP.Lexer.GscLexer().Lex(text);
+        var deadCode = GscDeadCodeAnalyzer.Analyze(lines, lexed.Tokens);
+
+        var combined = ifdefRanges.Concat(deadCode.DeadRanges);
 
         _languageServer.SendNotification("custom/inactiveRegions", new
         {
             uri = uri.ToString(),
-            ranges = ranges.Select(r => new { start = r.StartLine, end = r.EndLine }).ToArray()
+            ranges = combined.Select(r => new { start = r.StartLine, end = r.EndLine }).ToArray()
         });
     }
 

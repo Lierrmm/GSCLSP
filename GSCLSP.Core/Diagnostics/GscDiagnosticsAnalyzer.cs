@@ -13,10 +13,12 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
     public const string MissingSemicolonWarningCode = "gsclsp.missingSemicolon";
     public const string InvalidBuiltinArgCountDiagnosticCode = "gsclsp.invalidBuiltinArgCount";
+    public const string EarlyReturnWarningCode = "gsclsp.earlyReturn";
 
     private const string RecursiveWarningMuteKey = "recursive-function";
     private const string MissingSemicolonMuteKey = "missing-semicolon";
     private const string BuiltinArgCountMuteKey = "builtin-arg-count";
+    private const string EarlyReturnMuteKey = "early-return";
     private static readonly bool ResolutionTraceEnabled =
         string.Equals(Environment.GetEnvironmentVariable("GSCLSP_TRACE_RESOLUTION"), "1", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(Environment.GetEnvironmentVariable("GSCLSP_TRACE_RESOLUTION"), "true", StringComparison.OrdinalIgnoreCase);
@@ -105,6 +107,31 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         }
 
         diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, devBlockMask));
+        diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig));
+
+        return diagnostics;
+    }
+
+    private static List<Diagnostic> CollectEarlyReturnWarnings(string[] lines, IReadOnlyList<Token> tokens, MuteConfig muteConfig)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var result = GscDeadCodeAnalyzer.Analyze(lines, tokens);
+
+        foreach (var er in result.EarlyReturns)
+        {
+            if (IsMuted(muteConfig, EarlyReturnMuteKey, er.Line)) continue;
+
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Warning,
+                Source = "gsclsp",
+                Code = EarlyReturnWarningCode,
+                Message = "Early return leaves unreachable code below.",
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(er.Line, er.Column),
+                    new Position(er.Line, er.Column + er.Length))
+            });
+        }
 
         return diagnostics;
     }
