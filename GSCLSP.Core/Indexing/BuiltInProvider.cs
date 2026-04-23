@@ -169,4 +169,22 @@ public class BuiltInProvider
             ? _builtInMethods.Values.Concat(_builtInFunctions.Values)
             : _builtInFunctions.Values.Concat(_builtInMethods.Values);
     }
+
+    public void LoadNameOnlyBuiltIns(IEnumerable<string> functionNames, IEnumerable<string> methodNames)
+    {
+        _builtInFunctions.Clear();
+        _builtInMethods.Clear();
+
+        foreach (var name in functionNames)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            _builtInFunctions[name] = new GscSymbol(name, "Engine", 0, string.Empty, SymbolType.Function);
+        }
+
+        foreach (var name in methodNames)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            _builtInMethods[name] = new GscSymbol(name, "Engine", 0, string.Empty, SymbolType.Method);
+        }
+    }
 }

@@ -1,6 +1,7 @@
 ﻿using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Core.Services;
+using GSCLSP.Core.Tools;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -15,6 +16,8 @@ public partial class GscIndexer
     public int SymbolCount => _symbols.Count;
     public BuiltInProvider BuiltIns { get; } = new();
     public string? DumpPath { get; private set; }
+    public string CurrentGame { get; private set; } = "iw4";
+    public event Action<string>? GameChanged;
     public List<GscSymbol> WorkspaceSymbols { get; private set; } = [];
     private readonly Dictionary<string, GscFileMap> _workspaceFileMaps = [];
     private readonly Dictionary<string, GscFileMap> _fileMaps = [];
@@ -921,12 +924,17 @@ public partial class GscIndexer
         return clean;
     }
 
+    private static readonly TimeSpan GscToolCacheMaxAge = TimeSpan.FromDays(7);
+
     private void LoadConfiguredBuiltIns(bool hasWorkspaceConfig, string? workspaceGame)
     {
         var game = ResolveGameValue(hasWorkspaceConfig, workspaceGame);
         var normalizedGame = string.IsNullOrWhiteSpace(game)
             ? "iw4"
             : game.Trim().ToLowerInvariant();
+
+        var gameChanged = !string.Equals(CurrentGame, normalizedGame, StringComparison.Ordinal);
+        CurrentGame = normalizedGame;
 
         var basePath = AppDomain.CurrentDomain.BaseDirectory;
         var dataPath = Path.Combine(basePath, "data");
@@ -937,22 +945,63 @@ public partial class GscIndexer
         if (File.Exists(requestedPath))
         {
             BuiltIns.LoadBuiltIns(requestedPath);
-            Console.Error.WriteLine($"GSCLSP: loaded built-ins for game '{normalizedGame}'.");
+            Console.Error.WriteLine($"GSCLSP: loaded builtins for game '{normalizedGame}'.");
+            if (gameChanged) GameChanged?.Invoke(normalizedGame);
+            return;
+        }
+
+        if (GscToolBuiltInsLoader.IsSupported(normalizedGame))
+        {
+            var cached = GscToolBuiltInsLoader.TryLoadFromCache(normalizedGame);
+            if (cached != null)
+            {
+                BuiltIns.LoadNameOnlyBuiltIns(cached.Functions, cached.Methods);
+                Console.Error.WriteLine($"GSCLSP: Loaded cached builtins for game '{normalizedGame}'.");
+                if (gameChanged) GameChanged?.Invoke(normalizedGame);
+
+                if (GscToolBuiltInsLoader.IsCacheStale(normalizedGame, GscToolCacheMaxAge))
+                    _ = RefreshGscToolBuiltInsAsync(normalizedGame);
+            }
+            else
+            {
+                // Clear stale (previous game's) built-ins so they don't bleed into diagnostics until the fetch completes.
+                BuiltIns.LoadNameOnlyBuiltIns([], []);
+                Console.Error.WriteLine($"GSCLSP: no cache for '{normalizedGame}'; fetching from gsc-tool.");
+                _ = RefreshGscToolBuiltInsAsync(normalizedGame);
+            }
             return;
         }
 
         if (!normalizedGame.Equals("iw4", StringComparison.OrdinalIgnoreCase))
         {
-            Console.Error.WriteLine($"GSCLSP: built-ins for game '{normalizedGame}' not found. Falling back to iw4_builtins.json.");
+            Console.Error.WriteLine($"GSCLSP: Builtins for game '{normalizedGame}' not found, using iw4_builtins.json instead...");
         }
 
         if (File.Exists(fallbackPath))
         {
             BuiltIns.LoadBuiltIns(fallbackPath);
+            if (gameChanged) GameChanged?.Invoke(normalizedGame);
             return;
         }
 
-        Console.Error.WriteLine("GSCLSP: no built-ins file found (expected data/iw4_builtins.json).");
+        Console.Error.WriteLine("GSCLSP: No builtins file found, expected data/iw4_builtins.json");
+    }
+
+    private async Task RefreshGscToolBuiltInsAsync(string game)
+    {
+        var fetched = await GscToolBuiltInsLoader.FetchAsync(game).ConfigureAwait(false);
+        if (fetched == null)
+        {
+            await Console.Error.WriteLineAsync($"GSCLSP: gsc-tool fetch for '{game}' failed or unsupported.");
+            return;
+        }
+
+        if (!string.Equals(CurrentGame, game, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        BuiltIns.LoadNameOnlyBuiltIns(fetched.Functions, fetched.Methods);
+        await Console.Error.WriteLineAsync($"GSCLSP: Refreshed gsc-tool built-ins for game '{game}'.");
+        GameChanged?.Invoke(game);
     }
 
     private static string ResolveGameValue(bool hasWorkspaceConfig, string? workspaceGame)

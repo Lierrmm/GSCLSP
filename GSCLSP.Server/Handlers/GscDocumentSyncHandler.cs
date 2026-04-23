@@ -15,6 +15,7 @@ public class GscDocumentStore
     public void Update(DocumentUri uri, string text) => _documents[uri] = text;
     public void Remove(DocumentUri uri) => _documents.TryRemove(uri, out _);
     public string? Get(DocumentUri uri) => _documents.TryGetValue(uri, out var text) ? text : null;
+    public IEnumerable<KeyValuePair<DocumentUri, string>> OpenDocuments => _documents;
 }
 
 public class GscDocumentSyncHandler(GscDocumentStore store, GscDiagnosticsHandler diagnosticsHandler) : TextDocumentSyncHandlerBase

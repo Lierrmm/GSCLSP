@@ -9,16 +9,35 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
-public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer)
+public partial class GscDiagnosticsHandler
 {
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
     public const string MissingSemicolonWarningCode = "gsclsp.missingSemicolon";
     public const string InvalidBuiltinArgCountDiagnosticCode = "gsclsp.invalidBuiltinArgCount";
 
-    private readonly GscIndexer _indexer = indexer;
-    private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer = new(indexer);
-    private readonly ILanguageServerFacade _languageServer = languageServer;
+    private readonly GscIndexer _indexer;
+    private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
+    private readonly ILanguageServerFacade _languageServer;
+    private readonly GscDocumentStore _documentStore;
+
+    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore)
+    {
+        _indexer = indexer;
+        _languageServer = languageServer;
+        _documentStore = documentStore;
+        _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
+
+        _indexer.GameChanged += _ => RepublishAllOpenDocuments();
+    }
+
+    private void RepublishAllOpenDocuments()
+    {
+        foreach (var (uri, text) in _documentStore.OpenDocuments)
+        {
+            _ = PublishAsync(uri, text, CancellationToken.None);
+        }
+    }
 
     public async Task PublishAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
     {
@@ -28,6 +47,20 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         {
             Uri = uri,
             Diagnostics = new Container<Diagnostic>(diagnostics)
+        });
+
+        PublishInactiveRegions(uri, text);
+    }
+
+    public void PublishInactiveRegions(DocumentUri uri, string text)
+    {
+        var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+        var ranges = GscInactiveRegionAnalyzer.Analyze(lines, _indexer.CurrentGame);
+
+        _languageServer.SendNotification("custom/inactiveRegions", new
+        {
+            uri = uri.ToString(),
+            ranges = ranges.Select(r => new { start = r.StartLine, end = r.EndLine }).ToArray()
         });
     }
 

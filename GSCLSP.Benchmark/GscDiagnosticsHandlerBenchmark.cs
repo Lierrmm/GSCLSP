@@ -105,7 +105,7 @@ on_player_spawn(player)
         _indexer.IndexWorkspace(_tempDir);
         _testFilePath = Path.Combine(_tempDir, "scripts", "main.gsc");
 
-        _diagnosticsHandler = new GscDiagnosticsHandler(_indexer, null!);
+        _diagnosticsHandler = new GscDiagnosticsHandler(_indexer, null!, new GscDocumentStore());
     }
 
     [Benchmark]
