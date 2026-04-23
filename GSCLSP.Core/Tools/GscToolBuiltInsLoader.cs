@@ -12,7 +12,6 @@ public static class GscToolBuiltInsLoader
     {
         "iw5", "iw6", "iw7", "iw8", "iw9",
         "s1", "s2", "s4",
-        "t6", "t7", "t8", "t9",
         "h1", "h2",
     };
 
@@ -82,6 +81,10 @@ public static class GscToolBuiltInsLoader
 
             SaveCache(key, functions, methods);
             return new NameLists(functions, methods);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {

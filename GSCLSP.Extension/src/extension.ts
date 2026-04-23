@@ -29,6 +29,7 @@ let targetGameStatusBar: StatusBarItem | undefined;
 let inactiveDecoration: TextEditorDecorationType | undefined;
 const inactiveRangesByUri = new Map<string, Range[]>();
 
+// games that GSCLSP can work on no problem, but they may use IW4 builtins for now
 const KNOWN_GAMES = [
   "iw3",
   "iw4",
@@ -40,6 +41,7 @@ const KNOWN_GAMES = [
   "s1",
   "s2",
   "s4",
+  "t4",
   "t5",
   "t6",
   "t7",

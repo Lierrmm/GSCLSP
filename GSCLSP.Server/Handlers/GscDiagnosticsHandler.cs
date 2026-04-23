@@ -37,13 +37,13 @@ public class GscDiagnosticsHandler
         var cancellationTokenSource = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _republishCancellationTokenSource, cancellationTokenSource);
         previous?.Cancel();
-        previous?.Dispose();
 
-        _ = RepublishAllOpenDocuments(cancellationTokenSource.Token);
+        _ = RepublishAllOpenDocumentsAsync(cancellationTokenSource);
     }
 
-    private async Task RepublishAllOpenDocuments(CancellationToken cancellationToken)
+    private async Task RepublishAllOpenDocumentsAsync(CancellationTokenSource cancellationTokenSource)
     {
+        var cancellationToken = cancellationTokenSource.Token;
         var tasks = _documentStore.OpenDocuments
             .Select(document => RepublishDocumentAsync(document.Key, document.Value, cancellationToken))
             .ToArray();
@@ -54,6 +54,10 @@ public class GscDiagnosticsHandler
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+        finally
+        {
+            cancellationTokenSource.Dispose();
         }
     }
 
@@ -68,7 +72,7 @@ public class GscDiagnosticsHandler
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"GSCLSP: failed to republish diagnostics for '{uri}': {ex}");
+            await Console.Error.WriteLineAsync($"GSCLSP: failed to republish diagnostics for '{uri}': {ex}");
         }
     }
 

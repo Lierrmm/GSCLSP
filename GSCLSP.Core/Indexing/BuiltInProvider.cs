@@ -49,6 +49,11 @@ public class BuiltInProvider
                     LoadEntries(methods, builtInMethods, SymbolType.Method);
                 }
             }
+            else
+            {
+                Console.Error.WriteLine($"[Warning] Unexpected built-ins JSON root kind '{root.ValueKind}' in: {jsonPath}");
+                return;
+            }
 
             ReplaceSnapshot(builtInFunctions, builtInMethods);
             Console.Error.WriteLine($"Loaded {builtInFunctions.Count} engine built-in functions and {builtInMethods.Count} engine built-in methods.");
