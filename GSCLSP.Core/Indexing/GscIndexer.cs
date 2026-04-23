@@ -691,24 +691,13 @@ public partial class GscIndexer
                 if (!trimmed.StartsWith("#define ")) continue;
 
                 var afterDefine = trimmed[8..];
-                int spaceIdx = afterDefine.IndexOf(' ');
-                int tabIdx = afterDefine.IndexOf('\t');
+                int sepIdx = afterDefine.IndexOfAny([' ', '\t', '(']);
 
-                string macroName;
-                string macroValue;
-
-                if (spaceIdx < 0 && tabIdx < 0)
-                {
-                    macroName = afterDefine.Trim();
-                    macroValue = "";
-                }
-                else
-                {
-                    int sepIdx = (spaceIdx >= 0 && tabIdx >= 0) ? Math.Min(spaceIdx, tabIdx)
-                               : (spaceIdx >= 0 ? spaceIdx : tabIdx);
-                    macroName = afterDefine[..sepIdx].Trim();
-                    macroValue = afterDefine[(sepIdx + 1)..].Trim();
-                }
+                string macroName = sepIdx < 0 ? afterDefine.Trim() : afterDefine[..sepIdx].Trim();
+                int valueStart = sepIdx < 0 ? afterDefine.Length
+                               : afterDefine[sepIdx] == '(' ? sepIdx
+                               : sepIdx + 1;
+                string macroValue = afterDefine[valueStart..].Trim();
 
                 if (!string.IsNullOrEmpty(macroName))
                 {

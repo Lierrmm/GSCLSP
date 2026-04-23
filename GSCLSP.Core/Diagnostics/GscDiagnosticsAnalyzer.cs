@@ -530,6 +530,9 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         if (_indexer.BuiltIns.GetBuiltIn(functionName) != null)
             return true;
 
+        if (_indexer.ResolveMacro(currentFilePath, functionName) != null)
+            return true;
+
         if (!string.IsNullOrWhiteSpace(qualifiedPath))
         {
             if (PathMatches(currentFilePath, qualifiedPath) && localFunctions.Contains(functionName))
