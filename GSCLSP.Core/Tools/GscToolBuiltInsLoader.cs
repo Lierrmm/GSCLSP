@@ -6,13 +6,16 @@ namespace GSCLSP.Core.Tools;
 
 public static class GscToolBuiltInsLoader
 {
-    private const string RawBaseUrl = "https://raw.githubusercontent.com/xensik/gsc-tool/refs/heads/dev/src/gsc/engine";
-
     public static readonly HashSet<string> SupportedGames = new(StringComparer.OrdinalIgnoreCase)
     {
         "iw5", "iw6", "iw7", "iw8", "iw9",
         "s1", "s2", "s4",
         "h1", "h2",
+    };
+
+    private static readonly HttpClient http = new()
+    {
+        BaseAddress = new Uri("https://raw.githubusercontent.com/xensik/gsc-tool/refs/heads/dev/src/gsc/engine"),
     };
 
     public static bool IsSupported(string game) => SupportedGames.Contains(game);
@@ -61,13 +64,12 @@ public static class GscToolBuiltInsLoader
 
         try
         {
-            using var http = new HttpClient();
-            var funcTask = TryGetFirstAvailableAsync(http, ct,
-                $"{RawBaseUrl}/{key}_func.cpp",
-                $"{RawBaseUrl}/{key}_pc_func.cpp");
-            var methTask = TryGetFirstAvailableAsync(http, ct,
-                $"{RawBaseUrl}/{key}_meth.cpp",
-                $"{RawBaseUrl}/{key}_pc_meth.cpp");
+            var funcTask = TryGetFirstAvailableAsync(ct,
+                $"{key}_func.cpp",
+                $"{key}_pc_func.cpp");
+            var methTask = TryGetFirstAvailableAsync(ct,
+                $"{key}_meth.cpp",
+                $"{key}_pc_meth.cpp");
 
             await Task.WhenAll(funcTask, methTask);
 
@@ -92,7 +94,7 @@ public static class GscToolBuiltInsLoader
         }
     }
 
-    private static async Task<string?> TryGetFirstAvailableAsync(HttpClient http, CancellationToken ct, params string[] urls)
+    private static async Task<string?> TryGetFirstAvailableAsync(CancellationToken ct, params string[] urls)
     {
         foreach (var url in urls)
         {
