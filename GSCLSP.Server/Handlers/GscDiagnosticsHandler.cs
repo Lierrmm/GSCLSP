@@ -21,15 +21,13 @@ public class GscDiagnosticsHandler
     private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
     private readonly ILanguageServerFacade _languageServer;
     private readonly GscDocumentStore _documentStore;
-    private readonly ILogger<GscDiagnosticsHandler> _logger;
     private CancellationTokenSource? _republishCancellationTokenSource;
 
-    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore, ILogger<GscDiagnosticsHandler> logger)
+    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore)
     {
         _indexer = indexer;
         _languageServer = languageServer;
         _documentStore = documentStore;
-        _logger = logger;
         _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
 
         _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
@@ -75,7 +73,6 @@ public class GscDiagnosticsHandler
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to republish diagnostics for '{Uri}'", uri);
         }
     }
 
