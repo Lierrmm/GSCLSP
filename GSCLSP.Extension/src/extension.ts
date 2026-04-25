@@ -97,9 +97,7 @@ async function updateStatusBar(): Promise<void> {
 async function selectTargetGameCommand(): Promise<void> {
   const folder = targetWorkspaceFolder();
   if (!folder || folder.uri.scheme !== "file") {
-    window.showErrorMessage(
-      "GSCLSP: Open a local workspace folder to configure target game.",
-    );
+    window.showErrorMessage("GSCLSP: Open a local workspace folder to configure target game.");
     return;
   }
 
@@ -124,7 +122,11 @@ async function selectTargetGameCommand(): Promise<void> {
     });
     if (!input) return;
     chosen = input.trim().toLowerCase();
-    if (!chosen) return;
+    if (!/^[a-z0-9_]+$/.test(chosen))
+    {
+      window.showErrorMessage(`GSCLSP: Invalid game identifier "${input}. Please try again.`);
+      return;
+    }
   }
 
   const config = await readWorkspaceConfig(folder);
@@ -150,9 +152,8 @@ function handleInactiveRegions(params: InactiveRegionsParams): void {
   const uri = Uri.parse(params.uri);
   const key = uri.toString();
 
-  // server sends 1-based line numbers but VS Code Range expects 0-based indices
   const ranges = params.ranges.map(
-    (r) => new Range(r.start - 1, 0, r.end - 1, Number.MAX_SAFE_INTEGER),
+    (r) => new Range(r.start, 0, r.end, Number.MAX_SAFE_INTEGER),
   );
   inactiveRangesByUri.set(key, ranges);
 
@@ -218,9 +219,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
               : workspace.workspaceFolders?.[0];
 
             if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
-              window.showErrorMessage(
-                "GSCLSP: Open a local workspace folder to save gsclsp.config.json",
-              );
+              window.showErrorMessage("GSCLSP: Open a local workspace folder to save gsclsp.config.json");
               return;
             }
 
@@ -255,9 +254,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
             } catch (error) {
               const message =
                 error instanceof Error ? error.message : String(error);
-              window.showErrorMessage(
-                `GSCLSP: Failed to write gsclsp.config.json: ${message}`,
-              );
+              window.showErrorMessage(`GSCLSP: Failed to write gsclsp.config.json: ${message}`);
             }
 
             return new Promise((resolve) => setTimeout(resolve, 2000));
