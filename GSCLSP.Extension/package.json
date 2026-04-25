@@ -27,6 +27,10 @@
       {
         "command": "gsclsp.browseDumpPath",
         "title": "GSC: Set Dump Folder Path"
+      },
+      {
+        "command": "gsclsp.selectTargetGame",
+        "title": "GSC: Select Target Game"
       }
     ],
     "languages": [

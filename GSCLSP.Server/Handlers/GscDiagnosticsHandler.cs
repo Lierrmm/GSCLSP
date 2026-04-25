@@ -1,6 +1,7 @@
 using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Diagnostics;
 using GSCLSP.Core.Models;
+using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
@@ -9,16 +10,71 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
-public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer)
+public class GscDiagnosticsHandler
 {
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
     public const string MissingSemicolonWarningCode = "gsclsp.missingSemicolon";
     public const string InvalidBuiltinArgCountDiagnosticCode = "gsclsp.invalidBuiltinArgCount";
 
-    private readonly GscIndexer _indexer = indexer;
-    private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer = new(indexer);
-    private readonly ILanguageServerFacade _languageServer = languageServer;
+    private readonly GscIndexer _indexer;
+    private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
+    private readonly ILanguageServerFacade _languageServer;
+    private readonly GscDocumentStore _documentStore;
+    private CancellationTokenSource? _republishCancellationTokenSource;
+
+    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore)
+    {
+        _indexer = indexer;
+        _languageServer = languageServer;
+        _documentStore = documentStore;
+        _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
+
+        _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
+    }
+
+    private void StartRepublishAllOpenDocuments()
+    {
+        var cancellationTokenSource = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _republishCancellationTokenSource, cancellationTokenSource);
+        previous?.Cancel();
+
+        _ = RepublishAllOpenDocumentsAsync(cancellationTokenSource);
+    }
+
+    private async Task RepublishAllOpenDocumentsAsync(CancellationTokenSource cancellationTokenSource)
+    {
+        var cancellationToken = cancellationTokenSource.Token;
+        var tasks = _documentStore.OpenDocuments
+            .Select(document => RepublishDocumentAsync(document.Key, document.Value, cancellationToken))
+            .ToArray();
+
+        try
+        {
+            await Task.WhenAll(tasks);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            cancellationTokenSource.Dispose();
+        }
+    }
+
+    private async Task RepublishDocumentAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await PublishAsync(uri, text, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+        }
+    }
 
     public async Task PublishAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
     {
@@ -28,6 +84,32 @@ public partial class GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFa
         {
             Uri = uri,
             Diagnostics = new Container<Diagnostic>(diagnostics)
+        });
+
+        await PublishInactiveRegionsAsync(uri, text, cancellationToken);
+    }
+
+    public async Task PublishInactiveRegionsAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
+    {
+        var ranges = await Task.Run(() =>
+        {
+            var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+            var lexed = new GSCLSP.Lexer.GscLexer().Lex(text);
+            var ifdefRanges = GscInactiveRegionAnalyzer.Analyze(lines, _indexer.CurrentGame);
+            var deadCode = GscDeadCodeAnalyzer.Analyze(lines, lexed.Tokens);
+
+            return ifdefRanges
+                .Concat(deadCode.DeadRanges)
+                .Select(r => new { start = r.StartLine, end = r.EndLine })
+                .ToArray();
+        }, cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _languageServer.SendNotification("custom/inactiveRegions", new
+        {
+            uri = uri.ToString(),
+            ranges
         });
     }
 

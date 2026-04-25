@@ -11,8 +11,9 @@ public class BuiltInProvider
         "iprintlnbold"
     };
 
-    private readonly Dictionary<string, GscSymbol> _builtInFunctions = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, GscSymbol> _builtInMethods = new(StringComparer.OrdinalIgnoreCase);
+    private BuiltInSnapshot _snapshot = new(
+        new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase),
+        new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase));
 
     public void LoadBuiltIns(string jsonPath)
     {
@@ -24,33 +25,38 @@ public class BuiltInProvider
 
         try
         {
-            _builtInFunctions.Clear();
-            _builtInMethods.Clear();
-
             var json = File.ReadAllText(jsonPath);
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
+            var builtInFunctions = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
+            var builtInMethods = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
 
             if (root.ValueKind == JsonValueKind.Array)
             {
                 // Legacy format: [ { name, args: [ { name } ] } ]
-                LoadEntries(root, _builtInFunctions, SymbolType.Function);
+                LoadEntries(root, builtInFunctions, SymbolType.Function);
             }
             else if (root.ValueKind == JsonValueKind.Object)
             {
                 // New format: { functions: [...], methods: [...] }
                 if (root.TryGetProperty("functions", out var functions) && functions.ValueKind == JsonValueKind.Array)
                 {
-                    LoadEntries(functions, _builtInFunctions, SymbolType.Function);
+                    LoadEntries(functions, builtInFunctions, SymbolType.Function);
                 }
 
                 if (root.TryGetProperty("methods", out var methods) && methods.ValueKind == JsonValueKind.Array)
                 {
-                    LoadEntries(methods, _builtInMethods, SymbolType.Method);
+                    LoadEntries(methods, builtInMethods, SymbolType.Method);
                 }
             }
+            else
+            {
+                Console.Error.WriteLine($"[Warning] Unexpected built-ins JSON root kind '{root.ValueKind}' in: {jsonPath}");
+                return;
+            }
 
-            Console.Error.WriteLine($"Loaded {_builtInFunctions.Count} engine built-in functions and {_builtInMethods.Count} engine built-in methods.");
+            ReplaceSnapshot(builtInFunctions, builtInMethods);
+            Console.Error.WriteLine($"Loaded {builtInFunctions.Count} engine built-in functions and {builtInMethods.Count} engine built-in methods.");
         }
         catch (Exception ex)
         {
@@ -146,27 +152,59 @@ public class BuiltInProvider
 
     public GscSymbol? GetBuiltIn(string name, bool preferMethod = false)
     {
+        var snapshot = _snapshot;
+
         if (preferMethod)
         {
-            if (_builtInMethods.TryGetValue(name, out var methodSymbol))
+            if (snapshot.Methods.TryGetValue(name, out var methodSymbol))
                 return methodSymbol;
 
-            return _builtInFunctions.TryGetValue(name, out var fallbackFunction) ? fallbackFunction : null;
+            return snapshot.Functions.TryGetValue(name, out var fallbackFunction) ? fallbackFunction : null;
         }
 
-        if (_builtInFunctions.TryGetValue(name, out var functionSymbol))
+        if (snapshot.Functions.TryGetValue(name, out var functionSymbol))
             return functionSymbol;
 
-        return _builtInMethods.TryGetValue(name, out var fallbackMethod) ? fallbackMethod : null;
+        return snapshot.Methods.TryGetValue(name, out var fallbackMethod) ? fallbackMethod : null;
     }
 
     public IEnumerable<string> GetNames() =>
-        _builtInFunctions.Keys.Concat(_builtInMethods.Keys).Distinct(StringComparer.OrdinalIgnoreCase);
+        _snapshot.Functions.Keys.Concat(_snapshot.Methods.Keys).Distinct(StringComparer.OrdinalIgnoreCase);
 
     public IEnumerable<GscSymbol> GetAll(bool preferMethodsFirst = false)
     {
+        var snapshot = _snapshot;
         return preferMethodsFirst
-            ? _builtInMethods.Values.Concat(_builtInFunctions.Values)
-            : _builtInFunctions.Values.Concat(_builtInMethods.Values);
+            ? snapshot.Methods.Values.Concat(snapshot.Functions.Values)
+            : snapshot.Functions.Values.Concat(snapshot.Methods.Values);
     }
+
+    public void LoadNameOnlyBuiltIns(IEnumerable<string> functionNames, IEnumerable<string> methodNames)
+    {
+        var builtInFunctions = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
+        var builtInMethods = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var name in functionNames)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            builtInFunctions[name] = new GscSymbol(name, "Engine", 0, string.Empty, SymbolType.Function);
+        }
+
+        foreach (var name in methodNames)
+        {
+            if (string.IsNullOrWhiteSpace(name)) continue;
+            builtInMethods[name] = new GscSymbol(name, "Engine", 0, string.Empty, SymbolType.Method);
+        }
+
+        ReplaceSnapshot(builtInFunctions, builtInMethods);
+    }
+
+    private void ReplaceSnapshot(Dictionary<string, GscSymbol> functions, Dictionary<string, GscSymbol> methods)
+    {
+        Interlocked.Exchange(ref _snapshot, new BuiltInSnapshot(functions, methods));
+    }
+
+    private sealed record BuiltInSnapshot(
+        Dictionary<string, GscSymbol> Functions,
+        Dictionary<string, GscSymbol> Methods);
 }

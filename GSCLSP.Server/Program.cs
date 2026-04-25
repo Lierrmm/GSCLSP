@@ -43,8 +43,7 @@ var server = await LanguageServer.From(options =>
 
             if (!string.IsNullOrEmpty(workspacePath))
             {
-                var serverIndexer = server.Services.GetService<GscIndexer>();
-                serverIndexer?.IndexWorkspace(workspacePath);
+                indexer.IndexWorkspace(workspacePath);
             }
             else
             {
