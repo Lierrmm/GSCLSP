@@ -15,7 +15,7 @@ public static class GscToolBuiltInsLoader
 
     private static readonly HttpClient http = new()
     {
-        BaseAddress = new Uri("https://raw.githubusercontent.com/xensik/gsc-tool/refs/heads/dev/src/gsc/engine"),
+        BaseAddress = new Uri("https://raw.githubusercontent.com/xensik/gsc-tool/refs/heads/dev/src/gsc/engine/"),
     };
 
     public static bool IsSupported(string game) => SupportedGames.Contains(game);

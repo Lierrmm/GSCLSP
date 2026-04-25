@@ -1,6 +1,7 @@
 using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Diagnostics;
 using GSCLSP.Core.Models;
+using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
@@ -20,13 +21,15 @@ public class GscDiagnosticsHandler
     private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
     private readonly ILanguageServerFacade _languageServer;
     private readonly GscDocumentStore _documentStore;
+    private readonly ILogger<GscDiagnosticsHandler> _logger;
     private CancellationTokenSource? _republishCancellationTokenSource;
 
-    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore)
+    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore, ILogger<GscDiagnosticsHandler> logger)
     {
         _indexer = indexer;
         _languageServer = languageServer;
         _documentStore = documentStore;
+        _logger = logger;
         _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
 
         _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
@@ -72,7 +75,7 @@ public class GscDiagnosticsHandler
         }
         catch (Exception ex)
         {
-            await Console.Error.WriteLineAsync($"GSCLSP: failed to republish diagnostics for '{uri}': {ex}");
+            _logger.LogError(ex, "Failed to republish diagnostics for '{Uri}'", uri);
         }
     }
 

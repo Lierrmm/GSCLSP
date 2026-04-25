@@ -130,11 +130,8 @@ async function selectTargetGameCommand(): Promise<void> {
   const config = await readWorkspaceConfig(folder);
   config.game = chosen;
   await writeWorkspaceConfig(folder, config);
-  await client.sendNotification("custom/updateTargetGame", {
-    targetGame: chosen,
-  });
   await updateStatusBar();
-  window.showInformationMessage(`GSCLSP: Target game set to \"${chosen.toUpperCase()}\"`);
+  window.showInformationMessage(`GSCLSP: Target game set to "${chosen.toUpperCase()}"`);
 }
 
 interface InactiveRegionsParams {
@@ -251,10 +248,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
                 JSON.stringify(config, null, 2),
                 "utf8",
               );
-
-              await client.sendNotification("custom/updateDumpPath", {
-                path: newPath,
-              });
 
               window.showInformationMessage(
                 `GSCLSP: Updated ${configPath}`,
