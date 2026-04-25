@@ -71,7 +71,7 @@ public class GscDiagnosticsHandler
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
-        catch (Exception ex)
+        catch (Exception)
         {
         }
     }

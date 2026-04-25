@@ -1,4 +1,5 @@
-﻿using GSCLSP.Core.Indexing;
+﻿using GSCLSP.Core.Diagnostics;
+using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -230,6 +231,9 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var macro = _indexer.ResolveMacro(filePath, identifier);
         if (macro == null) return null;
 
+        // a preprocessor may have a #ifdef define #else define #endif, which means hover should use the active
+        macro = GetActveMacroDefinition(filePath, identifier, macro);
+
         string[] macroFileLines = _indexer.GetFileLines(macro.FilePath);
         var comment = GetLeadingComment(macroFileLines, macro.Line - 1);
 
@@ -244,5 +248,23 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+    }
+
+    private MacroDefinition GetActveMacroDefinition(string filePath, string identifier, MacroDefinition fallback)
+    {
+        var localMatches = GscIndexer.GetFileMacros(filePath)
+            .Where(m => m.Name.Equals(identifier, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (localMatches.Count <= 1) return fallback;
+
+        var inactiveRanges = GscInactiveRegionAnalyzer.Analyze(_indexer.GetFileLines(filePath), _indexer.CurrentGame);
+
+        var active = localMatches.FirstOrDefault(m =>
+        {
+            int zeroBased = m.Line - 1;
+            return !inactiveRanges.Any(r => zeroBased >= r.StartLine && zeroBased <= r.EndLine);
+        });
+
+        return active ?? fallback;
     }
 }
