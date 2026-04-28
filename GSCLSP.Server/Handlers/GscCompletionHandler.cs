@@ -50,15 +50,7 @@ namespace GSCLSP.Server.Handlers
                     request.Position
                 );
 
-                var directives = new[]
-                {
-                    "#include", "#using", "#inline", "#define", "#undef",
-                    "#ifdef", "#ifndef", "#if", "#elif", "#elifdef", "#elifndef",
-                    "#else", "#endif",
-                    "#pragma", "#warning", "#error", "#line",
-                    "#namespace", "#using_animtree"
-                };
-                foreach (var directive in directives)
+                foreach (var directive in GscDirectives.All)
                 {
                     completions.Add(new CompletionItem
                     {

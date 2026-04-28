@@ -22,7 +22,7 @@ This README is a work in progress and will be updated soon previewing every feat
 - Context-aware of local function and more
 <div align="center">
   <img src="images/completion1.png" width="60%">
-  <img src="images/completion3-preprocessor.png" width="60%">
+  <img src="images/completion3-preprocessor.png" width="75%">
 </div>
 
 ### Go to Definition

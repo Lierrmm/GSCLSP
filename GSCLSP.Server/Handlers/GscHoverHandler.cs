@@ -53,20 +53,23 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var token = GscLexingHelper.GetTokenAtOrBeforePosition(lexed.Tokens, request.Position.Line, request.Position.Character);
 
         var lineTrimmed = line.TrimStart();
-        var isOnMacroDefinition = lineTrimmed.StartsWith("#define", StringComparison.Ordinal);
+        var directiveWithIdentifier = MatchMacroIdentifierDirective(lineTrimmed);
 
-        if (!isOnMacroDefinition && (token is null || !IsHoverableToken(token.Value)))
+        if (directiveWithIdentifier is null && (token is null || !IsHoverableToken(token.Value)))
             return null;
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
         if (identifier.StartsWith("::")) identifier = identifier[2..];
 
-        if (string.IsNullOrEmpty(identifier) && isOnMacroDefinition)
+        if (string.IsNullOrEmpty(identifier) && directiveWithIdentifier is not null)
         {
-            identifier = ExtractMacroNameAtCursor(line, request.Position.Character);
+            identifier = ExtractDirectiveOperandAtCursor(line, request.Position.Character, directiveWithIdentifier);
         }
 
         if (string.IsNullOrEmpty(identifier)) return null;
+
+        var builtinDefineHover = FindBuiltInDefine(identifier);
+        if (builtinDefineHover != null) return builtinDefineHover;
 
         var macroHover = FindMacroDefinition(filePath, identifier);
         if (macroHover != null) return macroHover;
@@ -121,14 +124,28 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         return null;
     }
 
-    private static string ExtractMacroNameAtCursor(string line, int cursorChar)
+    private static string? MatchMacroIdentifierDirective(string trimmedLine)
+    {
+        foreach (var directive in GscDirectives.MacroIdentifierOperand)
+        {
+            if (trimmedLine.StartsWith(directive, StringComparison.Ordinal) &&
+                (trimmedLine.Length == directive.Length ||
+                 !char.IsLetterOrDigit(trimmedLine[directive.Length]) &&
+                 trimmedLine[directive.Length] != '_'))
+            {
+                return directive;
+            }
+        }
+        return null;
+    }
+
+    private static string ExtractDirectiveOperandAtCursor(string line, int cursorChar, string directive)
     {
         var trimmed = line.TrimStart();
-        if (!trimmed.StartsWith("#define", StringComparison.Ordinal)) return string.Empty;
-
         int leading = line.Length - trimmed.Length;
-        var afterDefine = trimmed[7..];
-        int nameStart = leading + 7 + (afterDefine.Length - afterDefine.TrimStart().Length);
+        int directiveLength = directive.Length;
+        var afterDirective = trimmed[directiveLength..];
+        int nameStart = leading + directiveLength + (afterDirective.Length - afterDirective.TrimStart().Length);
         int nameEnd = nameStart;
         while (nameEnd < line.Length && (char.IsLetterOrDigit(line[nameEnd]) || line[nameEnd] == '_'))
             nameEnd++;
@@ -224,6 +241,15 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         }
 
         return commentLines.Count > 0 ? string.Join("  \n", commentLines) : null;
+    }
+
+    private static Hover? FindBuiltInDefine(string identifier)
+    {
+        if (!GscDirectives.BuiltInDefineNames.Contains(identifier))
+            return null;
+
+        var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
 
     private Hover? FindMacroDefinition(string filePath, string identifier)
