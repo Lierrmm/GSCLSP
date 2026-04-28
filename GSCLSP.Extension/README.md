@@ -1,45 +1,59 @@
 # GSCLSP (GSC Language Support)
 
-Language support for `.gsc` / `.gsh` files powered by the `GSCLSP` language server.
+Adds language support for `.gsc`, `.gsh`, `.csc`, and `.csh` files powered by the `GSCLSP` language server.
+
+This README is a work in progress and will be updated soon previewing every feature.
 
 ## Features
 
-- **Code completion**
-  - Local/workspace/dump symbols
-  - Engine built-ins
-  - Include-aware suggestions
-  - Macro and local variable completions
-  - Context-aware call insertion
+### Target Game
+- Switch your game being used in the bottom right corner once inside a GSC
+- Changes built-in list and gives accurate diagnostics
 
-- **Go to Definition**
-  - Local functions
-  - Included/dump symbols
-  - Include/using/inline directive path targets
-  - Macro definitions
+### Syntax Highlighting
+- Adds colored keywording
+- Dead code zones for early returns and preprocessors
 
-- **Find References**
-  - Lexer-based reference matching for better accuracy
+### Code Completion
+- Local workspace & dump symbols
+- Engine built-ins per target game
+- Include-aware suggestions
+- Macro and local variable completions
+- Context-aware of local function and more
+<div align="center">
+  <img src="images/completion1.png" width="60%">
+  <img src="images/completion3-preprocessor.png" width="60%">
+</div>
 
-- **Hover**
-  - Function signatures and docs
-  - Built-in, macro, and local variable info
-  - Directive include path preview
+### Go to Definition
+- Local functions
+- Included/dump function symbols
+- Include/using/inline directive path targets
+- Local/global variable & macro definitions
 
-- **Diagnostics**
-  - Unresolved function calls (`gsclsp.unresolvedFunction`)
-  - Missing semicolon (`gsclsp.missingSemicolon`)
-  - Recursive function warning (`gsclsp.recursiveFunction`)
-  - Built-in argument count warning (`gsclsp.invalidBuiltinArgCount`)
+### Find References
+- Lexer-based reference matching for better accuracy
 
-- **Code Actions**
-  - Quick fix to insert `#include ...` for unresolved functions
+### Hover
+- Function signatures and docs
+- Built-in, macro, and local/global variable info
+- Directive include path preview
 
-## Diagnostic Mute Comments
+### Diagnostics
+- Unresolved function calls (`gsclsp.unresolvedFunction`)
+- Missing semicolon (`gsclsp.missingSemicolon`)
+- Recursive function warning (`gsclsp.recursiveFunction`)
+- Built-in argument count warning (`gsclsp.invalidBuiltinArgCount`)
 
-Warnings can be muted either:
+### Code Actions
+- Quick fix to insert `#include ...` for unresolved functions
 
-- at the **top of the file**, or
-- on the **line above** the affected line
+### Diagnostic Mute Comments
+
+Warnings can be muted on either:
+
+- the **first line**
+- or the **line above** the error
 
 Supported format:
 
