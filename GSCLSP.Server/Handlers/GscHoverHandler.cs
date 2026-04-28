@@ -248,6 +248,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         if (!GscDirectives.BuiltInDefineNames.Contains(identifier))
             return null;
 
+        var contentValue = $"```gsc\n#define {identifier}\n```\n---\n*(gsc-tool Preprocessor)*";
         var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
