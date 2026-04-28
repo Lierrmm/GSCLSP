@@ -1,4 +1,5 @@
-﻿using GSCLSP.Core.Models;
+﻿using GSCLSP.Core.Diagnostics;
+using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Core.Services;
 using GSCLSP.Core.Tools;
@@ -741,13 +742,8 @@ public partial class GscIndexer
 
     public List<MacroDefinition> GetAllVisibleMacros(string callingFilePath)
     {
-        var result = new List<MacroDefinition>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var m in GetFileMacros(callingFilePath))
-        {
-            if (seen.Add(m.Name)) result.Add(m);
-        }
+        var allMacros = new List<MacroDefinition>();
+        allMacros.AddRange(GetFileMacros(callingFilePath));
 
         string normalizedPath = callingFilePath.Replace("\\", "/").ToLower();
 
@@ -760,11 +756,35 @@ public partial class GscIndexer
             {
                 var resolvedPath = ResolveInlinePath(inlinePath);
                 if (resolvedPath == null) continue;
+                allMacros.AddRange(GetFileMacros(resolvedPath));
+            }
+        }
 
-                foreach (var m in GetFileMacros(resolvedPath))
-                {
-                    if (seen.Add(m.Name)) result.Add(m);
-                }
+        var inactiveByFile = new Dictionary<string, List<InactiveRange>>(StringComparer.OrdinalIgnoreCase);
+        bool IsActive(MacroDefinition m)
+        {
+            if (!inactiveByFile.TryGetValue(m.FilePath, out var ranges))
+            {
+                ranges = GscInactiveRegionAnalyzer.Analyze(GetFileLines(m.FilePath), CurrentGame);
+                inactiveByFile[m.FilePath] = ranges;
+            }
+            int z = m.Line - 1;
+            return !ranges.Any(r => z >= r.StartLine && z <= r.EndLine);
+        }
+
+        var result = new List<MacroDefinition>();
+        var nameToIndex = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var m in allMacros)
+        {
+            if (nameToIndex.TryGetValue(m.Name, out var idx))
+            {
+                if (!IsActive(result[idx]) && IsActive(m))
+                    result[idx] = m;
+            }
+            else
+            {
+                nameToIndex[m.Name] = result.Count;
+                result.Add(m);
             }
         }
 
@@ -964,7 +984,6 @@ public partial class GscIndexer
             }
             else
             {
-                // Clear stale (previous game's) built-ins so they don't bleed into diagnostics until the fetch completes.
                 BuiltIns.LoadNameOnlyBuiltIns([], []);
                 Console.Error.WriteLine($"GSCLSP: No cache for '{normalizedGame}', fetching from gsc-tool...");
                 if (gameChanged) GameChanged?.Invoke(normalizedGame);
