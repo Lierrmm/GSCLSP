@@ -41,6 +41,9 @@ public partial class RegexPatterns
     [GeneratedRegex(@"^\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;")]
     public static partial Regex LocalVarAssignmentRegex();
 
+    [GeneratedRegex(@"^([A-Za-z_]\w*)\s*=\s*(.+);(?:\s*//\s*(.*))?\s*$")]
+    public static partial Regex GlobalVarAssignmentRegex();
+
     [GeneratedRegex(@"(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))?(?<name>[a-zA-Z_]\w*)\s*\(")]
     public static partial Regex CallSiteRegex();
 

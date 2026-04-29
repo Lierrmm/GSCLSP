@@ -18,8 +18,8 @@ This README is a work in progress and will be updated soon previewing every feat
 - Local workspace & dump symbols
 - Engine built-ins per target game
 - Include-aware suggestions
-- Macro and local variable completions
-- Context-aware of local function and more
+- Macro preprocessors and global/local variable completions
+- Context-aware of functions and more
 <div align="center">
   <img src="images/completion1.png" width="60%">
   <img src="images/completion3-preprocessor.png" width="75%">

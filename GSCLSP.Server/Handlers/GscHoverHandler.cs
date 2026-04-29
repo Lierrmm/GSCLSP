@@ -74,6 +74,9 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var macroHover = FindMacroDefinition(filePath, identifier);
         if (macroHover != null) return macroHover;
 
+        var globalVarHover = FindGlobalVariable(filePath, identifier);
+        if (globalVarHover != null) return globalVarHover;
+
         var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
         if (localVarHover != null) return localVarHover;
 
@@ -253,6 +256,18 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
 
+    private Hover? FindGlobalVariable(string filePath, string identifier)
+    {
+        var global = _indexer.ResolveGlobalVariable(filePath, identifier);
+        if (global == null) return null;
+
+        var fileLines = _indexer.GetFileLines(global.FilePath);
+        var leadingComment = GetLeadingComment(fileLines, global.Line - 1);
+        var comment = !string.IsNullOrEmpty(leadingComment) ? leadingComment : global.TrailingComment;
+
+        return BuildDefinitionHover($"{global.Name} = {global.Value}", comment, "Global Variable", global.FilePath, global.Line);
+    }
+
     private Hover? FindMacroDefinition(string filePath, string identifier)
     {
         var macro = _indexer.ResolveMacro(filePath, identifier);
@@ -261,17 +276,25 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         // a preprocessor may have a #ifdef define #else define #endif, which means hover should use the active
         macro = GetActveMacroDefinition(filePath, identifier, macro);
 
-        string[] macroFileLines = _indexer.GetFileLines(macro.FilePath);
-        var comment = GetLeadingComment(macroFileLines, macro.Line - 1);
+        var fileLines = _indexer.GetFileLines(macro.FilePath);
+        var comment = GetLeadingComment(fileLines, macro.Line - 1);
+        var signature = string.IsNullOrEmpty(macro.Value)
+            ? $"#define {macro.Name}"
+            : $"#define {macro.Name} {macro.Value}";
 
-        var contentValue = $"```gsc\n#define {macro.Name}";
-        if (!string.IsNullOrEmpty(macro.Value))
-            contentValue += $" {macro.Value}";
-        contentValue += "\n```\n";
+        return BuildDefinitionHover(signature, comment, null, macro.FilePath, macro.Line);
+    }
+
+    private static Hover BuildDefinitionHover(string codeSignature, string? comment, string? kind, string filePath, int line)
+    {
+        var contentValue = $"```gsc\n{codeSignature}\n```\n";
         if (!string.IsNullOrEmpty(comment))
             contentValue += $"{comment}\n\n";
-        contentValue += $"---\n**Defined in:** `{macro.FilePath}`\n\n";
-        contentValue += $"**Line:** {macro.Line}";
+        contentValue += "---\n";
+        if (!string.IsNullOrEmpty(kind))
+            contentValue += $"`{kind}`\n\n";
+        contentValue += $"**Defined in:** `{filePath}`\n\n";
+        contentValue += $"**Line:** {line}";
 
         var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };

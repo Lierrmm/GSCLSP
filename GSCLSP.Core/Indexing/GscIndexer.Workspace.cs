@@ -248,6 +248,11 @@ public partial class GscIndexer
         {
             _macroCache.Clear();
         }
+
+        lock (_globalVarCacheLock)
+        {
+            _globalVarCache.Clear();
+        }
     }
 
     private void InvalidateFileCaches(string filePath)
@@ -277,6 +282,11 @@ public partial class GscIndexer
         lock (_macroCacheLock)
         {
             _macroCache.Remove(NormalizePathKey(filePath));
+        }
+
+        lock (_globalVarCacheLock)
+        {
+            _globalVarCache.Remove(NormalizePathKey(filePath));
         }
     }
 

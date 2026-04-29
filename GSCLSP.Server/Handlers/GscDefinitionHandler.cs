@@ -70,6 +70,20 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
             });
         }
 
+        var globalVar = _indexer.ResolveGlobalVariable(currentFilePath, identifier);
+        if (globalVar != null)
+        {
+            int targetLine = globalVar.Line - 1;
+            return new DefinitionResult(new Location
+            {
+                Uri = DocumentUri.FromFileSystemPath(globalVar.FilePath),
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(targetLine, 0),
+                    new Position(targetLine, 0)
+                )
+            });
+        }
+
         var funcName = GscIndexer.FindEnclosingFunctionName(lines, request.Position.Line);
         if (funcName != null)
         {
