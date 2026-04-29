@@ -43,7 +43,7 @@ public partial class GscIndexer
     private static readonly Lock _localVarCacheLock = new();
 
     // global variable cache defined at top of GSC file
-    public record GlobalVariableDefinition(string Name, string Value, string FilePath, int Line, string? TrailingComment);
+    public record GlobalVariableDefinition(string Name, string Value, int Line);
     private static readonly Dictionary<string, List<GlobalVariableDefinition>> _globalVarCache = [];
     private static readonly Lock _globalVarCacheLock = new();
 
@@ -837,10 +837,9 @@ public partial class GscIndexer
                     {
                         string name = match.Groups[1].Value;
                         string value = match.Groups[2].Value.Trim();
-                        string? trailing = match.Groups[3].Success ? match.Groups[3].Value.Trim() : null;
 
                         if (!GscLanguageKeywords.LocalVariableReservedWords.Contains(name))
-                            globals.Add(new GlobalVariableDefinition(name, value, filePath, i + 1, trailing));
+                            globals.Add(new GlobalVariableDefinition(name, value, i + 1));
                     }
                 }
 
@@ -856,31 +855,10 @@ public partial class GscIndexer
         return globals;
     }
 
-    public GlobalVariableDefinition? ResolveGlobalVariable(string callingFilePath, string name)
+    public static GlobalVariableDefinition? ResolveGlobalVariable(string callingFilePath, string name)
     {
         var localGlobals = GetFileGlobalVariables(callingFilePath);
-        var found = localGlobals.FirstOrDefault(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        if (found != null) return found;
-
-        string normalizedPath = callingFilePath.Replace("\\", "/").ToLower();
-
-        if (!_workspaceFileMaps.TryGetValue(normalizedPath, out GscFileMap? fileMap))
-            _fileMaps.TryGetValue(normalizedPath, out fileMap);
-
-        if (fileMap != null)
-        {
-            foreach (var inlinePath in fileMap.Inlines)
-            {
-                var resolvedPath = ResolveInlinePath(inlinePath);
-                if (resolvedPath == null) continue;
-
-                var inlineGlobals = GetFileGlobalVariables(resolvedPath);
-                found = inlineGlobals.FirstOrDefault(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-                if (found != null) return found;
-            }
-        }
-
-        return null;
+        return localGlobals.FirstOrDefault(g => g.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
     }
 
     private string? ResolveInlinePath(string inlinePath)

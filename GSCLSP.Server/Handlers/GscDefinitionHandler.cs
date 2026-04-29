@@ -70,13 +70,13 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
             });
         }
 
-        var globalVar = _indexer.ResolveGlobalVariable(currentFilePath, identifier);
+        var globalVar = GscIndexer.ResolveGlobalVariable(currentFilePath, identifier);
         if (globalVar != null)
         {
             int targetLine = globalVar.Line - 1;
             return new DefinitionResult(new Location
             {
-                Uri = DocumentUri.FromFileSystemPath(globalVar.FilePath),
+                Uri = uri,
                 Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
                     new Position(targetLine, 0),
                     new Position(targetLine, 0)

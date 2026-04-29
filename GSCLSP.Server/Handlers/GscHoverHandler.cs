@@ -193,7 +193,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         else
         {
             var localVar = matching[0];
-            var comment = GetLeadingComment(lines, localVar.Line - 1);
+            var comment = GetDefinitionComment(lines, localVar.Line - 1);
 
             contentValue = $"```gsc\n{localVar.Name} = {localVar.Value}\n```\n";
             if (!string.IsNullOrEmpty(comment))
@@ -211,6 +211,31 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+    }
+
+    private static string? GetDefinitionComment(string[] lines, int lineIndex)
+    {
+        if (lineIndex < 0 || lineIndex >= lines.Length) return null;
+        return GetLeadingComment(lines, lineIndex) ?? GetTrailingComment(lines[lineIndex]);
+    }
+
+    private static string? GetTrailingComment(string line)
+    {
+        bool inString = false;
+        for (int i = 0; i < line.Length - 1; i++)
+        {
+            if (line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
+            {
+                inString = !inString;
+                continue;
+            }
+            if (!inString && line[i] == '/' && line[i + 1] == '/')
+            {
+                var comment = line[(i + 2)..].Trim();
+                return string.IsNullOrEmpty(comment) ? null : comment;
+            }
+        }
+        return null;
     }
 
     private static string? GetLeadingComment(string[] lines, int lineIndex)
@@ -258,14 +283,13 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
     private Hover? FindGlobalVariable(string filePath, string identifier)
     {
-        var global = _indexer.ResolveGlobalVariable(filePath, identifier);
+        var global = GscIndexer.ResolveGlobalVariable(filePath, identifier);
         if (global == null) return null;
 
-        var fileLines = _indexer.GetFileLines(global.FilePath);
-        var leadingComment = GetLeadingComment(fileLines, global.Line - 1);
-        var comment = !string.IsNullOrEmpty(leadingComment) ? leadingComment : global.TrailingComment;
+        var fileLines = _indexer.GetFileLines(filePath);
+        var comment = GetDefinitionComment(fileLines, global.Line - 1);
 
-        return BuildDefinitionHover($"{global.Name} = {global.Value}", comment, "Global Variable", global.FilePath, global.Line);
+        return BuildDefinitionHover($"{global.Name} = {global.Value}", comment, "Global Variable", filePath, global.Line);
     }
 
     private Hover? FindMacroDefinition(string filePath, string identifier)
@@ -277,7 +301,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         macro = GetActveMacroDefinition(filePath, identifier, macro);
 
         var fileLines = _indexer.GetFileLines(macro.FilePath);
-        var comment = GetLeadingComment(fileLines, macro.Line - 1);
+        var comment = GetDefinitionComment(fileLines, macro.Line - 1);
         var signature = string.IsNullOrEmpty(macro.Value)
             ? $"#define {macro.Name}"
             : $"#define {macro.Name} {macro.Value}";
