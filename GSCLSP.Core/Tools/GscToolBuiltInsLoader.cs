@@ -16,11 +16,12 @@ public static class GscToolBuiltInsLoader
     private static readonly HttpClient http = new()
     {
         BaseAddress = new Uri("https://raw.githubusercontent.com/xensik/gsc-tool/refs/heads/dev/src/gsc/engine/"),
+        Timeout = TimeSpan.FromSeconds(120)
     };
 
     public static bool IsSupported(string game) => SupportedGames.Contains(game);
 
-    public sealed record NameLists(IReadOnlyList<string> Functions, IReadOnlyList<string> Methods);
+    public sealed record NameLists(IReadOnlyList<string> Functions, IReadOnlyList<string> Methods, IReadOnlyList<string> Tokens);
 
     public static string CachePath(string game)
     {
@@ -48,8 +49,9 @@ public static class GscToolBuiltInsLoader
             using var doc = JsonDocument.Parse(File.ReadAllText(path));
             var functions = ReadArray(doc.RootElement, "functions");
             var methods = ReadArray(doc.RootElement, "methods");
+            var tokens = ReadArray(doc.RootElement, "tokens");
             if (functions.Count == 0 && methods.Count == 0) return null;
-            return new NameLists(functions, methods);
+            return new NameLists(functions, methods, tokens);
         }
         catch
         {
@@ -70,19 +72,29 @@ public static class GscToolBuiltInsLoader
             var methTask = TryGetFirstAvailableAsync(ct,
                 $"{key}_meth.cpp",
                 $"{key}_pc_meth.cpp");
+            var tokTask = TryGetFirstAvailableAsync(ct,
+                $"{key}_token.cpp",
+                $"{key}_pc_token.cpp");
 
-            await Task.WhenAll(funcTask, methTask);
+            var source = await Task.WhenAll(funcTask, methTask, tokTask);
 
-            var funcSource = await funcTask;
-            var methSource = await methTask;
-            if (funcSource == null && methSource == null) return null;
+            if (source.All(string.IsNullOrEmpty)) return null;
+
+            var funcSource = source[0];
+            var methSource = source[1];
+            var tokSource = source[2];
 
             var functions = ParseNames(funcSource);
             var methods = ParseNames(methSource);
-            if (functions.Count == 0 && methods.Count == 0) return null;
+            var tokens = ParseNames(tokSource);
 
-            SaveCache(key, functions, methods);
-            return new NameLists(functions, methods);
+            tokens = [.. tokens.Where(t => !functions.Contains(t, StringComparer.OrdinalIgnoreCase) &&
+                                  !methods.Contains(t, StringComparer.OrdinalIgnoreCase) || !t.Contains('/'))];
+
+            if (functions.Count == 0 && methods.Count == 0 && tokens.Count == 0) return null;
+
+            SaveCache(key, functions, methods, tokens);
+            return new NameLists(functions, methods, tokens);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -138,7 +150,7 @@ public static class GscToolBuiltInsLoader
         return result;
     }
 
-    private static void SaveCache(string game, IEnumerable<string> functions, IEnumerable<string> methods)
+    private static void SaveCache(string game, IEnumerable<string> functions, IEnumerable<string> methods, IEnumerable<string> tokens /* Unused */)
     {
         try
         {

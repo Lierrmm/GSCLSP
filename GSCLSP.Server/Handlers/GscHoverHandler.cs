@@ -90,7 +90,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
             {
                 // We use our strict scanner to find the actual definition and its ScriptDoc
-                var detailedSymbol = GscIndexer.ScanFileForFunction(symbol.FilePath, symbol.Name);
+                var detailedSymbol = ScanFileForFunction(symbol.FilePath, symbol.Name);
                 if (detailedSymbol != null)
                 {
                     symbol = detailedSymbol;

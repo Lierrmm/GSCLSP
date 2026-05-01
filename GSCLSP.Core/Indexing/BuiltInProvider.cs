@@ -179,7 +179,7 @@ public class BuiltInProvider
             : snapshot.Functions.Values.Concat(snapshot.Methods.Values);
     }
 
-    public void LoadNameOnlyBuiltIns(IEnumerable<string> functionNames, IEnumerable<string> methodNames)
+    public void LoadNameOnlyBuiltIns(IEnumerable<string> functionNames, IEnumerable<string> methodNames, IEnumerable<string> tokenNames)
     {
         var builtInFunctions = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
         var builtInMethods = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
@@ -195,6 +195,16 @@ public class BuiltInProvider
             if (string.IsNullOrWhiteSpace(name)) continue;
             builtInMethods[name] = new GscSymbol(name, "Engine", 0, string.Empty, SymbolType.Method);
         }
+
+        /* 
+         * ignore for now - these include file paths and other non-function tokens that we don't want to treat as built-ins
+         * if we want to add them back in the future, we'll need to enhance GscSymbol to support non-function types and decide how to handle them in the rest of the codebase
+         */
+        //foreach (var name in tokenNames)
+        //{
+        //    if (string.IsNullOrWhiteSpace(name)) continue;
+        //    builtInFunctions[name] = new GscSymbol(name, "Engine", 0, string.Empty, SymbolType.Function);
+        //}
 
         ReplaceSnapshot(builtInFunctions, builtInMethods);
     }

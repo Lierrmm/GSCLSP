@@ -1045,7 +1045,7 @@ public partial class GscIndexer
             var cached = GscToolBuiltInsLoader.TryLoadFromCache(normalizedGame);
             if (cached != null)
             {
-                BuiltIns.LoadNameOnlyBuiltIns(cached.Functions, cached.Methods);
+                BuiltIns.LoadNameOnlyBuiltIns(cached.Functions, cached.Methods, cached.Tokens);
                 Console.Error.WriteLine($"GSCLSP: Loaded cached builtins for game '{normalizedGame}'.");
                 if (gameChanged) GameChanged?.Invoke(normalizedGame);
 
@@ -1054,7 +1054,7 @@ public partial class GscIndexer
             }
             else
             {
-                BuiltIns.LoadNameOnlyBuiltIns([], []);
+                BuiltIns.LoadNameOnlyBuiltIns([], [], []);
                 Console.Error.WriteLine($"GSCLSP: No cache for '{normalizedGame}', fetching from gsc-tool...");
                 if (gameChanged) GameChanged?.Invoke(normalizedGame);
                 _ = RefreshGscToolBuiltInsAsync(normalizedGame);
@@ -1080,7 +1080,7 @@ public partial class GscIndexer
 
     private async Task RefreshGscToolBuiltInsAsync(string game)
     {
-        var fetched = await GscToolBuiltInsLoader.FetchAsync(game).ConfigureAwait(false);
+        var fetched = await GscToolBuiltInsLoader.FetchAsync(game);
         if (fetched == null)
         {
             await Console.Error.WriteLineAsync($"GSCLSP: gsc-tool fetch for '{game}' failed or unsupported.");
@@ -1101,7 +1101,7 @@ public partial class GscIndexer
         var builtInsChanged = !BuiltInNamesEqual(previousFunctions, fetched.Functions)
             || !BuiltInNamesEqual(previousMethods, fetched.Methods);
 
-        BuiltIns.LoadNameOnlyBuiltIns(fetched.Functions, fetched.Methods);
+        BuiltIns.LoadNameOnlyBuiltIns(fetched.Functions, fetched.Methods, fetched.Tokens);
         await Console.Error.WriteLineAsync($"GSCLSP: Refreshed gsc-tool built-ins for game '{game}'.");
         if (builtInsChanged)
             GameChanged?.Invoke(game);
