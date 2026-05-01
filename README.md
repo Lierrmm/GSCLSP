@@ -7,6 +7,7 @@ The core engine behind the GSC Language Support extension. This repository conta
 ## Structure
 
 - `GSCLSP.Core/`: The C# Library that handles all parsing & indexing logic
+- `GSCLSP.Lexer/`: The C# Library that handles all lexer logic
 - `GSCLSP.Server/`: The C# Language Server using OmniSharp. (.NET 10 (Self-contained, Single-file, Compressed))
 - `GSCLSP.Extension/`: The VS Code extension client. (TypeScript)
 - `GSCLSP.Extension/out/`: Final binaries and data files for distribution.
@@ -38,3 +39,9 @@ dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=
 4. Open a command prompt, and run `bun install` inside of the `GSCLSP.Extension` folder.
 
 Now you can open VSCode in the `GSCLSP.Extension` source code, and click `F5` in a extension's file to test. Using the VSCode Extension Tester's reload function will work for server changes you build on the `.slnx` easily.
+
+### Credits
+
+- Liam - Intial work and supporting commits
+- Mjkzy - Supporting commits
+- xensik - GSC builtin functions/methods ( https://github.com/xensik/gsc-tool )
