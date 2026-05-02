@@ -42,6 +42,6 @@ Now you can open VSCode in the `GSCLSP.Extension` source code, and click `F5` in
 
 ### Credits
 
-- Liam - Intial work and supporting commits
-- Mjkzy - Supporting commits
-- xensik - GSC builtin functions/methods ( https://github.com/xensik/gsc-tool )
+- Lierrmm - Intial work and supporting commits
+- mjkzy - Supporting commits
+- xensik - GSC engine functions & methods *(check out https://github.com/xensik/gsc-tool)*
