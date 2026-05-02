@@ -99,7 +99,7 @@ public static class GscToolBuiltInsLoader
 
             if (functions.Count == 0 && methods.Count == 0 && tokens.Count == 0) return null;
 
-            SaveCache(key, source, functions, methods, tokens);
+            SaveCache(key, source, functions, methods);
             return new NameLists(functions, methods, tokens);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -189,7 +189,7 @@ public static class GscToolBuiltInsLoader
         return new GscToolSource(ownerStr, repoStr, branchStr);
     }
 
-    private static void SaveCache(string game, GscToolSource source, IEnumerable<string> functions, IEnumerable<string> methods, IEnumerable<string> tokens /* Unused */)
+    private static void SaveCache(string game, GscToolSource source, IEnumerable<string> functions, IEnumerable<string> methods)
     {
         try
         {
