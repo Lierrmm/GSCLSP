@@ -46,6 +46,8 @@ const KNOWN_GAMES = [
   "t6",
   "t7",
   "t8",
+  "h1",
+  "h2"
 ];
 
 function targetWorkspaceFolder(): WorkspaceFolder | undefined {
@@ -89,7 +91,7 @@ async function readTargetGame(): Promise<string | undefined> {
 async function updateStatusBar(): Promise<void> {
   if (!targetGameStatusBar) return;
   const game = (await readTargetGame()) ?? "iw4";
-  targetGameStatusBar.text = `$(chip) GSC Target Game: ${game.toUpperCase()}`;
+  targetGameStatusBar.text = `$(chip) GSC Target Game`;
   targetGameStatusBar.tooltip = "Click to change the target game for GSC";
   targetGameStatusBar.show();
 }
