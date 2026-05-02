@@ -15,7 +15,6 @@ public static class GscToolBuiltInsLoader
 
     private static readonly HttpClient http = new()
     {
-        BaseAddress = new Uri("https://raw.githubusercontent.com/xensik/gsc-tool/refs/heads/dev/src/gsc/engine/"),
         Timeout = TimeSpan.FromSeconds(120)
     };
 
@@ -32,14 +31,17 @@ public static class GscToolBuiltInsLoader
         return Path.Combine(root, $"{game.ToLowerInvariant()}_gsctool.json");
     }
 
-    public static bool IsCacheStale(string game, TimeSpan maxAge)
+    public static bool IsCacheStale(string game, GscToolSource source, TimeSpan maxAge)
     {
         var path = CachePath(game);
         if (!File.Exists(path)) return true;
-        return DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > maxAge;
+        if (DateTime.UtcNow - File.GetLastWriteTimeUtc(path) > maxAge) return true;
+
+        var cachedSource = TryReadCachedSource(path);
+        return !source.Equals(cachedSource);
     }
 
-    public static NameLists? TryLoadFromCache(string game)
+    public static NameLists? TryLoadFromCache(string game, GscToolSource source)
     {
         try
         {
@@ -47,6 +49,9 @@ public static class GscToolBuiltInsLoader
             if (!File.Exists(path)) return null;
 
             using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var cachedSource = ReadSourceElement(doc.RootElement) ?? GscToolSource.Default;
+            if (!source.Equals(cachedSource)) return null;
+
             var functions = ReadArray(doc.RootElement, "functions");
             var methods = ReadArray(doc.RootElement, "methods");
             var tokens = ReadArray(doc.RootElement, "tokens");
@@ -59,30 +64,31 @@ public static class GscToolBuiltInsLoader
         }
     }
 
-    public static async Task<NameLists?> FetchAsync(string game, CancellationToken ct = default)
+    public static async Task<NameLists?> FetchAsync(string game, GscToolSource source, CancellationToken ct = default)
     {
         var key = game.Trim().ToLowerInvariant();
         if (!IsSupported(key)) return null;
 
         try
         {
-            var funcTask = TryGetFirstAvailableAsync(ct,
+            var baseUrl = source.EngineDirectoryUrl;
+            var funcTask = TryGetFirstAvailableAsync(ct, baseUrl,
                 $"{key}_func.cpp",
                 $"{key}_pc_func.cpp");
-            var methTask = TryGetFirstAvailableAsync(ct,
+            var methTask = TryGetFirstAvailableAsync(ct, baseUrl,
                 $"{key}_meth.cpp",
                 $"{key}_pc_meth.cpp");
-            var tokTask = TryGetFirstAvailableAsync(ct,
+            var tokTask = TryGetFirstAvailableAsync(ct, baseUrl,
                 $"{key}_token.cpp",
                 $"{key}_pc_token.cpp");
 
-            var source = await Task.WhenAll(funcTask, methTask, tokTask);
+            var fetched = await Task.WhenAll(funcTask, methTask, tokTask);
 
-            if (source.All(string.IsNullOrEmpty)) return null;
+            if (fetched.All(string.IsNullOrEmpty)) return null;
 
-            var funcSource = source[0];
-            var methSource = source[1];
-            var tokSource = source[2];
+            var funcSource = fetched[0];
+            var methSource = fetched[1];
+            var tokSource = fetched[2];
 
             var functions = ParseNames(funcSource);
             var methods = ParseNames(methSource);
@@ -93,7 +99,7 @@ public static class GscToolBuiltInsLoader
 
             if (functions.Count == 0 && methods.Count == 0 && tokens.Count == 0) return null;
 
-            SaveCache(key, functions, methods, tokens);
+            SaveCache(key, source, functions, methods);
             return new NameLists(functions, methods, tokens);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -106,12 +112,12 @@ public static class GscToolBuiltInsLoader
         }
     }
 
-    private static async Task<string?> TryGetFirstAvailableAsync(CancellationToken ct, params string[] urls)
+    private static async Task<string?> TryGetFirstAvailableAsync(CancellationToken ct, string baseUrl, params string[] paths)
     {
-        foreach (var url in urls)
+        foreach (var p in paths)
         {
             ct.ThrowIfCancellationRequested();
-            try { return await http.GetStringAsync(url, ct); }
+            try { return await http.GetStringAsync(baseUrl + p, ct); }
             catch (OperationCanceledException) { throw; }
             catch { }
         }
@@ -150,7 +156,40 @@ public static class GscToolBuiltInsLoader
         return result;
     }
 
-    private static void SaveCache(string game, IEnumerable<string> functions, IEnumerable<string> methods, IEnumerable<string> tokens /* Unused */)
+    private static GscToolSource? TryReadCachedSource(string path)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            return ReadSourceElement(doc.RootElement) ?? GscToolSource.Default;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static GscToolSource? ReadSourceElement(JsonElement root)
+    {
+        if (!root.TryGetProperty("source", out var src) || src.ValueKind != JsonValueKind.Object)
+            return null;
+        if (!src.TryGetProperty("owner", out var owner) || owner.ValueKind != JsonValueKind.String)
+            return null;
+        if (!src.TryGetProperty("repo", out var repo) || repo.ValueKind != JsonValueKind.String)
+            return null;
+        if (!src.TryGetProperty("branch", out var branch) || branch.ValueKind != JsonValueKind.String)
+            return null;
+
+        var ownerStr = owner.GetString();
+        var repoStr = repo.GetString();
+        var branchStr = branch.GetString();
+        if (string.IsNullOrWhiteSpace(ownerStr) || string.IsNullOrWhiteSpace(repoStr) || string.IsNullOrWhiteSpace(branchStr))
+            return null;
+
+        return new GscToolSource(ownerStr, repoStr, branchStr);
+    }
+
+    private static void SaveCache(string game, GscToolSource source, IEnumerable<string> functions, IEnumerable<string> methods)
     {
         try
         {
@@ -158,7 +197,12 @@ public static class GscToolBuiltInsLoader
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
 
-            var payload = new { functions = functions.ToArray(), methods = methods.ToArray() };
+            var payload = new
+            {
+                source = new { owner = source.Owner, repo = source.Repo, branch = source.Branch },
+                functions = functions.ToArray(),
+                methods = methods.ToArray()
+            };
             File.WriteAllText(path, JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
