@@ -31,10 +31,10 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         var diagnostics = new List<Diagnostic>();
         var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         var muteConfig = ParseMuteConfig(lines);
-        var devBlockMask = BuildDevBlockMask(lines);
+        var excludedMask = BuildExcludedLineMask(lines, _indexer.CurrentGame);
 
         var localFunctions = GetLocalFunctions(text);
-        var includedFiles = await GetIncludedFilesAsync(lines, cancellationToken, devBlockMask);
+        var includedFiles = await GetIncludedFilesAsync(lines, cancellationToken, excludedMask);
 
         var lexer = new GscLexer();
         var lexed = lexer.Lex(text);
@@ -48,7 +48,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (devBlockMask[lineIndex])
+            if (excludedMask[lineIndex])
                 continue;
 
             if (!tokensByLine.TryGetValue(lineIndex, out var lineTokens) || lineTokens.Count == 0)
@@ -106,8 +106,8 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             }
         }
 
-        diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, devBlockMask));
-        diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, devBlockMask));
+        diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, excludedMask));
+        diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
 
         return diagnostics;
     }
@@ -116,14 +116,14 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         string[] lines,
         IReadOnlyList<Token> tokens,
         MuteConfig muteConfig,
-        bool[] devBlockMask)
+        bool[] excludedMask)
     {
         var diagnostics = new List<Diagnostic>();
         var result = GscDeadCodeAnalyzer.Analyze(lines, tokens);
 
         foreach (var er in result.EarlyReturns)
         {
-            if (er.Line >= 0 && er.Line < devBlockMask.Length && devBlockMask[er.Line])
+            if (er.Line >= 0 && er.Line < excludedMask.Length && excludedMask[er.Line])
                 continue;
 
             if (IsMuted(muteConfig, EarlyReturnMuteKey, er.Line)) continue;
@@ -147,13 +147,16 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         string[] lines,
         IReadOnlyDictionary<int, List<Token>> tokensByLine,
         MuteConfig muteConfig,
-        bool[] devBlockMask)
+        bool[] excludedMask)
     {
         var diagnostics = new List<Diagnostic>();
 
         foreach (var function in GetFunctionDefinitions(lines))
         {
             if (IsMuted(muteConfig, RecursiveWarningMuteKey, function.DefinitionLine))
+                continue;
+
+            if (function.DefinitionLine >= 0 && function.DefinitionLine < excludedMask.Length && excludedMask[function.DefinitionLine])
                 continue;
 
             var bodyStart = function.BraceLine;
@@ -165,7 +168,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
             for (int line = bodyStart; line <= bodyEnd; line++)
             {
-                if (line >= 0 && line < devBlockMask.Length && devBlockMask[line])
+                if (line >= 0 && line < excludedMask.Length && excludedMask[line])
                     continue;
 
                 if (!tokensByLine.TryGetValue(line, out var lineTokens) || lineTokens.Count < 2)
@@ -522,7 +525,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         return result;
     }
 
-    private async Task<List<IncludedFileScope>> GetIncludedFilesAsync(string[] lines, CancellationToken cancellationToken, bool[]? devBlockMask = null)
+    private async Task<List<IncludedFileScope>> GetIncludedFilesAsync(string[] lines, CancellationToken cancellationToken, bool[]? excludedMask = null)
     {
         var result = new List<IncludedFileScope>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -532,7 +535,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             var line = lines[lineIndex];
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (devBlockMask != null && lineIndex < devBlockMask.Length && devBlockMask[lineIndex])
+            if (excludedMask != null && lineIndex < excludedMask.Length && excludedMask[lineIndex])
                 continue;
 
             if (!TryExtractDirectivePath(line, out var includePath, includeInline: false))
@@ -816,7 +819,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         return (start, end);
     }
 
-    private static bool[] BuildDevBlockMask(string[] lines)
+    private static bool[] BuildExcludedLineMask(string[] lines, string currentGame)
     {
         var mask = new bool[lines.Length];
         var inDevBlock = false;
@@ -840,6 +843,14 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
                     inDevBlock = false;
                 }
             }
+        }
+
+        foreach (var range in GscInactiveRegionAnalyzer.Analyze(lines, currentGame))
+        {
+            int start = Math.Max(0, range.StartLine);
+            int end = Math.Min(lines.Length - 1, range.EndLine);
+            for (int i = start; i <= end; i++)
+                mask[i] = true;
         }
 
         return mask;
