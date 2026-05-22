@@ -33,11 +33,9 @@ public sealed record GscToolSource(string Owner, string Repo, string Branch)
         var repo = TrimDotGit(segments[1]);
         var branch = Default.Branch;
 
-        if (segments.Length >= 4 && segments[2].Equals("tree", StringComparison.OrdinalIgnoreCase))
-        {
-            branch = Uri.UnescapeDataString(string.Join("/", segments.Skip(3)));
-        }
-        else if (segments.Length >= 4 && segments[2].Equals("blob", StringComparison.OrdinalIgnoreCase))
+        if (segments.Length >= 4 &&
+            (segments[2].Equals("tree", StringComparison.OrdinalIgnoreCase) ||
+             segments[2].Equals("blob", StringComparison.OrdinalIgnoreCase)))
         {
             branch = Uri.UnescapeDataString(segments[3]);
         }
