@@ -71,14 +71,14 @@ public static class GscToolBuiltInsLoader
 
         try
         {
-            var baseUrl = source.EngineDirectoryUrl;
-            var funcTask = TryGetFirstAvailableAsync(ct, baseUrl,
+            var baseUri = source.EngineDirectoryUri;
+            var funcTask = TryGetFirstAvailableAsync(ct, baseUri,
                 $"{key}_func.cpp",
                 $"{key}_pc_func.cpp");
-            var methTask = TryGetFirstAvailableAsync(ct, baseUrl,
+            var methTask = TryGetFirstAvailableAsync(ct, baseUri,
                 $"{key}_meth.cpp",
                 $"{key}_pc_meth.cpp");
-            var tokTask = TryGetFirstAvailableAsync(ct, baseUrl,
+            var tokTask = TryGetFirstAvailableAsync(ct, baseUri,
                 $"{key}_token.cpp",
                 $"{key}_pc_token.cpp");
 
@@ -112,12 +112,12 @@ public static class GscToolBuiltInsLoader
         }
     }
 
-    private static async Task<string?> TryGetFirstAvailableAsync(CancellationToken ct, string baseUrl, params string[] paths)
+    private static async Task<string?> TryGetFirstAvailableAsync(CancellationToken ct, Uri baseUri, params string[] paths)
     {
         foreach (var p in paths)
         {
             ct.ThrowIfCancellationRequested();
-            try { return await http.GetStringAsync(baseUrl + p, ct); }
+            try { return await http.GetStringAsync(new Uri(baseUri, p), ct); }
             catch (OperationCanceledException) { throw; }
             catch { }
         }

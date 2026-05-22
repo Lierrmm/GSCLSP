@@ -1,13 +1,14 @@
-using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Tools;
 
-public sealed partial record GscToolSource(string Owner, string Repo, string Branch)
+public sealed record GscToolSource(string Owner, string Repo, string Branch)
 {
     public static readonly GscToolSource Default = new("xensik", "gsc-tool", "dev");
 
-    public string EngineDirectoryUrl =>
-        $"https://raw.githubusercontent.com/{Owner}/{Repo}/refs/heads/{Branch}/src/gsc/engine/";
+    public Uri EngineDirectoryUri => new(
+        new Uri($"https://raw.githubusercontent.com/{Owner}/{Repo}/"),
+        $"refs/heads/{Branch}/src/gsc/engine/");
 
     public bool IsDefault => Equals(Default);
 
@@ -52,14 +53,8 @@ public sealed partial record GscToolSource(string Owner, string Repo, string Bra
         repo.EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? repo[..^4] : repo;
 
     private static bool IsSafeSegment(string s) =>
-        !string.IsNullOrWhiteSpace(s) && SegmentRegex().IsMatch(s);
+        !string.IsNullOrWhiteSpace(s) && GitHubSegmentRegex().IsMatch(s);
 
     private static bool IsSafeBranch(string s) =>
-        !string.IsNullOrWhiteSpace(s) && BranchRegex().IsMatch(s);
-
-    [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
-    private static partial Regex SegmentRegex();
-
-    [GeneratedRegex(@"^[A-Za-z0-9._/\-]+$")]
-    private static partial Regex BranchRegex();
+        !string.IsNullOrWhiteSpace(s) && GitHubBranchRegex().IsMatch(s);
 }

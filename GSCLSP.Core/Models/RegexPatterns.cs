@@ -55,4 +55,10 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"\{\s*0x(?<id>[0-9A-Fa-f]+)\s*,\s*""(?<name>[^""]+)""\s*\}", RegexOptions.Compiled)]
     public static partial Regex GscToolRegex();
+
+    [GeneratedRegex(@"^[A-Za-z0-9._-]+$")]
+    public static partial Regex GitHubSegmentRegex();
+
+    [GeneratedRegex(@"^[A-Za-z0-9._/\-]+$")]
+    public static partial Regex GitHubBranchRegex();
 }
