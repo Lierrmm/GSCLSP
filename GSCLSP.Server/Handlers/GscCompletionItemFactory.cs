@@ -214,6 +214,20 @@ internal static class GscCompletionItemFactory
         FilterText = name
     }).ToArray();
 
+    public static readonly CompletionItem DefinedOperator = new()
+    {
+        Label = "defined",
+        LabelDetails = new CompletionItemLabelDetails
+        {
+            Description = "Preprocessor Operator"
+        },
+        Kind = CompletionItemKind.Operator,
+        InsertText = "defined($1)",
+        InsertTextFormat = InsertTextFormat.Snippet,
+        Command = new Command { Name = "editor.action.triggerSuggest" },
+        FilterText = "defined"
+    };
+
     public static CompletionList ToFilteredList(IEnumerable<CompletionItem> items)
     {
         var itemList = items as IList<CompletionItem> ?? [.. items];

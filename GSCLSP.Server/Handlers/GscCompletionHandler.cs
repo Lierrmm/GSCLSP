@@ -42,6 +42,9 @@ namespace GSCLSP.Server.Handlers
             string lineUntilCursor = line[..safeLength];
             var trimmedLine = lineUntilCursor.TrimStart();
 
+            if (request.Context?.TriggerCharacter == " " && !trimmedLine.StartsWith('#'))
+                return new CompletionList();
+
             if (trimmedLine.StartsWith('#') && !trimmedLine.Contains(' '))
             {
                 int hashPos = lineUntilCursor.IndexOf('#');
@@ -75,17 +78,19 @@ namespace GSCLSP.Server.Handlers
                 trimmedLine.StartsWith("#elifdef ") || trimmedLine.StartsWith("#elifndef ") ||
                 trimmedLine.StartsWith("#undef "))
             {
-                var visibleMacros = _indexer.GetAllVisibleMacros(currentFilePath);
-                foreach (var macro in visibleMacros)
-                {
-                    completions.Add(GscCompletionItemFactory.FromMacro(macro));
-                }
+                AddMacroCompletions(completions, currentFilePath);
+                return GscCompletionItemFactory.ToFilteredList(completions);
+            }
 
-                foreach (var define in GscCompletionItemFactory.BuiltInDefines)
+            if (trimmedLine.StartsWith("#if ") || trimmedLine.StartsWith("#elif "))
+            {
+                if (IsPreprocessorOperand(trimmedLine))
                 {
-                    completions.Add(define);
-                }
+                    AddMacroCompletions(completions, currentFilePath);
 
+                    if (!trimmedLine.TrimEnd().EndsWith('('))
+                        completions.Add(GscCompletionItemFactory.DefinedOperator);
+                }
                 return GscCompletionItemFactory.ToFilteredList(completions);
             }
 
@@ -282,8 +287,34 @@ namespace GSCLSP.Server.Handlers
             return new CompletionRegistrationOptions
             {
                 DocumentSelector = TextDocumentSelector.ForLanguage("gsc"),
-                TriggerCharacters = new Container<string>(":", ".", "#", "\\")
+                TriggerCharacters = new Container<string>(":", ".", "#", "\\", " ")
             };
+        }
+
+        private void AddMacroCompletions(List<CompletionItem> completions, string currentFilePath)
+        {
+            foreach (var macro in _indexer.GetAllVisibleMacros(currentFilePath))
+                completions.Add(GscCompletionItemFactory.FromMacro(macro));
+
+            foreach (var define in GscCompletionItemFactory.BuiltInDefines)
+                completions.Add(define);
+        }
+
+        private static bool IsPreprocessorOperand(string trimmedLine)
+        {
+            static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+            int exprStart = trimmedLine.IndexOf(' ') + 1;
+            int i = trimmedLine.Length;
+
+            // skip words
+            while (i > exprStart && IsWordChar(trimmedLine[i - 1])) i--;
+            while (i > exprStart && char.IsWhiteSpace(trimmedLine[i - 1])) i--;
+
+            if (i <= exprStart) return true;
+
+            char prev = trimmedLine[i - 1];
+            return prev != ')' && !IsWordChar(prev);
         }
 
         private static bool IsMethodCallCompletionContext(string lineUntilCursor)

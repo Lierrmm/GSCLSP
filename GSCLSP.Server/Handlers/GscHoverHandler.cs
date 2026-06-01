@@ -54,17 +54,22 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var lineTrimmed = line.TrimStart();
         var directiveWithIdentifier = MatchMacroIdentifierDirective(lineTrimmed);
+        var isExpressionDirective = 
+            lineTrimmed.StartsWith("#if ", StringComparison.Ordinal) ||
+            lineTrimmed.StartsWith("#elif ", StringComparison.Ordinal);
 
-        if (directiveWithIdentifier is null && (token is null || !IsHoverableToken(token.Value)))
+        if (directiveWithIdentifier is null && !isExpressionDirective &&
+            (token is null || !IsHoverableToken(token.Value)))
             return null;
 
         string identifier = GscWordScanner.GetFullIdentifierAt(line, request.Position.Character).Trim();
         if (identifier.StartsWith("::")) identifier = identifier[2..];
 
         if (string.IsNullOrEmpty(identifier) && directiveWithIdentifier is not null)
-        {
             identifier = ExtractDirectiveOperandAtCursor(line, request.Position.Character, directiveWithIdentifier);
-        }
+
+        if (string.IsNullOrEmpty(identifier) && isExpressionDirective)
+            identifier = ExtractWordAtCursor(line, request.Position.Character);
 
         if (string.IsNullOrEmpty(identifier)) return null;
 
@@ -73,6 +78,9 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var macroHover = FindMacroDefinition(filePath, identifier);
         if (macroHover != null) return macroHover;
+
+        // for expression directives, we dont need anything else so early return here
+        if (isExpressionDirective) return null;
 
         var globalVarHover = FindGlobalVariable(filePath, identifier);
         if (globalVarHover != null) return globalVarHover;
@@ -86,10 +94,10 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         {
             var symbol = resolution.Symbol;
 
-            // If we have a file path but no documentation, go get it from the source definition
+            // If we have a file path but no documentation, we grab it from the source definition
             if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
             {
-                // We use our strict scanner to find the actual definition and its ScriptDoc
+                // Use the scanner to find the actual definition and its ScriptDoc
                 var detailedSymbol = ScanFileForFunction(symbol.FilePath, symbol.Name);
                 if (detailedSymbol != null)
                 {
@@ -115,7 +123,6 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             }
             else
             {
-                // Backticks around file path to prevent backslash escaping
                 contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
                              $"**Line:** {symbol.LineNumber}";
             }
@@ -140,6 +147,20 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             }
         }
         return null;
+    }
+
+    private static string ExtractWordAtCursor(string line, int cursorChar)
+    {
+        static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+        int start = Math.Clamp(cursorChar, 0, line.Length);
+        while (start > 0 && IsWordChar(line[start - 1])) start--;
+
+        int end = start;
+        while (end < line.Length && IsWordChar(line[end])) end++;
+
+        var word = line[start..end];
+        return word.Length == 0 || char.IsDigit(word[0]) ? string.Empty : word;
     }
 
     private static string ExtractDirectiveOperandAtCursor(string line, int cursorChar, string directive)

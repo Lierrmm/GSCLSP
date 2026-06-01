@@ -133,7 +133,7 @@
     "if": {
       "comment": "Example: #if MACRO_NAME == <CONSTANT>",
       "name": "meta.preprocessor.if.gsc",
-      "begin": "(#if)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "begin": "(#if)\\s+",
       "beginCaptures": {
         "1": {
           "name": "keyword.control.directive.if.gsc"
@@ -155,7 +155,7 @@
           "name": "constant.language.c"
         },
         {
-          "match": "==|!=|<=|>=|<|>|&&|\\|\\||\\!|\\(|\\)|\\+|\\-|\\*|\\/|%",
+          "match": "==|!=|<=|>=|<<|>>|<|>|&&|\\|\\||&|\\||\\^|~|\\!|\\(|\\)|\\+|\\-|\\*|\\/|%",
           "name": "keyword.operator.gsc"
         },
         {
@@ -217,7 +217,7 @@
           "name": "constant.language.c"
         },
         {
-          "match": "==|!=|<=|>=|<|>|&&|\\|\\||\\!|\\(|\\)|\\+|\\-|\\*|\\/|%",
+          "match": "==|!=|<=|>=|<<|>>|<|>|&&|\\|\\||&|\\||\\^|~|\\!|\\(|\\)|\\+|\\-|\\*|\\/|%",
           "name": "keyword.operator.gsc"
         },
         {
