@@ -33,14 +33,14 @@ When you **Right mouse click** on any user-defined function or local variable, y
 
 This works for any function or local variable defined in GSC, including `#include`/`#using` GSC paths.
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" width="60%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" width="90%">
 </div>
 
 ### Hover Information
 
 When you hover your mouse cursor over any sort of function, macro, variable, or file path, a hover box will appear giving detailed information about what you are hovering. This includes line information, any comments **above the definition of the function/variable**, and any additional comments official documents contain.
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" width="60%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" width="70%">
 </div>
 
 ### Diagnostics
