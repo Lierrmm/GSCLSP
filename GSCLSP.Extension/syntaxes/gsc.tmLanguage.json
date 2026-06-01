@@ -58,6 +58,9 @@
       "include": "#using_animtree"
     },
     {
+      "include": "#animtree"
+    },
+    {
       "include": "#using"
     },
     {
@@ -431,6 +434,11 @@
           "include": "#strings"
         }
       ]
+    },
+    "animtree": {
+      "comment": "Example: level.scr_anim[...] = #animtree; — resolves to the nearest preceding #using_animtree",
+      "match": "#animtree\\b",
+      "name": "keyword.control.directive.animtree.gsc"
     },
     "precache": {
       "comment": "Example: #precache(\"model\", \"tag_origin\");",

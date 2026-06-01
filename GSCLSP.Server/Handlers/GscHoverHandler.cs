@@ -34,6 +34,9 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var line = lines[request.Position.Line];
 
+        if (IsCursorOnAnimtree(line, request.Position.Character))
+            return BuildAnimtreeHover(lines, request.Position.Line);
+
         if (GscHandlerCommon.IsIncludeLikeDirective(line.Trim()) &&
             GscHandlerCommon.TryExtractDirectivePath(line, out var includedFile))
         {
@@ -147,6 +150,28 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             }
         }
         return null;
+    }
+
+    private static bool IsCursorOnAnimtree(string line, int cursorChar)
+    {
+        foreach (System.Text.RegularExpressions.Match m in AnimtreeUsageRegex().Matches(line))
+        {
+            if (cursorChar >= m.Index && cursorChar <= m.Index + m.Length)
+                return true;
+        }
+        return false;
+    }
+
+    private static Hover BuildAnimtreeHover(string[] lines, int usageLine)
+    {
+        var active = GscAnimtreeResolver.ResolveActiveAnimtree(lines, usageLine);
+
+        var contentValue = active != null
+            ? $"```gsc\n#animtree\n```\nResolves to `#using_animtree(\"{active}\")`\n\n"
+            : "```gsc\n#animtree\n```\n---\nA `#using_animtree` declaration is required before `#animtree` can be used.";
+
+        var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
 
     private static string ExtractWordAtCursor(string line, int cursorChar)

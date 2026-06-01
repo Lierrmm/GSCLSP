@@ -1,5 +1,6 @@
 using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
+using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using System.Text.RegularExpressions;
@@ -14,6 +15,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
     public const string MissingSemicolonWarningCode = "gsclsp.missingSemicolon";
     public const string InvalidBuiltinArgCountDiagnosticCode = "gsclsp.invalidBuiltinArgCount";
     public const string EarlyReturnWarningCode = "gsclsp.earlyReturn";
+    public const string MissingAnimtreeDiagnosticCode = "gsclsp.missingAnimtree";
 
     private const string RecursiveWarningMuteKey = "recursive-function";
     private const string MissingSemicolonMuteKey = "missing-semicolon";
@@ -108,6 +110,34 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
         diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, excludedMask));
         diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
+        diagnostics.AddRange(CollectMissingAnimtreeErrors(lines, excludedMask));
+
+        return diagnostics;
+    }
+
+    private static List<Diagnostic> CollectMissingAnimtreeErrors(string[] lines, bool[] excludedMask)
+    {
+        var diagnostics = new List<Diagnostic>();
+
+        foreach (var usage in GscAnimtreeResolver.FindUsages(lines))
+        {
+            if (usage.Line < excludedMask.Length && excludedMask[usage.Line])
+                continue;
+
+            if (GscAnimtreeResolver.ResolveActiveAnimtree(lines, usage.Line) != null)
+                continue;
+
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Error,
+                Source = "gsclsp",
+                Code = MissingAnimtreeDiagnosticCode,
+                Message = "#animtree requires a preceding #using_animtree(\"...\") declaration.",
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(usage.Line, usage.Column),
+                    new Position(usage.Line, usage.Column + usage.Length))
+            });
+        }
 
         return diagnostics;
     }

@@ -9,7 +9,7 @@ internal static class GscDirectives
         "#ifdef", "#ifndef", "#if", "#elif", "#elifdef", "#elifndef",
         "#else", "#endif",
         "#pragma", "#warning", "#error", "#line",
-        "#namespace", "#using_animtree"
+        "#namespace", "#using_animtree", "#animtree"
     ];
 
     public static readonly string[] MacroIdentifierOperand =
