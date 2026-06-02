@@ -31,13 +31,23 @@ public class GscDiagnosticsHandler
         _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
 
         _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
+        _indexer.DumpStatusChanged += (game, hasDump) =>
+            _languageServer.SendNotification("custom/dumpStatus", new { game, hasDump });
     }
 
     private void StartRepublishAllOpenDocuments()
     {
         var cancellationTokenSource = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _republishCancellationTokenSource, cancellationTokenSource);
-        previous?.Cancel();
+
+        // this is kinda meme, but just silenty error. we dont really care here
+        try
+        {
+            previous?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
 
         _ = RepublishAllOpenDocumentsAsync(cancellationTokenSource);
     }

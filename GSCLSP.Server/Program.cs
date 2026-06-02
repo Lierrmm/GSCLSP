@@ -35,6 +35,7 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscReferencesHandler>()
         .WithHandler<GscCodeActionHandler>()
         .WithHandler<GscRenameHandler>()
+        .OnNotification("custom/reloadConfig", () => indexer.RefreshConfiguration())
         .OnInitialize((server, request, token) =>
         {
             var workspacePath = request.RootPath
@@ -47,7 +48,7 @@ var server = await LanguageServer.From(options =>
             }
             else
             {
-                indexer.UpdateSettingDumpPath(null);
+                indexer.RefreshConfiguration();
             }
 
             return Task.CompletedTask;

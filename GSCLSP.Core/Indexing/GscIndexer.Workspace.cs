@@ -124,7 +124,10 @@ public partial class GscIndexer
             {
                 ApplyConfiguredDumpPath();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GSCLSP: config reload failed: {ex}");
+            }
         };
 
         _configDebounceTimer.Start();

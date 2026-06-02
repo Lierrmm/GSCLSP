@@ -19,6 +19,7 @@ public partial class GscIndexer
     public string? DumpPath { get; private set; }
     public string CurrentGame { get; private set; } = "iw4";
     public event Action<string>? GameChanged;
+    public event Action<string, bool>? DumpStatusChanged;
     public List<GscSymbol> WorkspaceSymbols { get; private set; } = [];
     private readonly Dictionary<string, GscFileMap> _workspaceFileMaps = [];
     private readonly Dictionary<string, GscFileMap> _fileMaps = [];
@@ -51,8 +52,6 @@ public partial class GscIndexer
     public record MacroDefinition(string Name, string Value, string FilePath, int Line);
     private static readonly Dictionary<string, List<MacroDefinition>> _macroCache = [];
     private static readonly Lock _macroCacheLock = new();
-
-    private string? _settingDumpPath;
 
     public static string NormalizePath(string? path)
     {
@@ -970,37 +969,49 @@ public partial class GscIndexer
         });
     }
 
-    public void UpdateSettingDumpPath(string? settingDumpPath)
+    public void RefreshConfiguration()
     {
-        _settingDumpPath = settingDumpPath;
         ApplyConfiguredDumpPath();
     }
 
     private void ApplyConfiguredDumpPath()
     {
         var (hasWorkspaceConfig, workspaceConfig) = TryReadWorkspaceConfig(WorkspacePath);
-        var resolvedDumpPath = ResolveDumpPathValue(_settingDumpPath, WorkspacePath, hasWorkspaceConfig, workspaceConfig?.DumpPath);
 
-        if (hasWorkspaceConfig)
+        try
         {
-            if (string.IsNullOrWhiteSpace(workspaceConfig?.DumpPath))
-                Console.Error.WriteLine("GSCLSP: gsclsp.config.json found with no dumpPath. Clearing dump index.");
-            else
-                Console.Error.WriteLine($"GSCLSP: dumpPath from gsclsp.config.json -> {workspaceConfig.DumpPath}");
+            LoadConfiguredBuiltIns(hasWorkspaceConfig, workspaceConfig?.Game, workspaceConfig?.GscToolRepository);
         }
-        else
+        catch (Exception ex)
         {
-            Console.Error.WriteLine("GSCLSP: gsclsp.config.json not found. Dump index disabled unless configured.");
+            Console.Error.WriteLine($"GSCLSP: builtins load failed for game '{CurrentGame}': {ex}");
         }
 
-        LoadConfiguredBuiltIns(hasWorkspaceConfig, workspaceConfig?.Game, workspaceConfig?.GscToolRepository);
+        var rawDumpPath = ResolveRawDumpPath(workspaceConfig);
+        var resolvedDumpPath = NormalizeDumpPath(rawDumpPath, WorkspacePath);
+
+        if (string.Equals(resolvedDumpPath, DumpPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
         UpdateDumpPath(resolvedDumpPath);
+        DumpStatusChanged?.Invoke(CurrentGame, !string.IsNullOrEmpty(resolvedDumpPath) && Directory.Exists(resolvedDumpPath));
     }
 
-    private static string? ResolveDumpPathValue(string? settingDumpPath, string? workspacePath, bool hasWorkspaceConfig, string? workspaceDumpPath)
+    private string? ResolveRawDumpPath(WorkspaceConfig? workspaceConfig)
     {
-        var candidate = hasWorkspaceConfig ? workspaceDumpPath : settingDumpPath;
+        if (workspaceConfig?.DumpPaths != null &&
+            workspaceConfig.DumpPaths.TryGetValue(CurrentGame, out var perGamePath))
+        {
+            Console.Error.WriteLine($"GSCLSP: dumpPaths['{CurrentGame}'] -> {perGamePath}"); //
+            return perGamePath;
+        }
 
+        Console.Error.WriteLine($"GSCLSP: no dump configured for game '{CurrentGame}'.");
+        return null;
+    }
+
+    private static string? NormalizeDumpPath(string? candidate, string? workspacePath)
+    {
         if (string.IsNullOrWhiteSpace(candidate))
             return null;
 
@@ -1140,7 +1151,10 @@ public partial class GscIndexer
         return "iw4";
     }
 
-    private sealed record WorkspaceConfig(string? DumpPath, string? Game, string? GscToolRepository);
+    private sealed record WorkspaceConfig(
+        IReadOnlyDictionary<string, string>? DumpPaths,
+        string? Game,
+        string? GscToolRepository);
 
     private static (bool HasConfigFile, WorkspaceConfig? Config) TryReadWorkspaceConfig(string? workspacePath)
     {
@@ -1167,12 +1181,19 @@ public partial class GscIndexer
             if (root.ValueKind != JsonValueKind.Object)
                 return null;
 
-            string? dumpPath = null;
+            Dictionary<string, string>? dumpPaths = null;
             string? game = null;
             string? gscToolRepository = null;
 
-            if (root.TryGetProperty("dumpPath", out var directDumpPath) && directDumpPath.ValueKind == JsonValueKind.String)
-                dumpPath = directDumpPath.GetString();
+            if (root.TryGetProperty("dumpPaths", out var dumpPathsProperty) && dumpPathsProperty.ValueKind == JsonValueKind.Object)
+            {
+                dumpPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in dumpPathsProperty.EnumerateObject())
+                {
+                    if (entry.Value.ValueKind == JsonValueKind.String && entry.Value.GetString() is { Length: > 0 } path)
+                        dumpPaths[entry.Name] = path;
+                }
+            }
 
             if (root.TryGetProperty("game", out var gameProperty) && gameProperty.ValueKind == JsonValueKind.String)
                 game = gameProperty.GetString();
@@ -1180,7 +1201,7 @@ public partial class GscIndexer
             if (root.TryGetProperty("gsc_tool_repository", out var gscToolRepositoryProperty) && gscToolRepositoryProperty.ValueKind == JsonValueKind.String)
                 gscToolRepository = gscToolRepositoryProperty.GetString();
 
-            return new WorkspaceConfig(dumpPath, game, gscToolRepository);
+            return new WorkspaceConfig(dumpPaths, game, gscToolRepository);
         }
         catch { }
 

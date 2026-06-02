@@ -150,6 +150,25 @@ function applyDecorationsFor(editor: TextEditor | undefined): void {
   editor.setDecorations(inactiveDecoration, ranges);
 }
 
+interface DumpStatusParams {
+  game: string;
+  hasDump: boolean;
+}
+
+async function handleDumpStatus(params: DumpStatusParams): Promise<void> {
+  if (params.hasDump) return;
+
+  const setUp = "Setup Path";
+  const choice = await window.showWarningMessage(
+    `Could not find a GSC dump for game "${params.game.toUpperCase()}". It is recommended you setup a GSC dump for the best experience.`,
+    setUp,
+  );
+
+  if (choice === setUp) {
+    await commands.executeCommand("gsclsp.browseDumpPath");
+  }
+}
+
 function handleInactiveRegions(params: InactiveRegionsParams): void {
   const uri = Uri.parse(params.uri);
   const key = uri.toString();
@@ -177,6 +196,23 @@ async function ensureWorkspaceConfigFile(folder: WorkspaceFolder): Promise<void>
     await fs.access(configPath);
   } catch {
     await fs.writeFile(configPath, "{}\n", "utf8");
+  }
+
+  const config = await readWorkspaceConfig(folder);
+  let changed = false;
+
+  if ("dumpPath" in config) {
+    delete config.dumpPath;
+    changed = true;
+  }
+
+  if (typeof config.dumpPaths !== "object" || config.dumpPaths === null) {
+    config.dumpPaths = {};
+    changed = true;
+  }
+
+  if (changed) {
+    await writeWorkspaceConfig(folder, config);
   }
 }
 
@@ -231,19 +267,21 @@ export async function activate(context: ExtensionContext): Promise<void> {
             );
 
             try {
-              let config: { dumpPath?: string } = {};
+              let config: { dumpPaths?: Record<string, string> } = {};
 
               try {
                 const existing = await fs.readFile(configPath, "utf8");
                 const parsed = JSON.parse(existing) as unknown;
                 if (parsed && typeof parsed === "object") {
-                  config = parsed as { dumpPath?: string };
+                  config = parsed as typeof config;
                 }
               } catch {
                 config = {};
               }
 
-              config.dumpPath = newPath;
+              const game = (await readTargetGame()) ?? "iw4";
+              config.dumpPaths = { ...(config.dumpPaths ?? {}), [game]: newPath };
+
               await fs.writeFile(
                 configPath,
                 JSON.stringify(config, null, 2),
@@ -251,7 +289,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
               );
 
               window.showInformationMessage(
-                `GSCLSP: Updated ${configPath}`,
+                `GSCLSP: Set dump folder for ${game.toUpperCase()}`,
               );
             } catch (error) {
               const message =
@@ -334,9 +372,14 @@ export async function activate(context: ExtensionContext): Promise<void> {
     commands.registerCommand("gsclsp.selectTargetGame", selectTargetGameCommand),
   );
 
+  const onConfigChanged = async (): Promise<void> => {
+    await updateStatusBar();
+    await client.sendNotification("custom/reloadConfig", {});
+  };
+
   const configWatcher = workspace.createFileSystemWatcher("**/gsclsp.config.json");
-  configWatcher.onDidChange(() => updateStatusBar());
-  configWatcher.onDidCreate(() => updateStatusBar());
+  configWatcher.onDidChange(onConfigChanged);
+  configWatcher.onDidCreate(onConfigChanged);
   configWatcher.onDidDelete(() => updateStatusBar());
   context.subscriptions.push(configWatcher);
 
@@ -348,6 +391,10 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   context.subscriptions.push(
     client.onNotification("custom/inactiveRegions", handleInactiveRegions),
+  );
+
+  context.subscriptions.push(
+    client.onNotification("custom/dumpStatus", handleDumpStatus),
   );
 
   context.subscriptions.push(
