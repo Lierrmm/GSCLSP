@@ -31,7 +31,6 @@ public partial class GscIndexer
     private readonly HashSet<string> _pendingChanges = [];
     private readonly Lock _pendingChangesLock = new();
     private System.Timers.Timer? _debounceTimer;
-    private System.Timers.Timer? _configDebounceTimer;
     private const int DEBOUNCE_MS = 300;
 
     // Memoization cache for ScanFileForFunction

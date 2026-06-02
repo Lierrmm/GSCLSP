@@ -9,11 +9,19 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
 {
-    public partial class GscCompletionHandler(GscIndexer indexer, GscDocumentStore documentStore) : ICompletionHandler
+    public partial class GscCompletionHandler : ICompletionHandler
     {
-        private readonly GscIndexer _indexer = indexer;
-        private readonly GscDocumentStore _documentStore = documentStore;
+        private readonly GscIndexer _indexer;
+        private readonly GscDocumentStore _documentStore;
         private readonly ConcurrentDictionary<string, HashSet<string>> _fileIncludesCache = [];
+
+        public GscCompletionHandler(GscIndexer indexer, GscDocumentStore documentStore)
+        {
+            _indexer = indexer;
+            _documentStore = documentStore;
+
+            _indexer.DumpStatusChanged += (_, _) => _fileIncludesCache.Clear();
+        }
 
         public async Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
@@ -154,6 +162,7 @@ namespace GSCLSP.Server.Handlers
                                 LabelDetails = new CompletionItemLabelDetails { Description = "(folder)" },
                                 Kind = CompletionItemKind.Folder,
                                 FilterText = folder,
+                                SortText = "0_" + folder,
                                 InsertTextFormat = InsertTextFormat.PlainText,
                                 TextEdit = new TextEditOrInsertReplaceEdit(new TextEdit { Range = segmentRange, NewText = folder + "\\" }),
                                 Command = new Command { Name = "editor.action.triggerSuggest" }
@@ -169,6 +178,7 @@ namespace GSCLSP.Server.Handlers
                             LabelDetails = new CompletionItemLabelDetails { Description = isGsh ? ".gsh" : ".gsc" },
                             Kind = CompletionItemKind.File,
                             FilterText = fileName,
+                            SortText = "1_" + fileName,
                             InsertTextFormat = InsertTextFormat.PlainText,
                             TextEdit = new TextEditOrInsertReplaceEdit(new TextEdit { Range = segmentRange, NewText = fileName })
                         });
@@ -178,6 +188,13 @@ namespace GSCLSP.Server.Handlers
                 return GscCompletionItemFactory.ToFilteredList(completions);
             }
 
+            // namespaces from the dump are shown as a high priority
+            if (AddNamespaceFolderCompletions(completions, lineUntilCursor, request.Position))
+            {
+                return GscCompletionItemFactory.ToFilteredList(completions);
+            }
+
+            // using :: after the namespace is defined for functions only
             var namespaceMatch = NameSpaceRegex().Match(lineUntilCursor);
             if (namespaceMatch.Success)
             {
@@ -299,6 +316,87 @@ namespace GSCLSP.Server.Handlers
             foreach (var define in GscCompletionItemFactory.BuiltInDefines)
                 completions.Add(define);
         }
+
+        private bool AddNamespaceFolderCompletions(List<CompletionItem> completions, string lineUntilCursor, Position position)
+        {
+            if (lineUntilCursor.Contains("::", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var pathStart = lineUntilCursor.Length;
+            while (pathStart > 0 && IsPathChar(lineUntilCursor[pathStart - 1]))
+            {
+                pathStart--;
+            }
+
+            if (pathStart == lineUntilCursor.Length)
+            {
+                return false;
+            }
+
+            var typedPath = lineUntilCursor[pathStart..].Replace("/", "\\");
+            var lastSlash = typedPath.LastIndexOf('\\');
+            var prefix = lastSlash >= 0 ? typedPath[..(lastSlash + 1)] : string.Empty;
+            var segmentStart = lastSlash >= 0 ? pathStart + lastSlash + 1 : pathStart;
+            var segmentRange = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                new Position(position.Line, segmentStart),
+                position);
+
+            var folders = _indexer.GetAllIndexedFilePaths()
+                .Select(ToRelativeScriptPath)
+                .Where(p => p.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase))
+                .Select(p => p.Replace("/", "\\"))
+                .Where(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Select(p => p[prefix.Length..])
+                .Where(p => p.Contains('\\'))
+                .Select(p => p[..p.IndexOf('\\')])
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            var addedFolder = false;
+            foreach (var folder in folders)
+            {
+                completions.Add(new CompletionItem
+                {
+                    Label = folder,
+                    LabelDetails = new CompletionItemLabelDetails { Description = "(folder)" },
+                    Kind = CompletionItemKind.Folder,
+                    FilterText = folder,
+                    SortText = "0_" + folder,
+                    InsertTextFormat = InsertTextFormat.PlainText,
+                    TextEdit = new TextEditOrInsertReplaceEdit(new TextEdit { Range = segmentRange, NewText = folder + "\\" }),
+                    Command = new Command { Name = "editor.action.triggerSuggest" }
+                });
+                addedFolder = true;
+            }
+
+            return lastSlash >= 0 && addedFolder;
+
+            string ToRelativeScriptPath(string filePath)
+            {
+                var normalized = filePath.Replace("\\", "/");
+                foreach (var rootPath in new[] { _indexer.WorkspacePath, _indexer.DumpPath })
+                {
+                    if (rootPath == null)
+                    {
+                        continue;
+                    }
+
+                    var root = rootPath.Replace("\\", "/").TrimEnd('/');
+                    if (!normalized.StartsWith(root + "/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    return normalized[(root.Length + 1)..];
+                }
+
+                return normalized;
+            }
+        }
+
+        private static bool IsPathChar(char c) =>
+            char.IsLetterOrDigit(c) || c == '_' || c == '\\' || c == '/';
 
         private static bool IsPreprocessorOperand(string trimmedLine)
         {
