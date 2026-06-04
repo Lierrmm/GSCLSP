@@ -370,6 +370,7 @@ namespace GSCLSP.Server.Handlers
                 addedFolder = true;
             }
 
+            // the return value only decides whether to stop the parent function early
             return lastSlash >= 0 && addedFolder;
 
             string ToRelativeScriptPath(string filePath)

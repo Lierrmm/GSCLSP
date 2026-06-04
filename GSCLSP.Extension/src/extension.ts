@@ -201,13 +201,19 @@ async function ensureWorkspaceConfigFile(folder: WorkspaceFolder): Promise<void>
   const config = await readWorkspaceConfig(folder);
   let changed = false;
 
-  if ("dumpPath" in config) {
-    delete config.dumpPath;
+  if (typeof config.dumpPaths !== "object" || config.dumpPaths === null) {
+    config.dumpPaths = {};
     changed = true;
   }
 
-  if (typeof config.dumpPaths !== "object" || config.dumpPaths === null) {
-    config.dumpPaths = {};
+  if ("dumpPath" in config) {
+    const legacy = config.dumpPath;
+    const game = (await readTargetGame()) ?? "iw4";
+    const paths = config.dumpPaths as Record<string, unknown>;
+    if (typeof legacy === "string" && legacy.length > 0 && !(game in paths)) {
+      paths[game] = legacy;
+    }
+    delete config.dumpPath;
     changed = true;
   }
 
@@ -355,7 +361,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
   );
 
   context.subscriptions.push(client);
-  await client.start();
 
   if (context.extensionMode === ExtensionMode.Development) {
     await client.setTrace(Trace.Verbose);
@@ -409,6 +414,8 @@ export async function activate(context: ExtensionContext): Promise<void> {
       for (const e of editors) applyDecorationsFor(e);
     }),
   );
+
+  await client.start();
 }
 
 export async function deactivate(): Promise<void> {

@@ -1001,7 +1001,6 @@ public partial class GscIndexer
         if (workspaceConfig?.DumpPaths != null &&
             workspaceConfig.DumpPaths.TryGetValue(CurrentGame, out var perGamePath))
         {
-            Console.Error.WriteLine($"GSCLSP: dumpPaths['{CurrentGame}'] -> {perGamePath}"); //
             return perGamePath;
         }
 

@@ -68,7 +68,7 @@ Dump folders are used per game by `dumpPaths` in the config. The current `game` 
 
 ## Choosing Your Target Game
 
-Once you are inside a valid *GSC* file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP changes the built-ins list and gives accurate diagnostics.
+Once you are inside a valid *GSC* file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP change the built-ins list and gives accurate diagnostics.
 
 If the active game has no entry in `dumpPaths`, no dump is indexed (workspace symbols and engine builtins still work).
 
