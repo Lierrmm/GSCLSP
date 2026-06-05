@@ -105,39 +105,8 @@ public partial class GscIndexer
         }
     }
 
-    private static bool IsWorkspaceConfigFile(string fullPath) =>
-        Path.GetFileName(fullPath).Equals("gsclsp.config.json", StringComparison.OrdinalIgnoreCase);
-
-    private void ScheduleConfigReload()
-    {
-        _configDebounceTimer?.Stop();
-        _configDebounceTimer?.Dispose();
-
-        _configDebounceTimer = new System.Timers.Timer(DEBOUNCE_MS)
-        {
-            AutoReset = false,
-        };
-
-        _configDebounceTimer.Elapsed += (_, _) =>
-        {
-            try
-            {
-                ApplyConfiguredDumpPath();
-            }
-            catch { }
-        };
-
-        _configDebounceTimer.Start();
-    }
-
     private void OnFileChanged(object sender, FileSystemEventArgs e)
     {
-        if (IsWorkspaceConfigFile(e.FullPath))
-        {
-            ScheduleConfigReload();
-            return;
-        }
-
         if (!IsScriptFile(e.FullPath))
             return;
 
@@ -155,11 +124,6 @@ public partial class GscIndexer
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        if (IsWorkspaceConfigFile(e.OldFullPath) || IsWorkspaceConfigFile(e.FullPath))
-        {
-            ScheduleConfigReload();
-        }
-
         _fileContentCache.Remove(e.OldFullPath);
         OnFileChanged(sender, new FileSystemEventArgs(WatcherChangeTypes.Changed, Path.GetDirectoryName(e.FullPath)!, Path.GetFileName(e.FullPath)));
     }

@@ -2,10 +2,6 @@
 
 [Visual Studio Code](https://code.visualstudio.com/) language support for *Call of Duty®*'s scripting language `.gsc`, `.gsh`, `.csc`, and `.csh` files, powered by the **GSCLSP [C# language server](https://github.com/Lierrmm/GSCLSP/tree/main/GSCLSP.Server)**.
 
-## Choosing Your Target Game
-
-Once you are inside a valid *GSC* file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP changes the built-ins list and gives accurate diagnostics.
-
 ## Features
 
 ### Syntax Highlighting
@@ -54,6 +50,28 @@ When you hover your mouse cursor over any sort of function, macro, variable, or 
 ### Code Actions
 - Quick fix to insert `#include ...` for unresolved functions
 
+## Project Setup
+
+When you open a workspace, the extension ensures a `gsclsp.config.json` file exists in the workspace root.
+
+Dump folders are used per game by `dumpPaths` in the config. The current `game` selects which dump is in use. Switching games will swap the dump **automatically.**
+
+```json
+{
+  "game": "s4",
+  "dumpPaths": {
+    "iw5": "D:\\dumps\\iw5",
+    "s4": "D:\\dumps\\s4"
+  }
+}
+```
+
+## Choosing Your Target Game
+
+Once you are inside a valid *GSC* file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP change the built-ins list and gives accurate diagnostics.
+
+If the active game has no entry in `dumpPaths`, no dump is indexed (workspace symbols and engine builtins still work).
+
 ## How to disable warnings/errors
 
 Warnings can be muted on either:
@@ -74,18 +92,6 @@ Aliases supported:
 - `recursive` -> `recursive-function`
 - `semicolon` -> `missing-semicolon`
 - `builtin-args` or `arity` -> `builtin-arg-count`
-
-## Project Setup
-
-When you open a workspace, the extension ensures a `gsclsp.config.json` file exists in the workspace root.
-
-Example:
-
-```json
-{
-  "dumpPath": "D:\\your\\gsc_dump"
-}
-```
 
 ## Command
 

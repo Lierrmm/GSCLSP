@@ -29,9 +29,6 @@ public partial class RegexPatterns
     [GeneratedRegex(@"^#inline\s+([\w\\]+(?:\.\w+)?)")]
     public static partial Regex InlinePathRegex();
 
-    [GeneratedRegex(@"([\w\\]*\\[\w\\]+)::")]
-    public static partial Regex NamespacePathRegex();
-
     [GeneratedRegex(@"//.*")]
     public static partial Regex CommentRegex();
 
