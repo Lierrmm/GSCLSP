@@ -17,7 +17,7 @@ public partial class RegexPatterns
     [GeneratedRegex(@"([\w\\]+)::$")]
     public static partial Regex NameSpaceRegex();
 
-    [GeneratedRegex(@"^(?<name>[a-zA-Z_]\w*)\s*\((?<params>[^)]*)\)", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^(?:(?:function\s+(?:private\s+)?(?:autoexec\s+)?)\s*)?(?<name>[a-zA-Z_]\w*)\s*\((?<params>[^)]*)\)", RegexOptions.Multiline)]
     public static partial Regex FunctionMultiLineRegex();
 
     [GeneratedRegex(@"(Summary|Example|MandatoryArg|OptionalArg|Module|CallOn|SPMP):")]

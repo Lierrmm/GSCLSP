@@ -257,6 +257,10 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             if (line.TrimEnd().EndsWith(';'))
                 continue;
 
+            var trimmed = line.TrimStart();
+            if (!IsPotentialFuncDefLine(trimmed))
+                continue;
+
             var match = FunctionMultiLineRegex().Match(line);
             if (!match.Success)
                 continue;
@@ -682,7 +686,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         var codeLine = StripTrailingLineComment(line);
 
         if (codeLine.Length == 0 || char.IsWhiteSpace(codeLine[0])) return false;
-        if (matchIndex != 0) return false;
+        if (matchIndex != 0 && !GscLanguageKeywords.IsValidFunctionPrefix(codeLine.AsSpan(0, matchIndex))) return false;
         if (codeLine.Contains(';')) return false;
 
         var match = FunctionMultiLineRegex().Match(codeLine);
@@ -690,6 +694,21 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             return false;
 
         return codeLine.Contains('{') || (lineIndex + 1 < lines.Length && StripTrailingLineComment(lines[lineIndex + 1]).TrimStart().StartsWith('{'));
+    }
+
+    private static bool IsPotentialFuncDefLine(string trimmed)
+    {
+        if (trimmed.StartsWith("function", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        int i = 0;
+        while (i < trimmed.Length && !char.IsWhiteSpace(trimmed[i]) && trimmed[i] != '(') i++;
+        if (i == 0)
+            return false;
+
+        var firstWord = trimmed.AsSpan(0, i);
+        return GscLanguageKeywords.FunctionModifierKeywords.Contains(firstWord.ToString()) ||
+                System.Text.RegularExpressions.Regex.IsMatch(firstWord.ToString(), @"^[a-zA-Z_]\w*$");
     }
 
     private static string StripTrailingLineComment(string line)
