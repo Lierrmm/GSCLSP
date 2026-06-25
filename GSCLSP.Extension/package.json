@@ -64,7 +64,7 @@
     "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/node": "^25.3.3",
+    "@types/node": "^24.13.2",
     "@types/vscode": "^1.75.0",
     "@vscode/vsce": "latest",
     "typescript": "^6.0.0"

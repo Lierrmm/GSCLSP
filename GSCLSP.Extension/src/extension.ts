@@ -312,11 +312,10 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   context.subscriptions.push(browseCommand);
 
-  const outputChannel = window.createOutputChannel("bbe-gsclsp");
+  const outputChannel = window.createOutputChannel("bbe-gsclsp", { log: true });
   context.subscriptions.push(outputChannel);
 
   window.showInformationMessage("BBE Tools: GSC Extension is spawning");
-  console.log("TS: GSCLSP Activation started");
 
   const debugExe = context.asAbsolutePath(
     path.join(
