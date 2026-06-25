@@ -451,19 +451,31 @@ public partial class GscIndexer
                 if (!codeLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
                 {
                     bool skipLine = false;
-                    foreach (var mod in GscLanguageKeywords.FunctionModifierKeywords)
+                    while (true)
                     {
-                        if (checkLine.StartsWith(mod, StringComparison.OrdinalIgnoreCase))
+                        bool matchedModifier = false;
+                        foreach (var mod in GscLanguageKeywords.FunctionModifierKeywords)
                         {
-                            int afterMod = mod.Length;
-                            while (afterMod < checkLine.Length && char.IsWhiteSpace(checkLine[afterMod])) afterMod++;
-                            if (afterMod >= checkLine.Length)
+                            if (checkLine.StartsWith(mod, StringComparison.OrdinalIgnoreCase))
                             {
-                                skipLine = true;
+                                int afterMod = mod.Length;
+                                if (afterMod < checkLine.Length && (char.IsLetterOrDigit(checkLine[afterMod]) || checkLine[afterMod] == '_'))
+                                    continue;
+
+                                while (afterMod < checkLine.Length && char.IsWhiteSpace(checkLine[afterMod])) afterMod++;
+                                if (afterMod >= checkLine.Length)
+                                {
+                                    skipLine = true;
+                                    break;
+                                }
+                                checkLine = checkLine.Substring(afterMod);
+                                matchedModifier = true;
                                 break;
                             }
-                            checkLine = checkLine.Substring(afterMod);
                         }
+
+                        if (skipLine || !matchedModifier)
+                            break;
                     }
 
                     if (!skipLine && !checkLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
