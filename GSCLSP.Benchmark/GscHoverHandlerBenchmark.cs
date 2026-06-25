@@ -7,6 +7,7 @@ using GSCLSP.Core.Indexing;
 using GSCLSP.Server.Handlers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Microsoft.VSDiagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace GSCLSP.Benchmark;
 
@@ -20,7 +21,7 @@ public class GscHoverHandlerBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _indexer = new GscIndexer();
+        _indexer = new GscIndexer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         _hoverHandler = new GscHoverHandler(_indexer, new GscDocumentStore());
         // Create test workspace
         string tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-hover-" + Guid.NewGuid());

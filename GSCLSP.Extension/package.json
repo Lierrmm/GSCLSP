@@ -1,28 +1,60 @@
 {
   "name": "gsclsp",
   "displayName": "GSC LSP - Language Support",
-  "description": "Language Server for GSC Scripts",
   "version": "1.0.3",
-  "icon": "logo.png",
-  "publisher": "bbe-tools",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/Lierrmm/GSCLSP"
-  },
-  "engines": {
-    "vscode": "^1.80.0"
-  },
+  "description": "Language Server for GSC Scripts",
   "categories": [
     "Programming Languages"
   ],
   "keywords": [
+    "cod",
     "gsc",
     "gsh",
-    "lsp",
-    "cod"
+    "lsp"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lierrmm/GSCLSP"
+  },
+  "publisher": "bbe-tools",
   "main": "./dist/extension.js",
+  "scripts": {
+    "build": "bun run build.ts",
+    "package": "vsce package",
+    "list": "vsce ls",
+    "publish": "vsce publish",
+    "lint": "oxlint",
+    "fmt": "oxfmt"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "latest",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "typescript": "^6.0.0"
+  },
   "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "GSC LSP Configuration",
+      "properties": {
+        "gsclsp.trace.server": {
+          "scope": "window",
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "verbose",
+          "description": "Traces the communication between VS Code and the GSC language server."
+        }
+      }
+    },
     "commands": [
       {
         "command": "gsclsp.browseDumpPath",
@@ -57,19 +89,8 @@
       }
     ]
   },
-  "scripts": {
-    "build": "bun run build.ts",
-    "package": "vsce package",
-    "list": "vsce ls",
-    "publish": "vsce publish"
-  },
-  "devDependencies": {
-    "@types/node": "^24.13.2",
-    "@types/vscode": "^1.75.0",
-    "@vscode/vsce": "latest",
-    "typescript": "^6.0.0"
-  },
-  "dependencies": {
-    "vscode-languageclient": "^10.0.0"
+  "icon": "logo.png",
+  "engines": {
+    "vscode": "^1.80.0"
   }
 }

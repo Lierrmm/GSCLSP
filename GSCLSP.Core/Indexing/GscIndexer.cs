@@ -3,6 +3,7 @@ using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Core.Services;
 using GSCLSP.Core.Tools;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -10,12 +11,14 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Indexing;
 
-public partial class GscIndexer
+public partial class GscIndexer(ILogger logger)
 {
+    private readonly ILogger _logger = logger;
+ 
     private readonly List<GscSymbol> _symbols = [];
     public IEnumerable<GscSymbol> Symbols => _symbols;
     public int SymbolCount => _symbols.Count;
-    public BuiltInProvider BuiltIns { get; } = new();
+    public BuiltInProvider BuiltIns { get; } = new(logger);
     public string? DumpPath { get; private set; }
     public string CurrentGame { get; private set; } = "iw4";
     public event Action<string>? GameChanged;
@@ -115,16 +118,16 @@ public partial class GscIndexer
         {
             if (File.Exists(cacheFile))
             {
-                Console.Error.WriteLine($"GSCLSP: Loading existing GSC dump cache...");
+                _logger.LogDebug("Loading existing GSC dump cache from {CacheFile}", cacheFile);
                 LoadGlobalIndex(cacheFile);
             }
             else
             {
-                Console.Error.WriteLine($"GSCLSP: No cache found. Crawling folder...");
+                _logger.LogDebug("No cache found. Crawling folder {FolderPath}...", newPath);
                 IndexFolder(newPath);
                 ExportIndexToJson(newPath, cacheFile);
 
-                Console.Error.WriteLine($"GSCLSP: Created new cache with {_symbols.Count} symbols.");
+                _logger.LogDebug("Created new cache with {Count} symbols.", _symbols.Count);
                 LoadGlobalIndex(cacheFile);
             }
         });
@@ -149,7 +152,8 @@ public partial class GscIndexer
             }
         }
 
-        Console.Error.WriteLine($"GSCLSP: Indexer loaded {_symbols.Count} GSC symbols from JSON.");
+
+        _logger.LogDebug("Indexer loaded {Count} GSC symbols from JSON.", _symbols.Count);
     }
 
     private void ParseFile(string path)
@@ -381,7 +385,7 @@ public partial class GscIndexer
         if (globalMatch != null)
             return new GscResolution(globalMatch, ResolutionType.Included, globalMatch.FilePath);
 
-        Console.Error.WriteLine($"GSCLSP: '{functionName}' could not be resolved.");
+        _logger.LogTrace("'{FunctionName}' could not be resolved.", functionName);
         return new GscResolution(null, ResolutionType.NotFound);
     }
 
@@ -643,7 +647,7 @@ public partial class GscIndexer
                 int space = paramName.IndexOfAny([' ', '\t']);
                 if (space > 0) paramName = paramName[..space];
 
-                if (!System.Text.RegularExpressions.Regex.IsMatch(paramName, @"^[A-Za-z_]\w*$"))
+                if (!Regex.IsMatch(paramName, @"^[A-Za-z_]\w*$"))
                     continue;
                 if (GscLanguageKeywords.LocalVariableReservedWords.Contains(paramName)) continue;
 
@@ -889,34 +893,6 @@ public partial class GscIndexer
         return ResolveFunction(contextPath, lookupName, isMethodStyleCall);
     }
 
-    public void FindReferences(string functionName)
-    {
-        var sw = Stopwatch.StartNew();
-        int count = 0;
-
-        // We search for the function name followed by a parenthesis
-        // to avoid catching variable names that happen to match.
-        string pattern = $@"\b{Regex.Escape(functionName)}\s*\(";
-
-        // Iterate through every file we've indexed
-        foreach (var fileMap in _fileMaps.Values)
-        {
-            var lines = File.ReadLines(fileMap.FilePath);
-            int lineNum = 0;
-            foreach (var line in lines)
-            {
-                lineNum++;
-                if (Regex.IsMatch(line, pattern, RegexOptions.IgnoreCase))
-                {
-                    Console.WriteLine($"[REF] {Path.GetFileName(fileMap.FilePath)}:{lineNum} -> {line.Trim()}");
-                    count++;
-                }
-            }
-        }
-
-        Console.WriteLine($"\nFound {count} references in {sw.Elapsed.TotalMilliseconds:N2}ms.");
-    }
-
     public bool IsKnownFunction(string scriptPath, string functionName)
     {
         string searchSuffix = scriptPath.Replace("\\", "/");
@@ -983,7 +959,7 @@ public partial class GscIndexer
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"GSCLSP: builtins load failed for game '{CurrentGame}': {ex}");
+            _logger.LogError(ex, "Builtins load failed for game '{Game}'", CurrentGame);
         }
 
         var rawDumpPath = ResolveRawDumpPath(workspaceConfig);
@@ -1004,7 +980,7 @@ public partial class GscIndexer
             return perGamePath;
         }
 
-        Console.Error.WriteLine($"GSCLSP: no dump configured for game '{CurrentGame}'.");
+        _logger.LogInformation("No dump path configured for game '{Game}' in workspace config.", CurrentGame);
         return null;
     }
 
@@ -1044,7 +1020,7 @@ public partial class GscIndexer
         if (File.Exists(requestedPath))
         {
             BuiltIns.LoadBuiltIns(requestedPath);
-            Console.Error.WriteLine($"GSCLSP: loaded builtins for game '{normalizedGame}'.");
+            _logger.LogInformation("Loaded builtins for game '{Game}'.", normalizedGame);
             if (gameChanged) GameChanged?.Invoke(normalizedGame);
             return;
         }
@@ -1061,7 +1037,7 @@ public partial class GscIndexer
                 var previousMethods = SnapshotBuiltInNames(SymbolType.Method);
 
                 BuiltIns.LoadNameOnlyBuiltIns(cached.Functions, cached.Methods, cached.Tokens);
-                Console.Error.WriteLine($"GSCLSP: Loaded cached builtins for game '{normalizedGame}'{sourceLabel}.");
+                _logger.LogDebug("Loaded cached builtins for game '{Game}'{SourceLabel}.", normalizedGame, sourceLabel);
 
                 var builtInsChanged = !BuiltInNamesEqual(previousFunctions, cached.Functions)
                                    || !BuiltInNamesEqual(previousMethods, cached.Methods);
@@ -1074,7 +1050,7 @@ public partial class GscIndexer
             else
             {
                 BuiltIns.LoadNameOnlyBuiltIns([], [], []);
-                Console.Error.WriteLine($"GSCLSP: No cache for '{normalizedGame}'{sourceLabel}, fetching from gsc-tool...");
+                _logger.LogDebug("No cached builtins for game '{Game}'{SourceLabel}, fetching from gsc-tool...", normalizedGame, sourceLabel);
                 if (gameChanged) GameChanged?.Invoke(normalizedGame);
                 _ = RefreshGscToolBuiltInsAsync(normalizedGame, source);
             }
@@ -1083,7 +1059,7 @@ public partial class GscIndexer
 
         if (!normalizedGame.Equals("iw4", StringComparison.OrdinalIgnoreCase))
         {
-            Console.Error.WriteLine($"GSCLSP: Builtins for game '{normalizedGame}' not found, using iw4_builtins.json instead...");
+            _logger.LogDebug("Builtins for game '{Game}' not found, using iw4_builtins.json instead...", normalizedGame);
         }
 
         if (File.Exists(fallbackPath))
@@ -1093,7 +1069,7 @@ public partial class GscIndexer
             return;
         }
 
-        Console.Error.WriteLine("GSCLSP: No builtins file found, expected data/iw4_builtins.json");
+        _logger.LogDebug("No builtins file found for game '{Game}', expected data/iw4_builtins.json", normalizedGame);
         if (gameChanged) GameChanged?.Invoke(normalizedGame);
     }
 
@@ -1102,7 +1078,7 @@ public partial class GscIndexer
         var fetched = await GscToolBuiltInsLoader.FetchAsync(game, source);
         if (fetched == null)
         {
-            await Console.Error.WriteLineAsync($"GSCLSP: gsc-tool fetch for '{game}' from {source.DisplayName} failed or unsupported.");
+            _logger.LogError("gsc-tool fetch for '{Game}' from {Source} failed or unsupported.", game, source.DisplayName);
             return;
         }
 
@@ -1115,7 +1091,7 @@ public partial class GscIndexer
             || !BuiltInNamesEqual(previousMethods, fetched.Methods);
 
         BuiltIns.LoadNameOnlyBuiltIns(fetched.Functions, fetched.Methods, fetched.Tokens);
-        await Console.Error.WriteLineAsync($"GSCLSP: Refreshed built-ins for game '{game}' ({source.DisplayName})");
+        _logger.LogDebug("Refreshed builtins for game '{Game}' from {Source}.", game, source.DisplayName);
         if (builtInsChanged)
             GameChanged?.Invoke(game);
     }
@@ -1131,7 +1107,6 @@ public partial class GscIndexer
         if (GscToolSource.TryParse(raw, out var source))
             return source;
 
-        Console.Error.WriteLine($"GSCLSP: invalid gsc_tool_repository '{raw}', falling back to {GscToolSource.Default.DisplayName}.");
         return GscToolSource.Default;
     }
 

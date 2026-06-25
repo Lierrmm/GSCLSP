@@ -7,6 +7,7 @@ using GSCLSP.Core.Indexing;
 using GSCLSP.Server.Handlers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Microsoft.VSDiagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace GSCLSP.Benchmark;
 [CPUUsageDiagnoser]
@@ -19,7 +20,7 @@ public class GscReferencesHandlerBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _indexer = new GscIndexer();
+        _indexer = new GscIndexer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         _referencesHandler = new GscReferencesHandler(_indexer, null);
         // Create test workspace
         string tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-references-" + Guid.NewGuid());

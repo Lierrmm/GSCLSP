@@ -22,17 +22,29 @@ public class GscDiagnosticsHandler
     private readonly ILanguageServerFacade _languageServer;
     private readonly GscDocumentStore _documentStore;
     private CancellationTokenSource? _republishCancellationTokenSource;
+    private readonly ILogger<GscDiagnosticsHandler> _logger;
 
-    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore)
+    public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore, ILogger<GscDiagnosticsHandler> logger)
     {
         _indexer = indexer;
         _languageServer = languageServer;
         _documentStore = documentStore;
-        _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer);
+        _logger = logger;
+
+        _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer, _logger);
 
         _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
         _indexer.DumpStatusChanged += (game, hasDump) =>
-            _languageServer.SendNotification("custom/dumpStatus", new { game, hasDump });
+        {
+            try
+            {
+                _languageServer.SendNotification("custom/dumpStatus", new { game, hasDump });
+            }
+            catch
+            {
+                // Silently ignore if server is not yet initialized
+            }
+        };
     }
 
     private void StartRepublishAllOpenDocuments()

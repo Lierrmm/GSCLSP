@@ -2,13 +2,14 @@ using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
+using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Diagnostics;
 
-public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
+public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
 {
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
@@ -652,8 +653,9 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             .Take(8)
             .ToList();
 
-        Console.Error.WriteLine(
-            $"GSCLSP Trace Resolve: unresolved '{functionName}' @ {currentFilePath}:{lineIndex + 1} | qualified='{qualifiedPath}' | local={localHit} builtin={builtInHit} includeHits=[{string.Join(", ", includeHits)}] qualifiedIncludeHits=[{string.Join(", ", qualifiedIncludeHits)}] symbolHits=[{string.Join(", ", symbolHits)}]");
+        logger.LogWarning(
+            "GSCLSP Trace Resolve: unresolved '{FunctionName}' @ {CurrentFilePath}:{Line} | qualified='{QualifiedPath}' | local={LocalHit} builtin={BuiltInHit} includeHits=[{IncludeHits}] qualifiedIncludeHits=[{QualifiedHits}] symbolHits=[{SymbolHits}]", functionName,
+            currentFilePath, lineIndex + 1, qualifiedPath, localHit, builtInHit, string.Join(", ", includeHits), string.Join(", ", qualifiedIncludeHits), string.Join(", ", symbolHits));
     }
 
     private IEnumerable<GscSymbol> FindCandidateSymbols(string functionName)

@@ -1,9 +1,10 @@
 ﻿using System.Text.Json;
 using GSCLSP.Core.Models;
+using Microsoft.Extensions.Logging;
 
 namespace GSCLSP.Core.Indexing;
 
-public class BuiltInProvider
+public class BuiltInProvider(ILogger logger)
 {
     private static readonly HashSet<string> VariadicBuiltIns = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -19,7 +20,7 @@ public class BuiltInProvider
     {
         if (!File.Exists(jsonPath))
         {
-            Console.WriteLine($"[Warning] Built-ins file not found at: {jsonPath}");
+            logger.LogWarning("Built-ins file not found at: {JsonPath}", jsonPath);
             return;
         }
 
@@ -51,16 +52,16 @@ public class BuiltInProvider
             }
             else
             {
-                Console.Error.WriteLine($"[Warning] Unexpected built-ins JSON root kind '{root.ValueKind}' in: {jsonPath}");
+                logger.LogWarning("Unexpected built-ins JSON root kind '{ValueKind}' in: {JsonPath}", root.ValueKind, jsonPath);
                 return;
             }
 
             ReplaceSnapshot(builtInFunctions, builtInMethods);
-            Console.Error.WriteLine($"Loaded {builtInFunctions.Count} engine built-in functions and {builtInMethods.Count} engine built-in methods.");
+            logger.LogInformation("Loaded {builtInFunctions.Count} engine built-in functions and {builtInMethods.Count} engine built-in methods.", builtInFunctions.Count, builtInMethods.Count);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[Error] Failed to load built-ins: {ex.Message}");
+            logger.LogError(ex, "Failed to load built-ins");
         }
     }
 
