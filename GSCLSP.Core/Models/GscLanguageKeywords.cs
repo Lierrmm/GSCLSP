@@ -13,8 +13,40 @@ public static class GscLanguageKeywords
         "assert", "assertex", "assertmsg",
         "true", "false", "undefined",
         "size", "game", "self", "anim", "level",
-        "isdefined", "istrue"
+        "isdefined", "istrue",
+        "function", "private", "autoexec"
     };
+
+    public static readonly HashSet<string> FunctionModifierKeywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "function", "private", "autoexec"
+    };
+
+    /// <summary>
+    /// Validates that a prefix consists only of allowed function modifier keywords (function, private, autoexec).
+    /// </summary>
+    public static bool IsValidFunctionPrefix(ReadOnlySpan<char> prefix)
+    {
+        if (prefix.IsEmpty)
+            return true;
+
+        int i = 0;
+        while (i < prefix.Length)
+        {
+            while (i < prefix.Length && char.IsWhiteSpace(prefix[i])) i++;
+            if (i >= prefix.Length)
+                return true;
+
+            int start = i;
+            while (i < prefix.Length && !char.IsWhiteSpace(prefix[i])) i++;
+
+            var word = prefix[start..i];
+            if (!FunctionModifierKeywords.Contains(word.ToString()))
+                return false;
+        }
+
+        return true;
+    }
 
     public static readonly HashSet<string> LocalVariableReservedWords = new(StringComparer.OrdinalIgnoreCase)
     {

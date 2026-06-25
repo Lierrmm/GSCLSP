@@ -214,7 +214,10 @@ public partial class GscIndexer
             return false;
 
         var match = FunctionMultiLineRegex().Match(codeLine);
-        if (!match.Success || match.Index != 0)
+        if (!match.Success)
+            return false;
+
+        if (match.Index != 0 && !GscLanguageKeywords.IsValidFunctionPrefix(codeLine.AsSpan(0, match.Index)))
             return false;
 
         var name = match.Groups["name"].Value;
@@ -438,22 +441,74 @@ public partial class GscIndexer
                 if (codeLine.Contains(';'))
                     continue;
 
-                // Quick reject: line must start with function name (case-insensitive)
+                // Quick reject: line must start with function name or valid modifier keywords
                 if (fnLen == 0 || codeLine.Length < fnLen)
                     continue;
 
+                int pos = -1;
+                string checkLine = codeLine;
+
                 if (!codeLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
-                    continue;
+                {
+                    bool skipLine = false;
+                    while (true)
+                    {
+                        bool matchedModifier = false;
+                        foreach (var mod in GscLanguageKeywords.FunctionModifierKeywords)
+                        {
+                            if (checkLine.StartsWith(mod, StringComparison.OrdinalIgnoreCase))
+                            {
+                                int afterMod = mod.Length;
+                                if (afterMod < checkLine.Length && (char.IsLetterOrDigit(checkLine[afterMod]) || checkLine[afterMod] == '_'))
+                                    continue;
 
-                // Next character after name should be whitespace or '('
-                if (codeLine.Length == fnLen)
-                    continue;
+                                while (afterMod < checkLine.Length && char.IsWhiteSpace(checkLine[afterMod])) afterMod++;
+                                if (afterMod >= checkLine.Length)
+                                {
+                                    skipLine = true;
+                                    break;
+                                }
+                                checkLine = checkLine.Substring(afterMod);
+                                matchedModifier = true;
+                                break;
+                            }
+                        }
 
-                int pos = fnLen;
-                // skip whitespace
-                while (pos < codeLine.Length && char.IsWhiteSpace(codeLine[pos])) pos++;
-                if (pos >= codeLine.Length || codeLine[pos] != '(')
-                    continue;
+                        if (skipLine || !matchedModifier)
+                            break;
+                    }
+
+                    if (!skipLine && !checkLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
+                        skipLine = true;
+
+                    if (!skipLine)
+                    {
+                        int nameStartInCodeLine = codeLine.Length - checkLine.Length;
+                        int nameEnd = nameStartInCodeLine + fnLen;
+                        if (nameEnd >= codeLine.Length)
+                            skipLine = true;
+                        else
+                        {
+                            pos = nameEnd;
+                            while (pos < codeLine.Length && char.IsWhiteSpace(codeLine[pos])) pos++;
+                            if (pos >= codeLine.Length || codeLine[pos] != '(')
+                                skipLine = true;
+                        }
+                    }
+
+                    if (skipLine)
+                        continue;
+                }
+                else
+                {
+                    if (codeLine.Length == fnLen)
+                        continue;
+
+                    pos = fnLen;
+                    while (pos < codeLine.Length && char.IsWhiteSpace(codeLine[pos])) pos++;
+                    if (pos >= codeLine.Length || codeLine[pos] != '(')
+                        continue;
+                }
 
                 // Find closing ')' on the same line
                 int closeParen = codeLine.IndexOf(')', pos + 1);
