@@ -46,6 +46,7 @@ const KNOWN_GAMES = [
   "t6",
   "t7",
   "t8",
+  "t9",
   "h1",
   "h2",
   "jup"

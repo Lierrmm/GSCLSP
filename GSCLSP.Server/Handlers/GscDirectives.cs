@@ -25,7 +25,6 @@ internal static class GscDirectives
         "IW5", "IW6", "IW7", "IW8", "IW9",
         "S1", "S2", "S4",
         "H1", "H2",
-        "T6", "T7", "T8", "T9",
-        "JUP"
+        "T6", "T7", "T8", "T9"
     };
 }
