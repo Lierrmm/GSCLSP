@@ -8,6 +8,12 @@ public partial class RegexPatterns
     [GeneratedRegex(@"^#include\s+([\w\\]+)(;?)")]
     public static partial Regex IncludeRegex();
 
+    [GeneratedRegex(@"^#using\s+([\w\\]+)(;?)")]
+    public static partial Regex UsingRegex();
+
+    [GeneratedRegex(@"^#namespace\s+(\w+)\s*;?")]
+    public static partial Regex NamespaceDirectiveRegex();
+
     [GeneratedRegex(@"^\s*#using_animtree\s*\(\s*""([^""]*)""\s*\)")]
     public static partial Regex UsingAnimtreeRegex();
 

@@ -47,7 +47,8 @@ const KNOWN_GAMES = [
   "t7",
   "t8",
   "h1",
-  "h2"
+  "h2",
+  "jup"
 ];
 
 function targetWorkspaceFolder(): WorkspaceFolder | undefined {

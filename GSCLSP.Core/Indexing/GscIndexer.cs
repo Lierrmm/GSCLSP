@@ -47,6 +47,11 @@ public partial class GscIndexer
     private static readonly Dictionary<string, List<GlobalVariableDefinition>> _globalVarCache = [];
     private static readonly Lock _globalVarCacheLock = new();
 
+    // namespace cache for Treyarch GSC files
+    private readonly Dictionary<string, string?> _fileNamespaceCache = new(StringComparer.OrdinalIgnoreCase);
+
+    public bool IsTreyarchGsc => GscLanguageKeywords.IsTreyarchGscGame(CurrentGame);
+
     // macro preprocessor defined at top of GSC file
     public record MacroDefinition(string Name, string Value, string FilePath, int Line);
     private static readonly Dictionary<string, List<MacroDefinition>> _macroCache = [];
@@ -162,10 +167,24 @@ public partial class GscIndexer
             var line = lines[lineIndex];
             var lineNum = lineIndex + 1;
 
+            var namespaceMatch = NamespaceDirectiveRegex().Match(line);
+            if (namespaceMatch.Success)
+            {
+                fileMap.Namespace = namespaceMatch.Groups[1].Value;
+                continue;
+            }
+
             var includeMatch = IncludeRegex().Match(line);
             if (includeMatch.Success)
             {
                 fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                continue;
+            }
+
+            var usingMatch = UsingRegex().Match(line);
+            if (usingMatch.Success)
+            {
+                fileMap.Usings.Add(usingMatch.Groups[1].Value.Replace("\\", "/"));
                 continue;
             }
 
@@ -194,7 +213,11 @@ public partial class GscIndexer
             _symbols.Add(symbol);
         }
 
-        _fileMaps[NormalizePathKey(path)] = fileMap;
+        var key = NormalizePathKey(path);
+        _fileMaps[key] = fileMap;
+
+        if (fileMap.Namespace != null)
+            _fileNamespaceCache[key] = fileMap.Namespace;
     }
 
     private static bool IsFunctionDefinitionLine(string[] lines, int lineIndex, out Match functionMatch)
@@ -290,7 +313,7 @@ public partial class GscIndexer
         return flat;
     }
 
-    public async Task<string?> GetIncludePathAsync(string includeString)
+    public string? GetIncludePath(string includeString)
     {
         if (string.IsNullOrWhiteSpace(includeString)) return null;
 
@@ -315,6 +338,111 @@ public partial class GscIndexer
         return null;
     }
 
+    public Task<string?> GetIncludePathAsync(string includeString) =>
+        Task.FromResult(GetIncludePath(includeString));
+
+    public string? GetNamespaceForFile(string filePath)
+    {
+        string key = NormalizePathKey(filePath);
+        if (_fileNamespaceCache.TryGetValue(key, out var cached))
+            return cached;
+
+        string? ns = null;
+        try
+        {
+            var lines = GetFileLines(filePath);
+            foreach (var line in lines)
+            {
+                var match = NamespaceDirectiveRegex().Match(line);
+                if (match.Success)
+                {
+                    ns = match.Groups[1].Value;
+                    break;
+                }
+            }
+        }
+        catch { }
+
+        _fileNamespaceCache[key] = ns;
+        return ns;
+    }
+
+    public string? ResolveNamespaceToFilePath(string namespaceName, string callingFilePath)
+    {
+        string normalizedCalling = NormalizePathKey(callingFilePath);
+
+        if (!_workspaceFileMaps.TryGetValue(normalizedCalling, out var callerMap))
+            _fileMaps.TryGetValue(normalizedCalling, out callerMap);
+
+        if (callerMap == null)
+            return null;
+
+        foreach (var usingPath in callerMap.Usings)
+        {
+            var resolved = GetIncludePath(usingPath);
+            if (resolved == null) continue;
+
+            var ns = GetNamespaceForFile(resolved);
+            if (ns != null && ns.Equals(namespaceName, StringComparison.OrdinalIgnoreCase))
+                return resolved;
+        }
+
+        foreach (var filePath in GetAllIndexedFilePaths())
+        {
+            var ns = GetNamespaceForFile(filePath);
+            if (ns != null && ns.Equals(namespaceName, StringComparison.OrdinalIgnoreCase))
+                return filePath;
+        }
+
+        return null;
+    }
+
+    public Dictionary<string, string> GetUsedNamespaces(string[] fileLines)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var line in fileLines)
+        {
+            var match = UsingRegex().Match(line);
+            if (!match.Success) continue;
+
+            var usingPath = match.Groups[1].Value.Replace("\\", "/");
+            var resolvedPath = GetIncludePath(usingPath);
+            if (string.IsNullOrEmpty(resolvedPath)) continue;
+
+            var ns = GetNamespaceForFile(resolvedPath);
+            if (!string.IsNullOrEmpty(ns))
+                result.TryAdd(ns, resolvedPath);
+        }
+
+        return result;
+    }
+
+    public Dictionary<string, string> GetUsedNamespacesForFile(string filePath)
+    {
+        string normalized = NormalizePathKey(filePath);
+        GscFileMap? fileMap = null;
+
+        if (!_workspaceFileMaps.TryGetValue(normalized, out fileMap))
+            _fileMaps.TryGetValue(normalized, out fileMap);
+
+        if (fileMap == null)
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var usingPath in fileMap.Usings)
+        {
+            var resolved = GetIncludePath(usingPath);
+            if (resolved == null) continue;
+
+            var ns = GetNamespaceForFile(resolved);
+            if (!string.IsNullOrEmpty(ns))
+                result.TryAdd(ns, resolved);
+        }
+
+        return result;
+    }
+
     public GscResolution ResolveFunction(string callingFilePath, string functionName, bool preferMethodBuiltIn = false)
     {
         string normalizedCallingPath = Uri.UnescapeDataString(callingFilePath)
@@ -332,30 +460,41 @@ public partial class GscIndexer
             return new GscResolution(currentFileLocal, ResolutionType.Local, normalizedCallingPath);
         }
 
-        // Built-ins like 'distance' or 'isDefined' override everything except local definitions.
         var builtIn = BuiltIns.GetBuiltIn(functionName, preferMethodBuiltIn);
         if (builtIn != null)
         {
             return new GscResolution(builtIn, ResolutionType.Global);
         }
 
-        // If the user typed maps\mp\path::func, we look ONLY in that file.
         if (functionName.Contains("::"))
         {
             var parts = functionName.Split("::");
-            string explicitPath = parts[0].Replace("\\", "/");
+            string qualifier = parts[0].Replace("\\", "/");
             string funcName = parts[1];
 
-            var target = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
-                s.FilePath.Replace("\\", "/").ToLower().EndsWith(explicitPath + ".gsc") &&
+            if (IsTreyarchGsc)
+            {
+                var nsFilePath = ResolveNamespaceToFilePath(qualifier, callingFilePath);
+                if (nsFilePath != null)
+                {
+                    var target = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
+                        s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
+                        s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase));
+
+                    if (target != null)
+                        return new GscResolution(target, ResolutionType.Included, target.FilePath);
+                }
+            }
+
+            var pathTarget = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
+                s.FilePath.Replace("\\", "/").ToLower().EndsWith(qualifier + ".gsc") &&
                 s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase));
 
-            if (target != null)
-                return new GscResolution(target, ResolutionType.Included, target.FilePath);
+            if (pathTarget != null)
+                return new GscResolution(pathTarget, ResolutionType.Included, pathTarget.FilePath);
         }
 
-        // Check files that are explicitly included in the current file's header.
-        if (_workspaceFileMaps.TryGetValue(normalizedCallingPath, out var map) || 
+        if (_workspaceFileMaps.TryGetValue(normalizedCallingPath, out var map) ||
             _fileMaps.TryGetValue(normalizedCallingPath, out map))
         {
             foreach (var includePath in map.Includes)
@@ -363,7 +502,6 @@ public partial class GscIndexer
                 string searchSuffix = includePath.ToLower();
                 if (!searchSuffix.EndsWith(".gsc")) searchSuffix += ".gsc";
 
-                // Search for the included file in BOTH maps
                 var includedFile = _workspaceFileMaps.Values.Concat(_fileMaps.Values).FirstOrDefault(f =>
                     f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
 
@@ -375,14 +513,36 @@ public partial class GscIndexer
                     if (found != null) return new GscResolution(found, ResolutionType.Included, includedFile.FilePath);
                 }
             }
+
+            if (IsTreyarchGsc)
+            {
+                foreach (var usingPath in map.Usings)
+                {
+                    string searchSuffix = usingPath.ToLower();
+                    if (!searchSuffix.EndsWith(".gsc")) searchSuffix += ".gsc";
+
+                    var usingFile = _workspaceFileMaps.Values.Concat(_fileMaps.Values).FirstOrDefault(f =>
+                        f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
+
+                    if (usingFile != null)
+                    {
+                        var found = usingFile.LocalSymbols.FirstOrDefault(s =>
+                            s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+
+                        if (found != null) return new GscResolution(found, ResolutionType.Included, usingFile.FilePath);
+                    }
+                }
+            }
         }
 
-        // If nothing else works, search the entire project index
-        var globalMatch = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
-            s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+        if (!IsTreyarchGsc)
+        {
+            var globalMatch = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
+                s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
 
-        if (globalMatch != null)
-            return new GscResolution(globalMatch, ResolutionType.Included, globalMatch.FilePath);
+            if (globalMatch != null)
+                return new GscResolution(globalMatch, ResolutionType.Included, globalMatch.FilePath);
+        }
 
         Console.Error.WriteLine($"GSCLSP: '{functionName}' could not be resolved.");
         return new GscResolution(null, ResolutionType.NotFound);

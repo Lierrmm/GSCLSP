@@ -27,6 +27,9 @@ public partial class GscIndexer
 
             localSymbols.AddRange(parsed.Symbols);
             _workspaceFileMaps[normalizedPath] = parsed.FileMap;
+
+            if (parsed.FileMap.Namespace != null)
+                _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
         }
 
         WorkspaceSymbols = localSymbols;
@@ -159,6 +162,9 @@ public partial class GscIndexer
                     var parsed = ParseWorkspaceFileForIncrementalIndex(filePath);
                     updatedSymbols.AddRange(parsed.Symbols);
                     _workspaceFileMaps[normalizedPath] = parsed.FileMap;
+
+                    if (parsed.FileMap.Namespace != null)
+                        _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
                 }
                 catch (Exception ex)
                 {
@@ -197,6 +203,7 @@ public partial class GscIndexer
     {
         _symbols.Clear();
         _fileMaps.Clear();
+        _fileNamespaceCache.Clear();
 
         lock (_scanCacheLock)
         {
@@ -222,6 +229,7 @@ public partial class GscIndexer
     private void InvalidateFileCaches(string filePath)
     {
         _fileContentCache.Remove(filePath);
+        _fileNamespaceCache.Remove(NormalizePathKey(filePath));
 
         lock (_scanCacheLock)
         {
@@ -265,10 +273,24 @@ public partial class GscIndexer
             var line = lines[lineIndex];
             int lineNum = lineIndex + 1;
 
+            var namespaceMatch = NamespaceDirectiveRegex().Match(line);
+            if (namespaceMatch.Success)
+            {
+                fileMap.Namespace = namespaceMatch.Groups[1].Value;
+                continue;
+            }
+
             var includeMatch = IncludeRegex().Match(line);
             if (includeMatch.Success)
             {
                 fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                continue;
+            }
+
+            var usingMatch = UsingRegex().Match(line);
+            if (usingMatch.Success)
+            {
+                fileMap.Usings.Add(usingMatch.Groups[1].Value.Replace("\\", "/"));
                 continue;
             }
 

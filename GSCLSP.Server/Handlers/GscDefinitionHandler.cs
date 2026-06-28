@@ -120,14 +120,26 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
         var resolution = _indexer.ResolveFunction(currentFilePath, lookupName);
         var symbol = resolution.Symbol;
 
-        // If we have a pathFilter, override the symbol with one from that path
         if (symbol != null && !string.IsNullOrEmpty(pathFilter))
         {
             var allSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
 
-            symbol = allSymbols.FirstOrDefault(s =>
-                s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
-                s.FilePath.Replace("\\", "/").Contains(pathFilter, StringComparison.OrdinalIgnoreCase));
+            if (_indexer.IsTreyarchGsc)
+            {
+                var nsFilePath = _indexer.ResolveNamespaceToFilePath(pathFilter, currentFilePath);
+                if (nsFilePath != null)
+                {
+                    symbol = allSymbols.FirstOrDefault(s =>
+                        s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
+                        s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase)) ?? symbol;
+                }
+            }
+            else
+            {
+                symbol = allSymbols.FirstOrDefault(s =>
+                    s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
+                    s.FilePath.Replace("\\", "/").Contains(pathFilter, StringComparison.OrdinalIgnoreCase)) ?? symbol;
+            }
         }
 
         if (symbol != null && symbol.FilePath != "Engine")

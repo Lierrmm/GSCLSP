@@ -342,7 +342,8 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
         return trimmed.StartsWith("#include", StringComparison.OrdinalIgnoreCase)
             || trimmed.StartsWith("#inline", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#namespace", StringComparison.OrdinalIgnoreCase);
+            || trimmed.StartsWith("#namespace", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#using ", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsStatementContinuedToNextLine(List<Token> lineTokens)
@@ -582,7 +583,9 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
             var readablePath = ResolveReadablePath(resolvedPath);
             var content = _indexer.GetFileContent(readablePath);
             var functions = GetLocalFunctions(content);
-            result.Add(new IncludedFileScope(resolvedPath, functions));
+
+            var ns = _indexer.IsTreyarchGsc ? _indexer.GetNamespaceForFile(readablePath) : null;
+            result.Add(new IncludedFileScope(resolvedPath, functions, ns));
         }
 
         return result;
@@ -604,10 +607,24 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         if (_indexer.ResolveMacro(currentFilePath, functionName) != null)
             return true;
 
+        var isTreyarch = _indexer.IsTreyarchGsc;
+
         if (!string.IsNullOrWhiteSpace(qualifiedPath))
         {
             if (PathMatches(currentFilePath, qualifiedPath) && localFunctions.Contains(functionName))
                 return true;
+
+            if (isTreyarch)
+            {
+                var nsFilePath = _indexer.ResolveNamespaceToFilePath(qualifiedPath, currentFilePath);
+                if (nsFilePath != null)
+                {
+                    return _indexer.WorkspaceSymbols
+                        .Concat(_indexer.Symbols)
+                        .Any(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
+                                  s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+                }
+            }
 
             if (includedFiles.Any(f => PathMatches(f.Path, qualifiedPath) && f.Functions.Contains(functionName)))
                 return true;
@@ -618,6 +635,9 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
         if (includedFiles.Any(f => f.Functions.Contains(functionName)))
             return true;
+
+        if (isTreyarch)
+            return false;
 
         return FindCandidateSymbols(functionName).Any();
     }
@@ -1074,7 +1094,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         return false;
     }
 
-    private sealed record IncludedFileScope(string Path, HashSet<string> Functions);
+    private sealed record IncludedFileScope(string Path, HashSet<string> Functions, string? Namespace = null);
     private sealed record FunctionDefinition(string Name, int DefinitionLine, int NameColumn, int BraceLine);
     private sealed record MuteConfig(HashSet<string> TopOfFileMutes, Dictionary<int, HashSet<string>> LineMutes);
 }

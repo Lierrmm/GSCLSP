@@ -188,28 +188,68 @@ namespace GSCLSP.Server.Handlers
                 return GscCompletionItemFactory.ToFilteredList(completions);
             }
 
-            // namespaces from the dump are shown as a high priority
-            if (AddNamespaceFolderCompletions(completions, lineUntilCursor, request.Position))
+            var isTreyarch = _indexer.IsTreyarchGsc;
+
+            if (!isTreyarch)
             {
-                return GscCompletionItemFactory.ToFilteredList(completions);
+                if (AddNamespaceFolderCompletions(completions, lineUntilCursor, request.Position))
+                    return GscCompletionItemFactory.ToFilteredList(completions);
             }
 
-            // using :: after the namespace is defined for functions only
             var namespaceMatch = NameSpaceRegex().Match(lineUntilCursor);
             if (namespaceMatch.Success)
             {
-                string pathPrefix = namespaceMatch.Groups[1].Value.Replace("\\", "/").ToLower();
+                string qualifier = namespaceMatch.Groups[1].Value;
 
-                var filteredSymbols = _indexer.WorkspaceSymbols
+                if (isTreyarch)
+                {
+                    var usedNamespaces = _indexer.GetUsedNamespaces(currentFileLines);
+                    if (usedNamespaces.TryGetValue(qualifier, out var nsFilePath))
+                    {
+                        var filteredSymbols = _indexer.WorkspaceSymbols
+                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase))
+                            .Concat(_indexer.Symbols
+                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase)));
+
+                        foreach (var symbol in filteredSymbols)
+                        {
+                            completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, $"via {qualifier}::", appendSemicolon));
+                        }
+                        return GscCompletionItemFactory.ToFilteredList(completions);
+                    }
+                }
+
+                string pathPrefix = qualifier.Replace("\\", "/").ToLower();
+
+                var pathSymbols = _indexer.WorkspaceSymbols
                     .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase))
                     .Concat(_indexer.Symbols
                     .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase)));
 
-                foreach (var symbol in filteredSymbols)
+                foreach (var symbol in pathSymbols)
                 {
                     completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Global Function", appendSemicolon));
                 }
                 return GscCompletionItemFactory.ToFilteredList(completions);
+            }
+
+            if (isTreyarch)
+            {
+                var usedNamespaces = _indexer.GetUsedNamespaces(currentFileLines);
+                foreach (var (nsName, _) in usedNamespaces)
+                {
+                    completions.Add(new CompletionItem
+                    {
+                        Label = nsName,
+                        LabelDetails = new CompletionItemLabelDetails { Description = "(namespace)" },
+                        Kind = CompletionItemKind.Module,
+                        FilterText = nsName,
+                        SortText = "0_" + nsName,
+                        InsertText = nsName + "::",
+                        InsertTextFormat = InsertTextFormat.PlainText,
+                        Command = new Command { Name = "editor.action.triggerSuggest" }
+                    });
+                }
             }
 
             foreach (var symbol in _indexer.WorkspaceSymbols)
@@ -221,23 +261,28 @@ namespace GSCLSP.Server.Handlers
                     appendSemicolon));
             }
 
-            foreach (var symbol in _indexer.Symbols)
+            if (!isTreyarch)
             {
-                completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Dump Function", appendSemicolon));
+                foreach (var symbol in _indexer.Symbols)
+                {
+                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, "Dump Function", appendSemicolon));
+                }
             }
 
             var includesSet = _fileIncludesCache.GetOrAdd(currentFilePath, _ => ParseIncludes(currentFileLines));
 
             if (includesSet.Count > 0)
             {
+                var directiveLabel = isTreyarch ? "via #using" : "via #include";
+
                 foreach (var symbol in _indexer.WorkspaceSymbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
-                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, "via #include", appendSemicolon));
+                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, directiveLabel, appendSemicolon));
                 }
 
                 foreach (var symbol in _indexer.Symbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
-                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, "via #include", appendSemicolon));
+                    completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, directiveLabel, appendSemicolon));
                 }
             }
 

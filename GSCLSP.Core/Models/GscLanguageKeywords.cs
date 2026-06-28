@@ -48,6 +48,13 @@ public static class GscLanguageKeywords
         return true;
     }
 
+    public static readonly HashSet<string> TreyarchGscGames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "t7", "t8", "jup"
+    };
+
+    public static bool IsTreyarchGscGame(string gameId) => TreyarchGscGames.Contains(gameId);
+
     public static readonly HashSet<string> LocalVariableReservedWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "if", "else", "do", "while", "for", "foreach", "in",

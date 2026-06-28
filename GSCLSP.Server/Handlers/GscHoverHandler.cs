@@ -48,6 +48,14 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             if (foundIncludePath == null) return null;
 
             var contentValue = $"### {directive}\n`{foundIncludePath}`";
+
+            if (_indexer.IsTreyarchGsc && directive.Equals("#using", StringComparison.OrdinalIgnoreCase))
+            {
+                var ns = _indexer.GetNamespaceForFile(foundIncludePath);
+                if (!string.IsNullOrEmpty(ns))
+                    contentValue += $"\n\n**Namespace:** `{ns}`";
+            }
+
             var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
@@ -90,6 +98,36 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
         if (localVarHover != null) return localVarHover;
+
+        if (_indexer.IsTreyarchGsc && identifier.Contains("::"))
+        {
+            var nsParts = identifier.Split("::", 2);
+            var nsName = nsParts[0];
+            var nsFuncName = nsParts[1];
+
+            int wordEnd = request.Position.Character;
+            while (wordEnd < line.Length && (char.IsLetterOrDigit(line[wordEnd]) || line[wordEnd] == '_'))
+                wordEnd++;
+
+            bool cursorOnNamespace = wordEnd + 1 < line.Length && line[wordEnd] == ':' && line[wordEnd + 1] == ':';
+
+            if (cursorOnNamespace)
+            {
+                var nsFilePath = _indexer.ResolveNamespaceToFilePath(nsName, filePath);
+                if (nsFilePath != null)
+                {
+                    var nsLine = FindNamespaceLineInFile(nsFilePath, nsName);
+                    var contentValue = $"```gsc\n#namespace {nsName};\n```\n---\n**Defined in:** `{nsFilePath}`";
+                    if (nsLine > 0)
+                        contentValue += $"\n\n**Line:** {nsLine}";
+
+                    var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+                    return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+                }
+            }
+
+            identifier = nsFuncName;
+        }
 
         var resolution = _indexer.ResolveFunction(filePath, identifier);
 
@@ -368,6 +406,22 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+    }
+
+    private int FindNamespaceLineInFile(string filePath, string namespaceName)
+    {
+        try
+        {
+            var fileLines = _indexer.GetFileLines(filePath);
+            for (int i = 0; i < fileLines.Length; i++)
+            {
+                var match = NamespaceDirectiveRegex().Match(fileLines[i]);
+                if (match.Success && match.Groups[1].Value.Equals(namespaceName, StringComparison.OrdinalIgnoreCase))
+                    return i + 1;
+            }
+        }
+        catch { }
+        return 0;
     }
 
     private MacroDefinition GetActveMacroDefinition(string filePath, string identifier, MacroDefinition fallback)
