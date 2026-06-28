@@ -544,17 +544,25 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
         return string.Empty;
     }
 
-    private static HashSet<string> GetLocalFunctions(string text)
+    private static HashSet<string> GetLocalFunctions(string text, bool excludePrivate = false)
     {
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var matches = FunctionMultiLineRegex().Matches(text);
 
         foreach (Match match in matches)
         {
-            if (match.Success)
+            if (!match.Success) continue;
+
+            var nameGroup = match.Groups["name"];
+            if (excludePrivate && nameGroup.Index > 0)
             {
-                result.Add(match.Groups["name"].Value);
+                int lineStart = text.LastIndexOf('\n', nameGroup.Index - 1) + 1;
+                var prefix = text.AsSpan(lineStart, nameGroup.Index - lineStart);
+                if (GscIndexer.HasModifierWord(prefix, "private"))
+                    continue;
             }
+
+            result.Add(nameGroup.Value);
         }
 
         return result;
@@ -582,7 +590,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
 
             var readablePath = ResolveReadablePath(resolvedPath);
             var content = _indexer.GetFileContent(readablePath);
-            var functions = GetLocalFunctions(content);
+            var functions = GetLocalFunctions(content, excludePrivate: true);
 
             var ns = _indexer.IsTreyarchGsc ? _indexer.GetNamespaceForFile(readablePath) : null;
             result.Add(new IncludedFileScope(resolvedPath, functions, ns));
@@ -622,7 +630,8 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
                     return _indexer.WorkspaceSymbols
                         .Concat(_indexer.Symbols)
                         .Any(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
-                                  s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+                                  s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
+                                  !s.IsPrivate);
                 }
             }
 
@@ -684,7 +693,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer)
     {
         return _indexer.WorkspaceSymbols
             .Concat(_indexer.Symbols)
-            .Where(s => s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase))
+            .Where(s => s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate)
             .GroupBy(s => s.FilePath, StringComparer.OrdinalIgnoreCase)
             .Select(g => g.First());
     }

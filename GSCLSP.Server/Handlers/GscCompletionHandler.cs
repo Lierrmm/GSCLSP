@@ -207,9 +207,9 @@ namespace GSCLSP.Server.Handlers
                     if (usedNamespaces.TryGetValue(qualifier, out var nsFilePath))
                     {
                         var filteredSymbols = _indexer.WorkspaceSymbols
-                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase))
+                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate)
                             .Concat(_indexer.Symbols
-                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase)));
+                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate));
 
                         foreach (var symbol in filteredSymbols)
                         {
@@ -222,9 +222,9 @@ namespace GSCLSP.Server.Handlers
                 string pathPrefix = qualifier.Replace("\\", "/").ToLower();
 
                 var pathSymbols = _indexer.WorkspaceSymbols
-                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase))
+                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate)
                     .Concat(_indexer.Symbols
-                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase)));
+                    .Where(s => s.FilePath.Replace("\\", "/").Contains(pathPrefix, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate));
 
                 foreach (var symbol in pathSymbols)
                 {
@@ -255,6 +255,7 @@ namespace GSCLSP.Server.Handlers
             foreach (var symbol in _indexer.WorkspaceSymbols)
             {
                 bool isThisFile = symbol.FilePath.Equals(currentFilePath, StringComparison.OrdinalIgnoreCase);
+                if (!isThisFile && symbol.IsPrivate) continue;
                 completions.Add(GscCompletionItemFactory.FromSymbol(symbol,
                     isThisFile ? CompletionItemKind.Field : CompletionItemKind.Function,
                     isThisFile ? "Local Function" : "Project Function",
@@ -275,12 +276,12 @@ namespace GSCLSP.Server.Handlers
             {
                 var directiveLabel = isTreyarch ? "via #using" : "via #include";
 
-                foreach (var symbol in _indexer.WorkspaceSymbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
+                foreach (var symbol in _indexer.WorkspaceSymbols.Where(s => !s.IsPrivate && includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
                     completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, directiveLabel, appendSemicolon));
                 }
 
-                foreach (var symbol in _indexer.Symbols.Where(s => includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
+                foreach (var symbol in _indexer.Symbols.Where(s => !s.IsPrivate && includesSet.Contains(s.FilePath.Replace("\\", "/").ToLower())))
                 {
                     completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Reference, directiveLabel, appendSemicolon));
                 }

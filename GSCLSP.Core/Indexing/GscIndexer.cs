@@ -204,13 +204,17 @@ public partial class GscIndexer
             var name = funcMatch.Groups["name"].Value;
             var rawParams = funcMatch.Groups["params"].Value;
             var cleanParams = CleanGscParams(rawParams);
+            var nameGroup = funcMatch.Groups["name"];
+            var isPrivate = nameGroup.Index > 0 &&
+                HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
 
             var symbol = new GscSymbol(
                 name,
                 path,
                 lineNum,
                 cleanParams,
-                SymbolType.Function
+                SymbolType.Function,
+                IsPrivate: isPrivate
             );
             fileMap.LocalSymbols.Add(symbol);
             _symbols.Add(symbol);
@@ -286,6 +290,21 @@ public partial class GscIndexer
         return false;
     }
 
+    internal static bool HasModifierWord(ReadOnlySpan<char> prefix, string keyword)
+    {
+        int i = 0;
+        while (i < prefix.Length)
+        {
+            while (i < prefix.Length && char.IsWhiteSpace(prefix[i])) i++;
+            if (i >= prefix.Length) break;
+            int start = i;
+            while (i < prefix.Length && !char.IsWhiteSpace(prefix[i])) i++;
+            if (prefix[start..i].Equals(keyword, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
     private static string StripTrailingLineComment(string line)
     {
         if (string.IsNullOrEmpty(line))
@@ -326,11 +345,7 @@ public partial class GscIndexer
         if (overrideKey.EndsWith(".gsc") || overrideKey.EndsWith(".gsh"))
             overrideKey = overrideKey[..^4];
         if (_workspaceOverrides.TryGetValue(overrideKey, out var overridePath))
-        {
-            Console.Error.WriteLine($"GSCLSP: Override hit '{overrideKey}' -> {overridePath}");
             return overridePath;
-        }
-        Console.Error.WriteLine($"GSCLSP: Override miss '{overrideKey}', overrides count={_workspaceOverrides.Count}, keys=[{string.Join(", ", _workspaceOverrides.Keys)}]");
 
         var extensions = new[] { ".gsc", ".gsh" };
 
@@ -492,7 +507,8 @@ public partial class GscIndexer
                 {
                     var target = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
                         s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
-                        s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase));
+                        s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase) &&
+                        !s.IsPrivate);
 
                     if (target != null)
                         return new GscResolution(target, ResolutionType.Included, target.FilePath);
@@ -501,7 +517,8 @@ public partial class GscIndexer
 
             var pathTarget = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
                 s.FilePath.Replace("\\", "/").ToLower().EndsWith(qualifier + ".gsc") &&
-                s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase));
+                s.Name.Equals(funcName, StringComparison.OrdinalIgnoreCase) &&
+                !s.IsPrivate);
 
             if (pathTarget != null)
                 return new GscResolution(pathTarget, ResolutionType.Included, pathTarget.FilePath);
@@ -521,7 +538,8 @@ public partial class GscIndexer
                 if (includedFile != null)
                 {
                     var found = includedFile.LocalSymbols.FirstOrDefault(s =>
-                        s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+                        s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
+                        !s.IsPrivate);
 
                     if (found != null) return new GscResolution(found, ResolutionType.Included, includedFile.FilePath);
                 }
@@ -540,7 +558,8 @@ public partial class GscIndexer
                     if (usingFile != null)
                     {
                         var found = usingFile.LocalSymbols.FirstOrDefault(s =>
-                            s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+                            s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
+                            !s.IsPrivate);
 
                         if (found != null) return new GscResolution(found, ResolutionType.Included, usingFile.FilePath);
                     }
@@ -551,7 +570,8 @@ public partial class GscIndexer
         if (!IsTreyarchGsc)
         {
             var globalMatch = WorkspaceSymbols.Concat(Symbols).FirstOrDefault(s =>
-                s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase));
+                s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
+                !s.IsPrivate);
 
             if (globalMatch != null)
                 return new GscResolution(globalMatch, ResolutionType.Included, globalMatch.FilePath);

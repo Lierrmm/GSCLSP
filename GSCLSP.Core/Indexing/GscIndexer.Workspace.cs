@@ -31,10 +31,7 @@ public partial class GscIndexer
             _workspaceFileMaps[normalizedPath] = parsed.FileMap;
 
             if (parsed.FileMap.OverridePath != null)
-            {
                 _workspaceOverrides[parsed.FileMap.OverridePath] = file;
-                Console.Error.WriteLine($"GSCLSP: Registered override '{parsed.FileMap.OverridePath}' -> {file}");
-            }
 
             if (parsed.FileMap.Namespace != null)
                 _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
@@ -335,12 +332,17 @@ public partial class GscIndexer
             if (!IsFunctionDefinitionLine(lines, lineIndex, out var funcMatch))
                 continue;
 
+            var nameGroup = funcMatch.Groups["name"];
+            var isPrivate = nameGroup.Index > 0 &&
+                HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
+
             var symbol = new GscSymbol(
                 funcMatch.Groups["name"].Value,
                 filePath,
                 lineNum,
                 CleanGscParams(funcMatch.Groups["params"].Value),
-                SymbolType.Function
+                SymbolType.Function,
+                IsPrivate: isPrivate
             );
 
             symbols.Add(symbol);
