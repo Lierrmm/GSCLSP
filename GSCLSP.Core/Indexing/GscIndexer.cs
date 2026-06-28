@@ -529,11 +529,12 @@ public partial class GscIndexer
         {
             foreach (var includePath in map.Includes)
             {
-                string searchSuffix = includePath.ToLower();
-                if (!searchSuffix.EndsWith(".gsc")) searchSuffix += ".gsc";
+                var resolvedPath = GetIncludePath(includePath);
+                if (resolvedPath == null) continue;
 
-                var includedFile = _workspaceFileMaps.Values.Concat(_fileMaps.Values).FirstOrDefault(f =>
-                    f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
+                var resolvedKey = NormalizePathKey(resolvedPath);
+                if (!_workspaceFileMaps.TryGetValue(resolvedKey, out var includedFile))
+                    _fileMaps.TryGetValue(resolvedKey, out includedFile);
 
                 if (includedFile != null)
                 {
@@ -549,11 +550,12 @@ public partial class GscIndexer
             {
                 foreach (var usingPath in map.Usings)
                 {
-                    string searchSuffix = usingPath.ToLower();
-                    if (!searchSuffix.EndsWith(".gsc")) searchSuffix += ".gsc";
+                    var resolvedPath = GetIncludePath(usingPath);
+                    if (resolvedPath == null) continue;
 
-                    var usingFile = _workspaceFileMaps.Values.Concat(_fileMaps.Values).FirstOrDefault(f =>
-                        f.FilePath.Replace("\\", "/").ToLower().EndsWith(searchSuffix));
+                    var resolvedKey = NormalizePathKey(resolvedPath);
+                    if (!_workspaceFileMaps.TryGetValue(resolvedKey, out var usingFile))
+                        _fileMaps.TryGetValue(resolvedKey, out usingFile);
 
                     if (usingFile != null)
                     {

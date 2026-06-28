@@ -50,7 +50,7 @@ public static class GscLanguageKeywords
 
     public static readonly HashSet<string> TreyarchGscGames = new(StringComparer.OrdinalIgnoreCase)
     {
-        "t7", "t8", "jup"
+        "t7", "t8", "t9", "jup"
     };
 
     public static bool IsTreyarchGscGame(string gameId) => TreyarchGscGames.Contains(gameId);

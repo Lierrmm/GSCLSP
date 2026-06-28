@@ -4,7 +4,6 @@ using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.Collections.Concurrent;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers
@@ -13,14 +12,11 @@ namespace GSCLSP.Server.Handlers
     {
         private readonly GscIndexer _indexer;
         private readonly GscDocumentStore _documentStore;
-        private readonly ConcurrentDictionary<string, HashSet<string>> _fileIncludesCache = [];
 
         public GscCompletionHandler(GscIndexer indexer, GscDocumentStore documentStore)
         {
             _indexer = indexer;
             _documentStore = documentStore;
-
-            _indexer.DumpStatusChanged += (_, _) => _fileIncludesCache.Clear();
         }
 
         public async Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
@@ -215,8 +211,8 @@ namespace GSCLSP.Server.Handlers
                         {
                             completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, $"via {qualifier}::", appendSemicolon));
                         }
-                        return GscCompletionItemFactory.ToFilteredList(completions);
                     }
+                    return GscCompletionItemFactory.ToFilteredList(completions);
                 }
 
                 string pathPrefix = qualifier.Replace("\\", "/").ToLower();
@@ -255,7 +251,7 @@ namespace GSCLSP.Server.Handlers
             foreach (var symbol in _indexer.WorkspaceSymbols)
             {
                 bool isThisFile = symbol.FilePath.Equals(currentFilePath, StringComparison.OrdinalIgnoreCase);
-                if (!isThisFile && symbol.IsPrivate) continue;
+                if (!isThisFile && (symbol.IsPrivate || isTreyarch)) continue;
                 completions.Add(GscCompletionItemFactory.FromSymbol(symbol,
                     isThisFile ? CompletionItemKind.Field : CompletionItemKind.Function,
                     isThisFile ? "Local Function" : "Project Function",
@@ -270,7 +266,7 @@ namespace GSCLSP.Server.Handlers
                 }
             }
 
-            var includesSet = _fileIncludesCache.GetOrAdd(currentFilePath, _ => ParseIncludes(currentFileLines));
+            var includesSet = ParseIncludes(currentFileLines);
 
             if (includesSet.Count > 0)
             {

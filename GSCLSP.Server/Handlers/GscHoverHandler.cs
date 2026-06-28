@@ -1,5 +1,6 @@
 ﻿using GSCLSP.Core.Diagnostics;
 using GSCLSP.Core.Indexing;
+using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -127,52 +128,71 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             }
 
             identifier = nsFuncName;
-        }
 
-        var resolution = _indexer.ResolveFunction(filePath, identifier);
-
-        if (resolution.Symbol != null)
-        {
-            var symbol = resolution.Symbol;
-
-            // If we have a file path but no documentation, we grab it from the source definition
-            if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
+            var nsTargetPath = _indexer.ResolveNamespaceToFilePath(nsName, filePath);
+            if (nsTargetPath != null)
             {
-                // Use the scanner to find the actual definition and its ScriptDoc
-                var detailedSymbol = ScanFileForFunction(symbol.FilePath, symbol.Name);
-                if (detailedSymbol != null)
+                var nsSymbol = _indexer.WorkspaceSymbols
+                    .Concat(_indexer.Symbols)
+                    .FirstOrDefault(s =>
+                        s.FilePath.Equals(nsTargetPath, StringComparison.OrdinalIgnoreCase) &&
+                        s.Name.Equals(nsFuncName, StringComparison.OrdinalIgnoreCase) &&
+                        !s.IsPrivate);
+
+                if (nsSymbol != null)
                 {
-                    symbol = detailedSymbol;
+                    var nsResolution = new GscResolution(nsSymbol, ResolutionType.Included, nsTargetPath);
+                    return BuildFunctionHover(nsResolution, filePath);
                 }
             }
 
-            var signature = GscCompletionItemFactory.GetSignatureText(symbol);
-
-            var contentValue = $"```gsc\n{signature}\n```\n";
-
-            if (!string.IsNullOrEmpty(symbol.Documentation))
-            {
-                var doc = DocRegex().Replace(symbol.Documentation, "**$1:**");
-                contentValue += $"{doc}\n\n";
-            }
-
-            contentValue += "---\n";
-
-            if (symbol.FilePath == "Engine")
-            {
-                contentValue += "*(Engine Built-in)*";
-            }
-            else
-            {
-                contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
-                             $"**Line:** {symbol.LineNumber}";
-            }
-
-            var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+            return null;
         }
 
-        return null;
+        var resolution = _indexer.ResolveFunction(filePath, identifier);
+        return BuildFunctionHover(resolution, filePath);
+    }
+
+    private Hover? BuildFunctionHover(GscResolution resolution, string callingFilePath)
+    {
+        if (resolution.Symbol == null)
+            return null;
+
+        var symbol = resolution.Symbol;
+
+        if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
+        {
+            var detailedSymbol = ScanFileForFunction(symbol.FilePath, symbol.Name);
+            if (detailedSymbol != null)
+            {
+                symbol = detailedSymbol;
+            }
+        }
+
+        var signature = GscCompletionItemFactory.GetSignatureText(symbol);
+
+        var contentValue = $"```gsc\n{signature}\n```\n";
+
+        if (!string.IsNullOrEmpty(symbol.Documentation))
+        {
+            var doc = DocRegex().Replace(symbol.Documentation, "**$1:**");
+            contentValue += $"{doc}\n\n";
+        }
+
+        contentValue += "---\n";
+
+        if (symbol.FilePath == "Engine")
+        {
+            contentValue += "*(Engine Built-in)*";
+        }
+        else
+        {
+            contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
+                         $"**Line:** {symbol.LineNumber}";
+        }
+
+        var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
 
     private static string? MatchMacroIdentifierDirective(string trimmedLine)

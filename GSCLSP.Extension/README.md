@@ -76,7 +76,7 @@ If the active game has no entry in `dumpPaths`, no dump is indexed (workspace sy
 
 If working with JUP, IW9's hashes are the same and are applied to JUP's target game. 3arc syntax is required for JUP scripts, and it is **highly recommended** to point at `https://github.com/ate47/mwiii-source/tree/main/mp` for your GSC dump. for SP, use the `sp` folder instead.
 
-If you are overriding a GSC script but want the `#using` to resolve to your local file, make sure the first line of your source GSC includes a comment naming the file its overriding. 
+If you are overriding a GSC script but want the `#using` to resolve to your local file, make sure the first line of your source GSC includes a comment naming the file it's overriding.
 
 Normal GSC path example:
 ```cpp

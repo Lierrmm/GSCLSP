@@ -14,6 +14,8 @@ public partial class GscIndexer
 
         if (!Directory.Exists(workspacePath)) return;
 
+        foreach (var key in _workspaceFileMaps.Keys)
+            _fileNamespaceCache.Remove(key);
         _workspaceFileMaps.Clear();
         _workspaceOverrides.Clear();
         _fileContentCache.Clear();

@@ -131,14 +131,18 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
                 {
                     symbol = allSymbols.FirstOrDefault(s =>
                         s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
-                        s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase)) ?? symbol;
+                        s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase));
+                }
+                else
+                {
+                    symbol = null;
                 }
             }
             else
             {
                 symbol = allSymbols.FirstOrDefault(s =>
                     s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
-                    s.FilePath.Replace("\\", "/").Contains(pathFilter, StringComparison.OrdinalIgnoreCase)) ?? symbol;
+                    s.FilePath.Replace("\\", "/").Contains(pathFilter, StringComparison.OrdinalIgnoreCase));
             }
         }
 

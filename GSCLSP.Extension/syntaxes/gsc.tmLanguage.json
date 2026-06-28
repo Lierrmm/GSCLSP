@@ -529,8 +529,8 @@
           }
         },
         {
-          "comment": "Function reference after &: &funcName",
-          "match": "&([A-Za-z_][A-Za-z_0-9]*)",
+          "comment": "Function reference after &: &funcName or &ns::funcName",
+          "match": "&(?:[A-Za-z_][A-Za-z_0-9]*::)?([A-Za-z_][A-Za-z_0-9]*)",
           "captures": {
             "1": {
               "name": "entity.name.function.gsc"
