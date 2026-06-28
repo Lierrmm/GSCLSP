@@ -50,6 +50,9 @@ public partial class GscIndexer
     // namespace cache for Treyarch GSC files
     private readonly Dictionary<string, string?> _fileNamespaceCache = new(StringComparer.OrdinalIgnoreCase);
 
+    // workspace file overrides: normalized override path → actual workspace file path
+    private readonly Dictionary<string, string> _workspaceOverrides = new(StringComparer.OrdinalIgnoreCase);
+
     public bool IsTreyarchGsc => GscLanguageKeywords.IsTreyarchGscGame(CurrentGame);
 
     // macro preprocessor defined at top of GSC file
@@ -318,6 +321,16 @@ public partial class GscIndexer
         if (string.IsNullOrWhiteSpace(includeString)) return null;
 
         string normalized = includeString.Replace("\\", "/").ToLower();
+
+        string overrideKey = normalized;
+        if (overrideKey.EndsWith(".gsc") || overrideKey.EndsWith(".gsh"))
+            overrideKey = overrideKey[..^4];
+        if (_workspaceOverrides.TryGetValue(overrideKey, out var overridePath))
+        {
+            Console.Error.WriteLine($"GSCLSP: Override hit '{overrideKey}' -> {overridePath}");
+            return overridePath;
+        }
+        Console.Error.WriteLine($"GSCLSP: Override miss '{overrideKey}', overrides count={_workspaceOverrides.Count}, keys=[{string.Join(", ", _workspaceOverrides.Keys)}]");
 
         var extensions = new[] { ".gsc", ".gsh" };
 
@@ -1158,7 +1171,8 @@ public partial class GscIndexer
     public IEnumerable<string> GetAllIndexedFilePaths() =>
         _workspaceFileMaps.Values.Select(f => f.FilePath)
             .Concat(_fileMaps.Values.Select(f => f.FilePath))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     public IEnumerable<GscSymbol> GetSymbolsByName(string name) =>
         _symbols.Where(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));

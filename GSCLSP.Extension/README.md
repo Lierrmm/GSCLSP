@@ -72,6 +72,23 @@ Once you are inside a valid *GSC* file, you will see a `GSC Target Game` dropbox
 
 If the active game has no entry in `dumpPaths`, no dump is indexed (workspace symbols and engine builtins still work).
 
+### JUP
+
+If working with JUP, IW9's hashes are the same and are applied to JUP's target game. 3arc syntax is required for JUP scripts, and it is **highly recommended** to point at `https://github.com/ate47/mwiii-source/tree/main/mp` for your GSC dump. for SP, use the `sp` folder instead.
+
+If you are overriding a GSC script but want the `#using` to resolve to your local file, make sure the first line of your source GSC includes a comment naming the file its overriding. 
+
+Normal GSC path example:
+```cpp
+// scripts\mp\art.gsc
+```
+
+Hashed GSC path example:
+```cpp
+// script_13645532f846e433
+```
+
+
 ## How to disable warnings/errors
 
 Warnings can be muted on either:

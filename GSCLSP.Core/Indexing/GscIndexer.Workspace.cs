@@ -1,5 +1,6 @@
 using GSCLSP.Core.Models;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Indexing;
@@ -14,6 +15,7 @@ public partial class GscIndexer
         if (!Directory.Exists(workspacePath)) return;
 
         _workspaceFileMaps.Clear();
+        _workspaceOverrides.Clear();
         _fileContentCache.Clear();
         WorkspacePath = workspacePath;
 
@@ -27,6 +29,12 @@ public partial class GscIndexer
 
             localSymbols.AddRange(parsed.Symbols);
             _workspaceFileMaps[normalizedPath] = parsed.FileMap;
+
+            if (parsed.FileMap.OverridePath != null)
+            {
+                _workspaceOverrides[parsed.FileMap.OverridePath] = file;
+                Console.Error.WriteLine($"GSCLSP: Registered override '{parsed.FileMap.OverridePath}' -> {file}");
+            }
 
             if (parsed.FileMap.Namespace != null)
                 _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
@@ -153,15 +161,21 @@ public partial class GscIndexer
 
             updatedSymbols.RemoveAll(s => s.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
 
+            string normalizedPath = NormalizePathKey(filePath);
+
+            if (_workspaceFileMaps.TryGetValue(normalizedPath, out var oldMap) && oldMap.OverridePath != null)
+                _workspaceOverrides.Remove(oldMap.OverridePath);
+
             if (File.Exists(filePath))
             {
-                string normalizedPath = NormalizePathKey(filePath);
-
                 try
                 {
                     var parsed = ParseWorkspaceFileForIncrementalIndex(filePath);
                     updatedSymbols.AddRange(parsed.Symbols);
                     _workspaceFileMaps[normalizedPath] = parsed.FileMap;
+
+                    if (parsed.FileMap.OverridePath != null)
+                        _workspaceOverrides[parsed.FileMap.OverridePath] = filePath;
 
                     if (parsed.FileMap.Namespace != null)
                         _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
@@ -173,7 +187,6 @@ public partial class GscIndexer
             }
             else
             {
-                string normalizedPath = NormalizePathKey(filePath);
                 _workspaceFileMaps.Remove(normalizedPath);
             }
         }
@@ -262,11 +275,29 @@ public partial class GscIndexer
         }
     }
 
+    private static string? ExtractOverridePath(string[] lines)
+    {
+        if (lines.Length == 0) return null;
+        var firstLine = lines[0].Trim();
+        if (!firstLine.StartsWith("//")) return null;
+        var path = firstLine[2..].Trim();
+        if (string.IsNullOrEmpty(path) || path.Contains(' ') || path.Contains(':'))
+            return null;
+        if (!Regex.IsMatch(path, @"^[\w\\]+(?:\.gsc|\.gsh)?$"))
+            return null;
+        var normalized = path.Replace("\\", "/").ToLower();
+        if (normalized.EndsWith(".gsc") || normalized.EndsWith(".gsh"))
+            normalized = normalized[..^4];
+        return normalized;
+    }
+
     private static (GscFileMap FileMap, List<GscSymbol> Symbols) ParseWorkspaceFileForIncrementalIndex(string filePath)
     {
         var fileMap = new GscFileMap { FilePath = filePath };
         var symbols = new List<GscSymbol>();
         var lines = File.ReadAllLines(filePath);
+
+        fileMap.OverridePath = ExtractOverridePath(lines);
 
         for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
