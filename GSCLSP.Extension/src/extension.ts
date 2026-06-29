@@ -16,10 +16,12 @@ import {
   type TextEditorDecorationType,
   Range,
   Uri,
+  LogLevel,
 } from "vscode";
 import {
   LanguageClient,
   type LanguageClientOptions,
+  RevealOutputChannelOn,
   type ServerOptions,
   Trace,
 } from "vscode-languageclient/node";
@@ -55,20 +57,16 @@ const KNOWN_GAMES = [
 function targetWorkspaceFolder(): WorkspaceFolder | undefined {
   const activeUri = window.activeTextEditor?.document.uri;
   return activeUri
-    ? workspace.getWorkspaceFolder(activeUri) ?? workspace.workspaceFolders?.[0]
+    ? (workspace.getWorkspaceFolder(activeUri) ?? workspace.workspaceFolders?.[0])
     : workspace.workspaceFolders?.[0];
 }
 
-async function readWorkspaceConfig(
-  folder: WorkspaceFolder,
-): Promise<Record<string, unknown>> {
+async function readWorkspaceConfig(folder: WorkspaceFolder): Promise<Record<string, unknown>> {
   const configPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
   try {
     const existing = await fs.readFile(configPath, "utf8");
     const parsed = JSON.parse(existing) as unknown;
-    return parsed && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   } catch {
     return {};
   }
@@ -93,7 +91,7 @@ async function readTargetGame(): Promise<string | undefined> {
 async function updateStatusBar(): Promise<void> {
   if (!targetGameStatusBar) return;
   const game = (await readTargetGame()) ?? "iw4";
-  targetGameStatusBar.text = `$(chip) GSC Target Game`;
+  targetGameStatusBar.text = `$(chip) GSC Target Game: ${game.toUpperCase()}`;
   targetGameStatusBar.tooltip = "Click to change the target game for GSC";
   targetGameStatusBar.show();
 }
@@ -126,8 +124,7 @@ async function selectTargetGameCommand(): Promise<void> {
     });
     if (!input) return;
     chosen = input.trim().toLowerCase();
-    if (!/^[a-z0-9_]+$/.test(chosen))
-    {
+    if (!/^[a-z0-9_]+$/.test(chosen)) {
       window.showErrorMessage(`GSCLSP: Invalid game identifier "${input}. Please try again.`);
       return;
     }
@@ -175,9 +172,7 @@ function handleInactiveRegions(params: InactiveRegionsParams): void {
   const uri = Uri.parse(params.uri);
   const key = uri.toString();
 
-  const ranges = params.ranges.map(
-    (r) => new Range(r.start, 0, r.end, Number.MAX_SAFE_INTEGER),
-  );
+  const ranges = params.ranges.map((r) => new Range(r.start, 0, r.end, Number.MAX_SAFE_INTEGER));
   inactiveRangesByUri.set(key, ranges);
 
   for (const editor of window.visibleTextEditors) {
@@ -237,80 +232,69 @@ export async function activate(context: ExtensionContext): Promise<void> {
     }),
   );
 
-  let browseCommand = commands.registerCommand(
-    "gsclsp.browseDumpPath",
-    async () => {
-      const options: OpenDialogOptions = {
-        canSelectMany: false,
-        openLabel: "Select GSC Dump Folder",
-        canSelectFiles: false,
-        canSelectFolders: true,
-      };
+  let browseCommand = commands.registerCommand("gsclsp.browseDumpPath", async () => {
+    const options: OpenDialogOptions = {
+      canSelectMany: false,
+      openLabel: "Select GSC Dump Folder",
+      canSelectFiles: false,
+      canSelectFolders: true,
+    };
 
-      const fileUri = await window.showOpenDialog(options);
-      if (fileUri && fileUri[0]) {
-        const newPath = fileUri[0].fsPath;
-        window.withProgress(
-          {
-            location: ProgressLocation.Notification,
-            title: "GSC Indexer",
-            cancellable: false,
-          },
-          async (progress) => {
-            progress.report({ message: "Re-indexing dump..." });
+    const fileUri = await window.showOpenDialog(options);
+    if (fileUri && fileUri[0]) {
+      const newPath = fileUri[0].fsPath;
+      window.withProgress(
+        {
+          location: ProgressLocation.Notification,
+          title: "GSC Indexer",
+          cancellable: false,
+        },
+        async (progress) => {
+          progress.report({ message: "Re-indexing dump..." });
 
-            const activeUri = window.activeTextEditor?.document.uri;
-            const targetWorkspace = activeUri
-              ? workspace.getWorkspaceFolder(activeUri)
-              : workspace.workspaceFolders?.[0];
+          const activeUri = window.activeTextEditor?.document.uri;
+          const targetWorkspace = activeUri
+            ? workspace.getWorkspaceFolder(activeUri)
+            : workspace.workspaceFolders?.[0];
 
-            if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
-              window.showErrorMessage("GSCLSP: Open a local workspace folder to save gsclsp.config.json");
-              return;
-            }
-
-            const configPath = path.join(
-              targetWorkspace.uri.fsPath,
-              "gsclsp.config.json",
+          if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
+            window.showErrorMessage(
+              "GSCLSP: Open a local workspace folder to save gsclsp.config.json",
             );
+            return;
+          }
+
+          const configPath = path.join(targetWorkspace.uri.fsPath, "gsclsp.config.json");
+
+          try {
+            let config: { dumpPaths?: Record<string, string> } = {};
 
             try {
-              let config: { dumpPaths?: Record<string, string> } = {};
-
-              try {
-                const existing = await fs.readFile(configPath, "utf8");
-                const parsed = JSON.parse(existing) as unknown;
-                if (parsed && typeof parsed === "object") {
-                  config = parsed as typeof config;
-                }
-              } catch {
-                config = {};
+              const existing = await fs.readFile(configPath, "utf8");
+              const parsed = JSON.parse(existing) as unknown;
+              if (parsed && typeof parsed === "object") {
+                config = parsed as typeof config;
               }
-
-              const game = (await readTargetGame()) ?? "iw4";
-              config.dumpPaths = { ...(config.dumpPaths ?? {}), [game]: newPath };
-
-              await fs.writeFile(
-                configPath,
-                JSON.stringify(config, null, 2),
-                "utf8",
-              );
-
-              window.showInformationMessage(
-                `GSCLSP: Set dump folder for ${game.toUpperCase()}`,
-              );
-            } catch (error) {
-              const message =
-                error instanceof Error ? error.message : String(error);
-              window.showErrorMessage(`GSCLSP: Failed to write gsclsp.config.json: ${message}`);
+            } catch {
+              config = {};
             }
 
-            return new Promise((resolve) => setTimeout(resolve, 2000));
-          },
-        );
-      }
-    },
-  );
+            const game = (await readTargetGame()) ?? "iw4";
+            config.dumpPaths = { ...config.dumpPaths, [game]: newPath };
+
+            await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+
+            window.showInformationMessage(`GSCLSP: Set dump folder for ${game.toUpperCase()}`);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            window.showErrorMessage(`GSCLSP: Failed to write gsclsp.config.json: ${message}`);
+          }
+
+          return new Promise((resolve) => setTimeout(resolve, 2000));
+        },
+      );
+    }
+  });
 
   context.subscriptions.push(browseCommand);
 
@@ -320,20 +304,10 @@ export async function activate(context: ExtensionContext): Promise<void> {
   window.showInformationMessage("BBE Tools: GSC Extension is spawning");
 
   const debugExe = context.asAbsolutePath(
-    path.join(
-      "..",
-      "GSCLSP.Server",
-      "bin",
-      "Release",
-      "net10.0",
-      "win-x64",
-      "GSCLSP.Server.exe",
-    ),
+    path.join("..", "GSCLSP.Server", "bin", "Release", "net10.0", "win-x64", "GSCLSP.Server.exe"),
   );
 
-  const serverExe = context.asAbsolutePath(
-    path.join("out", "GSCLSP.Server.exe"),
-  );
+  const serverExe = context.asAbsolutePath(path.join("out", "GSCLSP.Server.exe"));
 
   const serverOptions: ServerOptions = {
     run: {
@@ -346,25 +320,31 @@ export async function activate(context: ExtensionContext): Promise<void> {
     },
   };
 
+  const trace = workspace.getConfiguration("gsclsp").get<string>("trace.server", "verbose");
+
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "gsc" }],
     outputChannel,
     synchronize: {
       fileEvents: workspace.createFileSystemWatcher("**/*.gsc"),
     },
+    revealOutputChannelOn: RevealOutputChannelOn.Never,
+    initializationOptions: {
+      trace: trace,
+    },
   };
 
-  client = new LanguageClient(
-    "gscServer",
-    "GSC Language Server",
-    serverOptions,
-    clientOptions,
-  );
+  client = new LanguageClient("gscServer", "GSC Language Server", serverOptions, clientOptions);
 
   context.subscriptions.push(client);
 
+  await client.start();
+
   if (context.extensionMode === ExtensionMode.Development) {
     await client.setTrace(Trace.Verbose);
+    if ("logLevel" in outputChannel) {
+      (outputChannel as any).logLevel = LogLevel.Debug;
+    }
   } else {
     await client.setTrace(Trace.Off);
   }
@@ -399,9 +379,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
     client.onNotification("custom/inactiveRegions", handleInactiveRegions),
   );
 
-  context.subscriptions.push(
-    client.onNotification("custom/dumpStatus", handleDumpStatus),
-  );
+  context.subscriptions.push(client.onNotification("custom/dumpStatus", handleDumpStatus));
 
   context.subscriptions.push(
     workspace.onDidCloseTextDocument((doc) => {
@@ -415,8 +393,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
       for (const e of editors) applyDecorationsFor(e);
     }),
   );
-
-  await client.start();
 }
 
 export async function deactivate(): Promise<void> {

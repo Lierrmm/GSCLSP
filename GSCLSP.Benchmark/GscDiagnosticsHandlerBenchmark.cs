@@ -6,6 +6,7 @@ using BenchmarkDotNet.Attributes;
 using GSCLSP.Core.Indexing;
 using GSCLSP.Server.Handlers;
 using Microsoft.VSDiagnostics;
+using Microsoft.Extensions.Logging;
 
 namespace GSCLSP.Benchmark;
 
@@ -21,7 +22,8 @@ public class GscDiagnosticsHandlerBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _indexer = new GscIndexer();
+        var logger = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+        _indexer = new GscIndexer(logger);
 
         _tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-diagnostics-" + Guid.NewGuid());
         Directory.CreateDirectory(_tempDir);
@@ -105,7 +107,7 @@ on_player_spawn(player)
         _indexer.IndexWorkspace(_tempDir);
         _testFilePath = Path.Combine(_tempDir, "scripts", "main.gsc");
 
-        _diagnosticsHandler = new GscDiagnosticsHandler(_indexer, null!, new GscDocumentStore());
+        _diagnosticsHandler = new GscDiagnosticsHandler(_indexer, null!, new GscDocumentStore(), Microsoft.Extensions.Logging.Abstractions.NullLogger<GscDiagnosticsHandler>.Instance);
     }
 
     [Benchmark]

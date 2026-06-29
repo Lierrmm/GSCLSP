@@ -1,10 +1,11 @@
 # GSCLSP
 
-[Visual Studio Code](https://code.visualstudio.com/) language support for *Call of Duty®*'s scripting language `.gsc`, `.gsh`, `.csc`, and `.csh` files, powered by the **GSCLSP [C# language server](https://github.com/Lierrmm/GSCLSP/tree/main/GSCLSP.Server)**.
+[Visual Studio Code](https://code.visualstudio.com/) language support for _Call of Duty®_'s scripting language `.gsc`, `.gsh`, `.csc`, and `.csh` files, powered by the **GSCLSP [C# language server](https://github.com/Lierrmm/GSCLSP/tree/main/GSCLSP.Server)**.
 
 ## Features
 
 ### Syntax Highlighting
+
 - Adds colored keywording
 - "Dead code" zones for early returns & unused preprocessors
 <div align="center"> 
@@ -12,6 +13,7 @@
 </div>
 
 ### Code Completion
+
 - Local workspace & your choice of dump symbols
 - Engine built-ins per target game
 - Context-aware suggestions, functions, and more
@@ -24,10 +26,12 @@
 ### Go to Definition & Go to References
 
 When you **Right mouse click** on any user-defined function or local variable, you can:
+
 - use the `Go to Definition` button to quickly jump to the line its defined at
 - use the `Go to References` or `Find All References` button to find every place that calls it
 
 This works for any function or local variable defined in GSC, including `#include`/`#using` GSC paths.
+
 <div align="center"> 
 <img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" width="90%">
 </div>
@@ -35,11 +39,13 @@ This works for any function or local variable defined in GSC, including `#includ
 ### Hover Information
 
 When you hover your mouse cursor over any sort of function, macro, variable, or file path, a hover box will appear giving detailed information about what you are hovering. This includes line information, any comments **above the definition of the function/variable**, and any additional comments official documents contain.
+
 <div align="center"> 
 <img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" width="70%">
 </div>
 
 ### Diagnostics
+
 - `gsclsp.unresolvedFunction`: Unresolved function calls
 - `gsclsp.recursiveFunction`: Recursive function warning
 - `gsclsp.missingSemicolon`: Missing semicolon
@@ -48,6 +54,7 @@ When you hover your mouse cursor over any sort of function, macro, variable, or 
 - `gsclsp.missingAnimtree`: Sanity check #animtree for valid #using_animtree
 
 ### Code Actions
+
 - Quick fix to insert `#include ...` for unresolved functions
 
 ## Project Setup
@@ -68,7 +75,7 @@ Dump folders are used per game by `dumpPaths` in the config. The current `game` 
 
 ## Choosing Your Target Game
 
-Once you are inside a valid *GSC* file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP change the built-ins list and gives accurate diagnostics.
+Once you are inside a valid _GSC_ file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP change the built-ins list and gives accurate diagnostics.
 
 If the active game has no entry in `dumpPaths`, no dump is indexed (workspace symbols and engine builtins still work).
 

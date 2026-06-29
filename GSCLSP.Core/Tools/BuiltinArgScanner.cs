@@ -57,7 +57,6 @@ public static partial class BuiltinArgScanner
         Apply(methods, methodStats, includeArgsArray, aliasMap?.MethodsById);
 
         var options = new JsonSerializerOptions { WriteIndented = true };
-        Console.WriteLine("Writing results to " + builtinsJsonPath);
         await File.WriteAllTextAsync(builtinsJsonPath, root.ToJsonString(options), ct);
 
         if (!string.IsNullOrWhiteSpace(matchesLogPath))

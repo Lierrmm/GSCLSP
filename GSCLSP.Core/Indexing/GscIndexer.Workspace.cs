@@ -1,4 +1,5 @@
 using GSCLSP.Core.Models;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
@@ -9,7 +10,7 @@ public partial class GscIndexer
 {
     public void IndexWorkspace(string workspacePath)
     {
-        Console.Error.WriteLine($"Indexing Workspace {workspacePath}");
+        _logger.LogDebug("Indexing Workspace {WorkspacePath}", workspacePath);
         var localSymbols = new List<GscSymbol>();
 
         if (!Directory.Exists(workspacePath)) return;
@@ -47,9 +48,9 @@ public partial class GscIndexer
         PreWarmScanCache(localSymbols);
     }
 
-    private static void PreWarmScanCache(List<GscSymbol> symbols)
+    private void PreWarmScanCache(List<GscSymbol> symbols)
     {
-        Console.Error.WriteLine($"GSCLSP: Pre-warming scan cache for {symbols.Count} functions...");
+        _logger.LogDebug("Pre-warming scan cache for {SymbolCount} functions", symbols.Count);
         var sw = Stopwatch.StartNew();
 
         foreach (var symbol in symbols)
@@ -62,7 +63,7 @@ public partial class GscIndexer
         }
 
         sw.Stop();
-        Console.Error.WriteLine($"GSCLSP: Scan cache pre-warmed {symbols.Count} symbols in {sw.Elapsed.TotalMilliseconds:N2}ms");
+        _logger.LogDebug("Scan cache pre-warmed {SymbolCount} symbols in {ElapsedMilliseconds:N2}ms", symbols.Count, sw.Elapsed.TotalMilliseconds);
     }
 
     public string GetFileContent(string filePath)
@@ -107,11 +108,11 @@ public partial class GscIndexer
             _fileWatcher.Deleted += OnFileChanged;
             _fileWatcher.Renamed += OnFileRenamed;
 
-            Console.Error.WriteLine($"GSCLSP: File watching started for {WorkspacePath}");
+            _logger.LogDebug("File watching started for {WorkspacePath}", WorkspacePath);
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"GSCLSP: File watching failed: {ex.Message}");
+            _logger.LogError(ex, "File watching failed for {WorkspacePath}", WorkspacePath);
         }
     }
 
@@ -150,7 +151,7 @@ public partial class GscIndexer
             _pendingChanges.Clear();
         }
 
-        Console.Error.WriteLine($"GSCLSP: Updating {changes.Count} files");
+        _logger.LogDebug("Processing {ChangeCount} pending changes", changes.Count);
 
         var updatedSymbols = new List<GscSymbol>(WorkspaceSymbols);
 
@@ -181,7 +182,7 @@ public partial class GscIndexer
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"GSCLSP: Error re-parsing {filePath}: {ex.Message}");
+                    _logger.LogError(ex, "Error re-parsing {FilePath}", filePath);
                 }
             }
             else
@@ -191,7 +192,7 @@ public partial class GscIndexer
         }
 
         WorkspaceSymbols = updatedSymbols;
-        Console.Error.WriteLine($"GSCLSP: Workspace updated. {WorkspaceSymbols.Count} symbols now indexed.");
+        _logger.LogDebug("Workspace updated. {SymbolCount} symbols now indexed", WorkspaceSymbols.Count);
     }
 
     private static int GetLineNumberFromIndex(string content, int index)

@@ -18,10 +18,10 @@ public class GscDocumentStore
     public IEnumerable<KeyValuePair<DocumentUri, string>> OpenDocuments => _documents;
 }
 
-public class GscDocumentSyncHandler(GscDocumentStore store, GscDiagnosticsHandler diagnosticsHandler) : TextDocumentSyncHandlerBase
+public class GscDocumentSyncHandler(GscDocumentStore store, Lazy<GscDiagnosticsHandler> diagnosticsHandler) : TextDocumentSyncHandlerBase
 {
     private readonly GscDocumentStore _store = store;
-    private readonly GscDiagnosticsHandler _diagnosticsHandler = diagnosticsHandler;
+    private readonly Lazy<GscDiagnosticsHandler> _diagnosticsHandler = diagnosticsHandler;
 
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri) =>
         new(uri, "gsc");
@@ -29,7 +29,7 @@ public class GscDocumentSyncHandler(GscDocumentStore store, GscDiagnosticsHandle
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         _store.Update(request.TextDocument.Uri, request.TextDocument.Text);
-        await _diagnosticsHandler.PublishAsync(request.TextDocument.Uri, request.TextDocument.Text, cancellationToken);
+        await _diagnosticsHandler.Value.PublishAsync(request.TextDocument.Uri, request.TextDocument.Text, cancellationToken);
         return Unit.Value;
     }
 
@@ -40,7 +40,7 @@ public class GscDocumentSyncHandler(GscDocumentStore store, GscDiagnosticsHandle
             if (change.Range == null)
             {
                 _store.Update(request.TextDocument.Uri, change.Text);
-                await _diagnosticsHandler.PublishAsync(request.TextDocument.Uri, change.Text, cancellationToken);
+                await _diagnosticsHandler.Value.PublishAsync(request.TextDocument.Uri, change.Text, cancellationToken);
             }
         }
         return Unit.Value;
@@ -49,7 +49,7 @@ public class GscDocumentSyncHandler(GscDocumentStore store, GscDiagnosticsHandle
     public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
     {
         _store.Remove(request.TextDocument.Uri);
-        await _diagnosticsHandler.ClearAsync(request.TextDocument.Uri, cancellationToken);
+        await _diagnosticsHandler.Value.ClearAsync(request.TextDocument.Uri, cancellationToken);
         return Unit.Value;
     }
 
