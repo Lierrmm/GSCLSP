@@ -44,6 +44,9 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton(provider =>
                 new GscIndexer(provider.GetRequiredService<ILogger<GscIndexer>>()));
             services.AddScoped<GscDiagnosticsHandler>();
+            // Provide a Lazy<GscDiagnosticsHandler> wrapper so handlers depending on Lazy<T> can be resolved
+            services.AddScoped(provider =>
+                new Lazy<GscDiagnosticsHandler>(() => provider.GetRequiredService<GscDiagnosticsHandler>()));
         })
         .WithHandler<GscDocumentSyncHandler>()
         .WithHandler<GscDefinitionHandler>()
@@ -55,11 +58,15 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscConfigReloadHandler>()
         .OnInitialize((server, request, token) =>
         {
+            var loggerFactory = server.Services.GetRequiredService<ILoggerFactory>();
             var diIndexer = server.Services.GetRequiredService<GscIndexer>();
 
             var workspacePath = request.RootPath
                 ?? request.RootUri?.GetFileSystemPath()
                 ?? request.WorkspaceFolders?.FirstOrDefault()?.Uri?.GetFileSystemPath();
+
+
+            var logger = loggerFactory.CreateLogger("ServerStartup");
 
             _ = Task.Run(() =>
             {
@@ -73,8 +80,6 @@ var server = await LanguageServer.From(options =>
                 }
             }, token);
 
-            var loggerFactory = server.Services.GetRequiredService<ILoggerFactory>();
-            var logger = loggerFactory.CreateLogger("ServerStartup");
 
             logger.LogInformation("Running GSC LSP Server");
 

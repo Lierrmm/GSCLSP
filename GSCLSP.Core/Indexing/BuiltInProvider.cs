@@ -57,7 +57,7 @@ public class BuiltInProvider(ILogger logger)
             }
 
             ReplaceSnapshot(builtInFunctions, builtInMethods);
-            logger.LogInformation("Loaded {builtInFunctions.Count} engine built-in functions and {builtInMethods.Count} engine built-in methods.", builtInFunctions.Count, builtInMethods.Count);
+            logger.LogInformation("Loaded {builtInFunctionsCount} engine built-in functions and {builtInMethodsCount} engine built-in methods.", builtInFunctions.Count, builtInMethods.Count);
         }
         catch (Exception ex)
         {

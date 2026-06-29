@@ -10,7 +10,7 @@ using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
 
-public class GscDiagnosticsHandler
+public class GscDiagnosticsHandler : IDisposable
 {
     public const string UnresolvedFunctionDiagnosticCode = "gsclsp.unresolvedFunction";
     public const string RecursiveFunctionWarningCode = "gsclsp.recursiveFunction";
@@ -23,6 +23,8 @@ public class GscDiagnosticsHandler
     private readonly GscDocumentStore _documentStore;
     private CancellationTokenSource? _republishCancellationTokenSource;
     private readonly ILogger<GscDiagnosticsHandler> _logger;
+    private readonly Action<string> _onGameChanged;
+    private readonly Action<string, bool> _onDumpStatusChanged;
 
     public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore, ILogger<GscDiagnosticsHandler> logger)
     {
@@ -33,8 +35,9 @@ public class GscDiagnosticsHandler
 
         _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer, _logger);
 
-        _indexer.GameChanged += _ => StartRepublishAllOpenDocuments();
-        _indexer.DumpStatusChanged += (game, hasDump) =>
+        // Use stored delegate instances so we can unsubscribe later (Dispose)
+        _onGameChanged = _ => StartRepublishAllOpenDocuments();
+        _onDumpStatusChanged = (game, hasDump) =>
         {
             try
             {
@@ -45,6 +48,9 @@ public class GscDiagnosticsHandler
                 // Silently ignore if server is not yet initialized
             }
         };
+
+        _indexer.GameChanged += _onGameChanged;
+        _indexer.DumpStatusChanged += _onDumpStatusChanged;
     }
 
     private void StartRepublishAllOpenDocuments()
@@ -282,6 +288,36 @@ public class GscDiagnosticsHandler
             normalizedScript += ".gsc";
 
         return normalizedFile.EndsWith(normalizedScript, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            if (_onGameChanged is not null)
+                _indexer.GameChanged -= _onGameChanged;
+        }
+        catch { }
+
+        try
+        {
+            if (_onDumpStatusChanged is not null)
+                _indexer.DumpStatusChanged -= _onDumpStatusChanged;
+        }
+        catch { }
+
+        try
+        {
+            var previous = Interlocked.Exchange(ref _republishCancellationTokenSource, null);
+            if (previous != null)
+            {
+                try { previous.Cancel(); } catch { }
+                try { previous.Dispose(); } catch { }
+            }
+        }
+        catch { }
+
+        GC.SuppressFinalize(this);
     }
 
     private sealed record IncludedFileScope(string Path, HashSet<string> Functions);

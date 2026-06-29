@@ -318,6 +318,8 @@ export async function activate(context: ExtensionContext): Promise<void> {
     },
   };
 
+  const trace = workspace.getConfiguration("gsclsp").get<string>("trace.server", "verbose");
+
   const clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: "file", language: "gsc" }],
     outputChannel,
@@ -326,7 +328,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
     },
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     initializationOptions: {
-      trace: "verbose",
+      trace: trace,
     },
   };
 
