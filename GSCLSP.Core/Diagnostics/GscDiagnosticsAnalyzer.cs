@@ -626,14 +626,14 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             if (isTreyarch)
             {
                 var nsFilePath = _indexer.ResolveNamespaceToFilePath(qualifiedPath, currentFilePath);
-                if (nsFilePath != null)
-                {
-                    return _indexer.WorkspaceSymbols
-                        .Concat(_indexer.Symbols)
-                        .Any(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
-                                  s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
-                                  !s.IsPrivate);
-                }
+                if (nsFilePath == null)
+                    return false;
+
+                return _indexer.WorkspaceSymbols
+                    .Concat(_indexer.Symbols)
+                    .Any(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
+                              s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
+                              !s.IsPrivate);
             }
 
             if (includedFiles.Any(f => PathMatches(f.Path, qualifiedPath) && f.Functions.Contains(functionName)))
