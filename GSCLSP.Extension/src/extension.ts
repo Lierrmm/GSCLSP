@@ -63,13 +63,15 @@ function targetWorkspaceFolder(): WorkspaceFolder | undefined {
 
 async function readWorkspaceConfig(folder: WorkspaceFolder): Promise<Record<string, unknown>> {
   const configPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
+  let raw: string;
   try {
-    const existing = await fs.readFile(configPath, "utf8");
-    const parsed = JSON.parse(existing) as unknown;
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
+    raw = await fs.readFile(configPath, "utf8");
+  } catch (err: unknown) {
+    if (err instanceof Error && (err as NodeJS.ErrnoException).code === "ENOENT") return {};
+    throw err;
   }
+  const parsed = JSON.parse(raw) as unknown;
+  return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
 }
 
 async function writeWorkspaceConfig(
@@ -125,7 +127,7 @@ async function selectTargetGameCommand(): Promise<void> {
     if (!input) return;
     chosen = input.trim().toLowerCase();
     if (!/^[a-z0-9_]+$/.test(chosen)) {
-      window.showErrorMessage(`GSCLSP: Invalid game identifier "${input}. Please try again.`);
+      window.showErrorMessage(`GSCLSP: Invalid game identifier "${input}". Please try again.`);
       return;
     }
   }
@@ -252,10 +254,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
         async (progress) => {
           progress.report({ message: "Re-indexing dump..." });
 
-          const activeUri = window.activeTextEditor?.document.uri;
-          const targetWorkspace = activeUri
-            ? workspace.getWorkspaceFolder(activeUri)
-            : workspace.workspaceFolders?.[0];
+          const targetWorkspace = targetWorkspaceFolder();
 
           if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
             window.showErrorMessage(
@@ -267,27 +266,17 @@ export async function activate(context: ExtensionContext): Promise<void> {
           const configPath = path.join(targetWorkspace.uri.fsPath, "gsclsp.config.json");
 
           try {
-            let config: { dumpPaths?: Record<string, string> } = {};
-
-            try {
-              const existing = await fs.readFile(configPath, "utf8");
-              const parsed = JSON.parse(existing) as unknown;
-              if (parsed && typeof parsed === "object") {
-                config = parsed as typeof config;
-              }
-            } catch {
-              config = {};
-            }
+            const config = await readWorkspaceConfig(targetWorkspace) as { dumpPaths?: Record<string, string> };
 
             const game = (await readTargetGame()) ?? "iw4";
             config.dumpPaths = { ...config.dumpPaths, [game]: newPath };
 
-            await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+            await writeWorkspaceConfig(targetWorkspace, config as Record<string, unknown>);
 
             window.showInformationMessage(`GSCLSP: Set dump folder for ${game.toUpperCase()}`);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            window.showErrorMessage(`GSCLSP: Failed to write gsclsp.config.json: ${message}`);
+            window.showErrorMessage(`GSCLSP: Failed to update gsclsp.config.json: ${message}`);
           }
 
           return new Promise((resolve) => setTimeout(resolve, 2000));
@@ -326,7 +315,12 @@ export async function activate(context: ExtensionContext): Promise<void> {
     documentSelector: [{ scheme: "file", language: "gsc" }],
     outputChannel,
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher("**/*.gsc"),
+      fileEvents: [
+        workspace.createFileSystemWatcher("**/*.gsc"),
+        workspace.createFileSystemWatcher("**/*.gsh"),
+        workspace.createFileSystemWatcher("**/*.csc"),
+        workspace.createFileSystemWatcher("**/*.csh"),
+      ],
     },
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     initializationOptions: {

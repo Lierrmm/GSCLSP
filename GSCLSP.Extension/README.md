@@ -9,7 +9,7 @@
 - Adds colored keywording
 - "Dead code" zones for early returns & unused preprocessors
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/syntax1.png" width="60%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/syntax1.png" alt="Syntax highlighting screenshot" width="60%">
 </div>
 
 ### Code Completion
@@ -19,21 +19,21 @@
 - Context-aware suggestions, functions, and more
 - Preprocessor directives and global/local variable completions
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion1.png" width="60%">
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion3-preprocessor.png" width="75%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion1.png" alt="Code completion screenshot" width="60%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion3-preprocessor.png" alt="Preprocessor completion screenshot" width="75%">
 </div>
 
 ### Go to Definition & Go to References
 
 When you **Right mouse click** on any user-defined function or local variable, you can:
 
-- use the `Go to Definition` button to quickly jump to the line its defined at
+- use the `Go to Definition` button to quickly jump to the line it's defined on
 - use the `Go to References` or `Find All References` button to find every place that calls it
 
 This works for any function or local variable defined in GSC, including `#include`/`#using` GSC paths.
 
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" width="90%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" alt="Go to Definition and References screenshot" width="90%">
 </div>
 
 ### Hover Information
@@ -41,7 +41,7 @@ This works for any function or local variable defined in GSC, including `#includ
 When you hover your mouse cursor over any sort of function, macro, variable, or file path, a hover box will appear giving detailed information about what you are hovering. This includes line information, any comments **above the definition of the function/variable**, and any additional comments official documents contain.
 
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" width="70%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" alt="Hover information screenshot" width="70%">
 </div>
 
 ### Diagnostics
