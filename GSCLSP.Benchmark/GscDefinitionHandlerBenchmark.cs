@@ -6,6 +6,7 @@ using BenchmarkDotNet.Attributes;
 using GSCLSP.Core.Indexing;
 using GSCLSP.Server.Handlers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Microsoft.Extensions.Logging;
 
 namespace GSCLSP.Benchmark;
 
@@ -19,7 +20,7 @@ public class GscDefinitionHandlerBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        _indexer = new GscIndexer();
+        _indexer = new GscIndexer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
         _definitionHandler = new GscDefinitionHandler(_indexer, null);
         // Create test workspace
         string tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-definition-" + Guid.NewGuid());
