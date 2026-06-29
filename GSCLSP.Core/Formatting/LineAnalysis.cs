@@ -16,7 +16,8 @@ internal readonly record struct LineAnalysis(
     int LeadingClosers,
     string FirstWord,
     IReadOnlyList<BraceEvent> Braces,
-    int OpenDelta
+    int OpenDelta,
+    bool HasCodeAfterBlockEnd
 );
 
 internal static class LineAnalyzer
@@ -206,6 +207,7 @@ internal static class LineAnalyzer
 
         var trimmed = line.Trim();
         var isBlank = firstSig < 0 && !inBlockComment;
+        var hasCodeAfterBlock = inBlockComment && codeStarted;
         var isCommentOnly = !codeStarted && !isBlank && !inBlockComment;
         var hasOpenBrace = braces.Exists(b => b.Open);
         var isBracelessHeader =
@@ -220,7 +222,7 @@ internal static class LineAnalyzer
             Trimmed: trimmed,
             IsBlank: isBlank,
             IsCommentOnly: isCommentOnly,
-            Respaceable: codeStarted && !inBlockComment && !hasInlineBlockComment,
+            Respaceable: codeStarted && !hasInlineBlockComment,
             CommentAt: commentAt,
             StartsWithOpenBrace: firstSigChar == '{',
             IsBracelessHeader: isBracelessHeader,
@@ -229,7 +231,8 @@ internal static class LineAnalyzer
             LeadingClosers: leadingClosers,
             FirstWord: firstWord,
             Braces: braces,
-            OpenDelta: openDelta
+            OpenDelta: openDelta,
+            HasCodeAfterBlockEnd: hasCodeAfterBlock
         );
     }
 }

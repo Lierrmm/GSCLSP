@@ -44,6 +44,7 @@ public static class GscFormatter
         selection = GscRespacer.Respace(selection, seedInBlock);
         selection = GscBraceRewriter.ToAllman(selection, seedInBlock);
         selection = GscIndenter.Indent(selection, indentUnit, state);
+        selection = GscFormatterCleanup.Cleanup(selection);
 
         return string.Join(eol, selection);
     }

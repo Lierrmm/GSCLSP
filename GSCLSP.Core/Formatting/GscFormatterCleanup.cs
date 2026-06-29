@@ -13,7 +13,7 @@ internal static class GscFormatterCleanup
             if (l.Length == 0)
             {
                 var prevKept = result.Count > 0 ? result[^1] : null;
-                var afterOpen = prevKept is not null && prevKept.EndsWith('{');
+                var afterOpen = prevKept is not null && CodeEndsWith(prevKept, '{');
 
                 var j = i + 1;
                 while (j < lines.Count && lines[j].Length == 0) j++;
@@ -38,5 +38,40 @@ internal static class GscFormatterCleanup
             result.RemoveAt(result.Count - 1);
 
         return result;
+    }
+
+    private static bool CodeEndsWith(string line, char c)
+    {
+        var n = line.Length;
+        var lastCode = -1;
+        var inStr = false;
+        var sc = '\0';
+        var inBlk = false;
+        var i = 0;
+
+        while (i < n)
+        {
+            var ch = line[i];
+            var ch2 = i + 1 < n ? line[i + 1] : '\0';
+
+            if (inBlk)
+            {
+                if (ch == '*' && ch2 == '/') { inBlk = false; i += 2; continue; }
+                i++; continue;
+            }
+            if (inStr)
+            {
+                if (ch == '\\') { i += 2; continue; }
+                if (ch == sc) inStr = false;
+                i++; continue;
+            }
+            if (ch == '/' && ch2 == '/') break;
+            if (ch == '/' && ch2 == '*') { inBlk = true; i += 2; continue; }
+            if (ch == '"' || ch == '\'') { inStr = true; sc = ch; i++; continue; }
+            if (ch is not ' ' and not '\t') lastCode = i;
+            i++;
+        }
+
+        return lastCode >= 0 && line[lastCode] == c;
     }
 }

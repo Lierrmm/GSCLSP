@@ -35,7 +35,7 @@ internal static class GscIndenter
         state.PendingSwitchBrace = info.EndsExpectingSwitchBrace;
 
         if (info.IsBlank) return "";
-        if (startedInBlock) return info.TrimmedEnd;
+        if (startedInBlock && !info.HasCodeAfterBlockEnd) return info.TrimmedEnd;
 
         var stack = state.Stack;
         if (info.StartsWithOpenBrace)
@@ -44,7 +44,8 @@ internal static class GscIndenter
                 stack.RemoveAt(stack.Count - 1);
         }
 
-        var isLabel = info.FirstWord is "case" or "default";
+        var isLabel = info.FirstWord.Equals("case", StringComparison.OrdinalIgnoreCase) ||
+                      info.FirstWord.Equals("default", StringComparison.OrdinalIgnoreCase);
         var continuation = (state.ParenCarry > 0 || state.PrevContinuesExpr) ? 1 : 0;
         var indentLevel = IndentForLine(stack, info.LeadingClosers, isLabel) + continuation;
         var output = indentLevel > 0 ? string.Concat(Enumerable.Repeat(indentUnit, indentLevel)) + info.Trimmed : info.Trimmed;

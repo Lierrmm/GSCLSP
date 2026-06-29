@@ -29,7 +29,7 @@ internal static class GscRespacer
             inBlock = info.EndsInBlockComment;
 
             if (info.IsBlank) { res.Add(""); continue; }
-            if (startedInBlock) { res.Add(info.TrimmedEnd); continue; }
+            if (startedInBlock && !info.HasCodeAfterBlockEnd) { res.Add(info.TrimmedEnd); continue; }
             if (info.IsCommentOnly || !info.Respaceable) { res.Add(info.Trimmed); continue; }
 
             var codeRaw = info.CommentAt >= 0 ? rawLine[..info.CommentAt] : rawLine;

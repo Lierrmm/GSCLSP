@@ -18,7 +18,7 @@ internal static class GscBraceRewriter
             var cur = s.Code;
             var pieces = new List<string>();
 
-            if (Regex.IsMatch(cur, @"^\}\s*else\b"))
+            if (Regex.IsMatch(cur, @"^\}\s*else\b", RegexOptions.IgnoreCase))
             {
                 pieces.Add(s.Indent + "}");
                 cur = Regex.Replace(cur, @"^\}\s*", "");
