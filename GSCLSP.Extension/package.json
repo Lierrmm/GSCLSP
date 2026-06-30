@@ -33,7 +33,7 @@
     "@types/node": "^24.13.2",
     "@types/vscode": "^1.75.0",
     "@vscode/vsce": "latest",
-    "oxfmt": "^0.56.0",
+    "oxfmt": "^0.57.0",
     "oxlint": "^1.71.0",
     "typescript": "^6.0.0"
   },
