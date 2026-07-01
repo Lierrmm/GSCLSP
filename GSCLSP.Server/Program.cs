@@ -56,6 +56,8 @@ var server = await LanguageServer.From(options =>
         .WithHandler<GscCodeActionHandler>()
         .WithHandler<GscRenameHandler>()
         .WithHandler<GscConfigReloadHandler>()
+        .WithHandler<GscFormattingHandler>()
+        .WithHandler<GscRangeFormattingHandler>()
         .OnInitialize((server, request, token) =>
         {
             var loggerFactory = server.Services.GetRequiredService<ILoggerFactory>();
