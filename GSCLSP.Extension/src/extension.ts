@@ -48,8 +48,10 @@ const KNOWN_GAMES = [
   "t6",
   "t7",
   "t8",
+  "t9",
   "h1",
   "h2",
+  "jup"
 ];
 
 function targetWorkspaceFolder(): WorkspaceFolder | undefined {
@@ -130,7 +132,7 @@ async function selectTargetGameCommand(): Promise<void> {
     if (!input) return;
     chosen = input.trim().toLowerCase();
     if (!/^[a-z0-9_]+$/.test(chosen)) {
-      window.showErrorMessage(`GSCLSP: Invalid game identifier "${input}. Please try again.`);
+      window.showErrorMessage(`GSCLSP: Invalid game identifier "${input}". Please try again.`);
       return;
     }
   }
@@ -276,10 +278,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
         async (progress) => {
           progress.report({ message: "Re-indexing dump..." });
 
-          const activeUri = window.activeTextEditor?.document.uri;
-          const targetWorkspace = activeUri
-            ? workspace.getWorkspaceFolder(activeUri)
-            : workspace.workspaceFolders?.[0];
+          const targetWorkspace = targetWorkspaceFolder();
 
           if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
             window.showErrorMessage(
@@ -337,7 +336,12 @@ export async function activate(context: ExtensionContext): Promise<void> {
     documentSelector: [{ scheme: "file", language: "gsc" }],
     outputChannel,
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher("**/*.gsc"),
+      fileEvents: [
+        workspace.createFileSystemWatcher("**/*.gsc"),
+        workspace.createFileSystemWatcher("**/*.gsh"),
+        workspace.createFileSystemWatcher("**/*.csc"),
+        workspace.createFileSystemWatcher("**/*.csh"),
+      ],
     },
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     initializationOptions: {

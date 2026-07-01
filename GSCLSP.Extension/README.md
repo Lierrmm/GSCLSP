@@ -9,7 +9,7 @@
 - Adds colored keywording
 - "Dead code" zones for early returns & unused preprocessors
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/syntax1.png" width="60%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/syntax1.png" alt="Syntax highlighting screenshot" width="60%">
 </div>
 
 ### Code Completion
@@ -19,21 +19,21 @@
 - Context-aware suggestions, functions, and more
 - Preprocessor directives and global/local variable completions
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion1.png" width="60%">
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion3-preprocessor.png" width="75%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion1.png" alt="Code completion screenshot" width="60%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/completion3-preprocessor.png" alt="Preprocessor completion screenshot" width="75%">
 </div>
 
 ### Go to Definition & Go to References
 
 When you **Right mouse click** on any user-defined function or local variable, you can:
 
-- use the `Go to Definition` button to quickly jump to the line its defined at
+- use the `Go to Definition` button to quickly jump to the line it's defined on
 - use the `Go to References` or `Find All References` button to find every place that calls it
 
 This works for any function or local variable defined in GSC, including `#include`/`#using` GSC paths.
 
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" width="90%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/defandref.png" alt="Go to Definition and References screenshot" width="90%">
 </div>
 
 ### Hover Information
@@ -41,7 +41,7 @@ This works for any function or local variable defined in GSC, including `#includ
 When you hover your mouse cursor over any sort of function, macro, variable, or file path, a hover box will appear giving detailed information about what you are hovering. This includes line information, any comments **above the definition of the function/variable**, and any additional comments official documents contain.
 
 <div align="center"> 
-<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" width="70%">
+<img src="https://raw.githubusercontent.com/Lierrmm/GSCLSP/refs/heads/main/GSCLSP.Extension/images/hover1.png" alt="Hover information screenshot" width="70%">
 </div>
 
 ### Diagnostics
@@ -78,6 +78,23 @@ Dump folders are used per game by `dumpPaths` in the config. The current `game` 
 Once you are inside a valid _GSC_ file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP change the built-ins list and gives accurate diagnostics.
 
 If the active game has no entry in `dumpPaths`, no dump is indexed (workspace symbols and engine builtins still work).
+
+### JUP
+
+If working with JUP, IW9's hashes are the same and are applied to JUP's target game. 3arc syntax is required for JUP scripts, and it is **highly recommended** to point at `https://github.com/ate47/mwiii-source/tree/main/mp` for your GSC dump. for SP, use the `sp` folder instead.
+
+If you are overriding a GSC script but want the `#using` to resolve to your local file, make sure the first line of your source GSC includes a comment naming the file it's overriding.
+
+Normal GSC path example:
+```cpp
+// scripts\mp\art.gsc
+```
+
+Hashed GSC path example:
+```cpp
+// script_13645532f846e433
+```
+
 
 ## How to disable warnings/errors
 
