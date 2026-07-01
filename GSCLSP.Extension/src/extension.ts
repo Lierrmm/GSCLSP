@@ -59,10 +59,17 @@ function targetWorkspaceFolder(): WorkspaceFolder | undefined {
     : workspace.workspaceFolders?.[0];
 }
 
+function configDir(folder: WorkspaceFolder): string {
+  return path.join(folder.uri.fsPath, ".gsclsp");
+}
+
+function configPath(folder: WorkspaceFolder): string {
+  return path.join(configDir(folder), "config.json");
+}
+
 async function readWorkspaceConfig(folder: WorkspaceFolder): Promise<Record<string, unknown>> {
-  const configPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
   try {
-    const existing = await fs.readFile(configPath, "utf8");
+    const existing = await fs.readFile(configPath(folder), "utf8");
     const parsed = JSON.parse(existing) as unknown;
     return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
   } catch {
@@ -74,8 +81,8 @@ async function writeWorkspaceConfig(
   folder: WorkspaceFolder,
   config: Record<string, unknown>,
 ): Promise<void> {
-  const configPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
-  await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+  await fs.mkdir(configDir(folder), { recursive: true });
+  await fs.writeFile(configPath(folder), JSON.stringify(config, null, 2), "utf8");
 }
 
 async function readTargetGame(): Promise<string | undefined> {
@@ -185,12 +192,25 @@ async function ensureWorkspaceConfigFile(folder: WorkspaceFolder): Promise<void>
     return;
   }
 
-  const configPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
+  const newPath = configPath(folder);
+  const oldPath = path.join(folder.uri.fsPath, "gsclsp.config.json");
 
+  let needsCreate = false;
   try {
-    await fs.access(configPath);
+    await fs.access(newPath);
   } catch {
-    await fs.writeFile(configPath, "{}\n", "utf8");
+    needsCreate = true;
+  }
+
+  if (needsCreate) {
+    await fs.mkdir(configDir(folder), { recursive: true });
+    try {
+      const oldContent = await fs.readFile(oldPath, "utf8");
+      await fs.writeFile(newPath, oldContent, "utf8");
+      await fs.unlink(oldPath);
+    } catch {
+      await fs.writeFile(newPath, "{}\n", "utf8");
+    }
   }
 
   const config = await readWorkspaceConfig(folder);
@@ -257,35 +277,22 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
           if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
             window.showErrorMessage(
-              "GSCLSP: Open a local workspace folder to save gsclsp.config.json",
+              "GSCLSP: Open a local workspace folder to save config",
             );
             return;
           }
 
-          const configPath = path.join(targetWorkspace.uri.fsPath, "gsclsp.config.json");
-
           try {
-            let config: { dumpPaths?: Record<string, string> } = {};
-
-            try {
-              const existing = await fs.readFile(configPath, "utf8");
-              const parsed = JSON.parse(existing) as unknown;
-              if (parsed && typeof parsed === "object") {
-                config = parsed as typeof config;
-              }
-            } catch {
-              config = {};
-            }
-
+            const config = await readWorkspaceConfig(targetWorkspace);
             const game = (await readTargetGame()) ?? "iw4";
-            config.dumpPaths = { ...config.dumpPaths, [game]: newPath };
+            config.dumpPaths = { ...(config.dumpPaths as Record<string, string>), [game]: newPath };
 
-            await fs.writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
+            await writeWorkspaceConfig(targetWorkspace, config);
 
             window.showInformationMessage(`GSCLSP: Set dump folder for ${game.toUpperCase()}`);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            window.showErrorMessage(`GSCLSP: Failed to write gsclsp.config.json: ${message}`);
+            window.showErrorMessage(`GSCLSP: Failed to write .gsclsp/config.json: ${message}`);
           }
 
           return new Promise((resolve) => setTimeout(resolve, 2000));
@@ -361,7 +368,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
     await client.sendNotification("custom/reloadConfig", {});
   };
 
-  const configWatcher = workspace.createFileSystemWatcher("**/gsclsp.config.json");
+  const configWatcher = workspace.createFileSystemWatcher("**/.gsclsp/config.json");
   configWatcher.onDidChange(onConfigChanged);
   configWatcher.onDidCreate(onConfigChanged);
   configWatcher.onDidDelete(() => updateStatusBar());
