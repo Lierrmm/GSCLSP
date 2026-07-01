@@ -1385,7 +1385,7 @@ public partial class GscIndexer(ILogger logger)
         if (string.IsNullOrWhiteSpace(workspacePath) || !Directory.Exists(workspacePath))
             return (false, null);
 
-        var configPath = Path.Combine(workspacePath, "gsclsp.config.json");
+        var configPath = Path.Combine(workspacePath, ".gsclsp", "config.json");
         if (!File.Exists(configPath))
             return (false, null);
 

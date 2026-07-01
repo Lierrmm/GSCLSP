@@ -70,4 +70,13 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"^[A-Za-z0-9._/\-]+$")]
     public static partial Regex GitHubBranchRegex();
+
+    [GeneratedRegex(@"^\}\s*else\b", RegexOptions.IgnoreCase)]
+    public static partial Regex BraceElseRegex();
+
+    [GeneratedRegex(@"^\}\s*")]
+    public static partial Regex LeadingBraceRegex();
+
+    [GeneratedRegex(@"^\s*")]
+    public static partial Regex LeadingWhitespaceRegex();
 }

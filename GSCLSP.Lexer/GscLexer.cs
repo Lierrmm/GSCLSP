@@ -115,13 +115,14 @@ public sealed class GscLexer
 
     private bool IsStartOfDirective()
     {
-        if (_position == 0)
+        for (var i = _position - 1; i >= 0; i--)
         {
-            return true;
+            var ch = _source[i];
+            if (ch == '\n' || ch == '\r') return true;
+            if (ch != ' ' && ch != '\t') return false;
         }
 
-        var previous = _source[_position - 1];
-        return previous == '\n' || previous == '\r';
+        return true;
     }
 
     private void ReadWhitespace()
