@@ -204,12 +204,18 @@ async function ensureWorkspaceConfigFile(folder: WorkspaceFolder): Promise<void>
 
   if (needsCreate) {
     await fs.mkdir(configDir(folder), { recursive: true });
+    let migrated = false;
     try {
       const oldContent = await fs.readFile(oldPath, "utf8");
       await fs.writeFile(newPath, oldContent, "utf8");
-      await fs.unlink(oldPath);
+      migrated = true;
     } catch {
       await fs.writeFile(newPath, "{}\n", "utf8");
+    }
+    if (migrated) {
+      try {
+        await fs.unlink(oldPath);
+      } catch {}
     }
   }
 

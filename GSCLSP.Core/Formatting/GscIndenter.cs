@@ -30,13 +30,21 @@ internal static class GscIndenter
     private static bool IsPreprocessorDirective(string trimmed)
     {
         if (trimmed.Length == 0 || trimmed[0] != '#') return false;
-        return trimmed.StartsWith("#ifdef", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#ifndef", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#elifdef", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#elifndef", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#else", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#endif", StringComparison.OrdinalIgnoreCase)
-            || trimmed.StartsWith("#define", StringComparison.OrdinalIgnoreCase);
+        return MatchDirective(trimmed, "#ifdef")
+            || MatchDirective(trimmed, "#ifndef")
+            || MatchDirective(trimmed, "#elifdef")
+            || MatchDirective(trimmed, "#elifndef")
+            || MatchDirective(trimmed, "#else")
+            || MatchDirective(trimmed, "#endif")
+            || MatchDirective(trimmed, "#define");
+    }
+
+    private static bool MatchDirective(string trimmed, string directive)
+    {
+        if (!trimmed.StartsWith(directive, StringComparison.OrdinalIgnoreCase)) return false;
+        if (trimmed.Length == directive.Length) return true;
+        var next = trimmed[directive.Length];
+        return !char.IsLetterOrDigit(next) && next != '_';
     }
 
     public static string IndentLine(IndentState state, string line, string indentUnit)
