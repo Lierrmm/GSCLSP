@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Formatting;
 
@@ -18,10 +18,10 @@ internal static class GscBraceRewriter
             var cur = s.Code;
             var pieces = new List<string>();
 
-            if (Regex.IsMatch(cur, @"^\}\s*else\b", RegexOptions.IgnoreCase))
+            if (BraceElseRegex().IsMatch(cur))
             {
                 pieces.Add(s.Indent + "}");
-                cur = Regex.Replace(cur, @"^\}\s*", "");
+                cur = LeadingBraceRegex().Replace(cur, "", 1);
             }
 
             if (cur.Length > 1 && cur.EndsWith('{'))
@@ -100,7 +100,7 @@ internal static class GscBraceRewriter
             i++;
         }
 
-        var indentMatch = Regex.Match(line, @"^\s*");
+        var indentMatch = LeadingWhitespaceRegex().Match(line);
         var indent = indentMatch.Value;
         var codeRaw = commentAt >= 0 ? line[..commentAt] : line;
         var code = codeRaw.Trim();

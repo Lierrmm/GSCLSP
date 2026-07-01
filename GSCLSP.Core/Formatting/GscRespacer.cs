@@ -7,7 +7,7 @@ internal static class GscRespacer
 {
     private static readonly HashSet<string> KeywordsSpaceBeforeParen = new(StringComparer.OrdinalIgnoreCase)
     {
-        "if", "for", "while", "foreach", "switch", "return"
+        "if", "for", "while", "foreach", "switch", "return", "wait"
     };
 
     private static readonly HashSet<string> NonValueKeywords = new(StringComparer.OrdinalIgnoreCase)
@@ -167,7 +167,12 @@ internal static class GscRespacer
         if (R is TokenKind.CloseParen or TokenKind.CloseBracket) return false;
         if (L == TokenKind.OpenBrace && R == TokenKind.CloseBrace) return false;
         if (L == TokenKind.CloseBrace && R == TokenKind.CloseBrace) return false;
-        if (R == TokenKind.Dot) return false;
+        if (R == TokenKind.Dot)
+        {
+            if (L == TokenKind.Keyword && NonValueKeywords.Contains(prev.Text))
+                return true;
+            return false;
+        }
         if (R == TokenKind.Arrow) return false;
 
         if (R == TokenKind.DoubleColon)
@@ -211,8 +216,10 @@ internal static class GscRespacer
 
         if (R == TokenKind.OpenBracket)
         {
-            if (IsValueProducingName(prev) ||
-                L is TokenKind.CloseParen or TokenKind.CloseBracket)
+            var isDoubleBracket = i + 1 < tokens.Count && tokens[i + 1].Kind == TokenKind.OpenBracket;
+            if (!isDoubleBracket &&
+                (IsValueProducingName(prev) ||
+                 L is TokenKind.CloseParen or TokenKind.CloseBracket))
                 return false;
         }
 
@@ -240,7 +247,13 @@ internal static class GscRespacer
 
     private static bool IsUnary(List<Token> tokens, int idx)
     {
-        if (idx == 0) return true;
+        // very weird case in where multi line comments that have + or - before a string needs to not be formatted
+        if (idx == 0)
+        {
+            var next = idx + 1 < tokens.Count ? tokens[idx + 1] : (Token?)null;
+            return next?.Kind != TokenKind.String;
+        }
+
         var p = tokens[idx - 1];
         return p.Kind switch
         {

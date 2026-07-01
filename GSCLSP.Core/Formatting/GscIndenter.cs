@@ -27,6 +27,18 @@ internal static class GscIndenter
         return result;
     }
 
+    private static bool IsPreprocessorDirective(string trimmed)
+    {
+        if (trimmed.Length == 0 || trimmed[0] != '#') return false;
+        return trimmed.StartsWith("#ifdef", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#ifndef", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#elifdef", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#elifndef", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#else", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#endif", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("#define", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static string IndentLine(IndentState state, string line, string indentUnit)
     {
         var info = LineAnalyzer.Analyze(line, state.InBlock, state.PendingSwitchBrace);
@@ -36,6 +48,7 @@ internal static class GscIndenter
 
         if (info.IsBlank) return "";
         if (startedInBlock && !info.HasCodeAfterBlockEnd) return info.TrimmedEnd;
+        if (IsPreprocessorDirective(info.Trimmed)) return info.Trimmed;
 
         var stack = state.Stack;
         if (info.StartsWithOpenBrace)
