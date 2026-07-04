@@ -1,6 +1,7 @@
 using GSCLSP.Core.Models;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Indexing;
@@ -14,7 +15,10 @@ public partial class GscIndexer
 
         if (!Directory.Exists(workspacePath)) return;
 
+        foreach (var key in _workspaceFileMaps.Keys)
+            _fileNamespaceCache.Remove(key);
         _workspaceFileMaps.Clear();
+        _workspaceOverrides.Clear();
         _fileContentCache.Clear();
         WorkspacePath = workspacePath;
 
@@ -28,6 +32,12 @@ public partial class GscIndexer
 
             localSymbols.AddRange(parsed.Symbols);
             _workspaceFileMaps[normalizedPath] = parsed.FileMap;
+
+            if (parsed.FileMap.OverridePath != null)
+                _workspaceOverrides[parsed.FileMap.OverridePath] = file;
+
+            if (parsed.FileMap.Namespace != null)
+                _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
         }
 
         WorkspaceSymbols = localSymbols;
@@ -151,15 +161,24 @@ public partial class GscIndexer
 
             updatedSymbols.RemoveAll(s => s.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase));
 
+            string normalizedPath = NormalizePathKey(filePath);
+
+            if (_workspaceFileMaps.TryGetValue(normalizedPath, out var oldMap) && oldMap.OverridePath != null)
+                _workspaceOverrides.Remove(oldMap.OverridePath);
+
             if (File.Exists(filePath))
             {
-                string normalizedPath = NormalizePathKey(filePath);
-
                 try
                 {
                     var parsed = ParseWorkspaceFileForIncrementalIndex(filePath);
                     updatedSymbols.AddRange(parsed.Symbols);
                     _workspaceFileMaps[normalizedPath] = parsed.FileMap;
+
+                    if (parsed.FileMap.OverridePath != null)
+                        _workspaceOverrides[parsed.FileMap.OverridePath] = filePath;
+
+                    if (parsed.FileMap.Namespace != null)
+                        _fileNamespaceCache[normalizedPath] = parsed.FileMap.Namespace;
                 }
                 catch (Exception ex)
                 {
@@ -168,7 +187,6 @@ public partial class GscIndexer
             }
             else
             {
-                string normalizedPath = NormalizePathKey(filePath);
                 _workspaceFileMaps.Remove(normalizedPath);
             }
         }
@@ -198,6 +216,7 @@ public partial class GscIndexer
     {
         _symbols.Clear();
         _fileMaps.Clear();
+        _fileNamespaceCache.Clear();
 
         lock (_scanCacheLock)
         {
@@ -223,6 +242,7 @@ public partial class GscIndexer
     private void InvalidateFileCaches(string filePath)
     {
         _fileContentCache.Remove(filePath);
+        _fileNamespaceCache.Remove(NormalizePathKey(filePath));
 
         lock (_scanCacheLock)
         {
@@ -255,21 +275,53 @@ public partial class GscIndexer
         }
     }
 
+    private static string? ExtractOverridePath(string[] lines)
+    {
+        if (lines.Length == 0) return null;
+        var firstLine = lines[0].Trim();
+        if (!firstLine.StartsWith("//")) return null;
+        var path = firstLine[2..].Trim();
+        if (string.IsNullOrEmpty(path) || path.Contains(' ') || path.Contains(':'))
+            return null;
+        if (!Regex.IsMatch(path, @"^[\w\\]+(?:\.gsc|\.gsh)?$"))
+            return null;
+        var normalized = path.Replace("\\", "/").ToLower();
+        if (normalized.EndsWith(".gsc") || normalized.EndsWith(".gsh"))
+            normalized = normalized[..^4];
+        return normalized;
+    }
+
     private static (GscFileMap FileMap, List<GscSymbol> Symbols) ParseWorkspaceFileForIncrementalIndex(string filePath)
     {
         var fileMap = new GscFileMap { FilePath = filePath };
         var symbols = new List<GscSymbol>();
         var lines = File.ReadAllLines(filePath);
 
+        fileMap.OverridePath = ExtractOverridePath(lines);
+
         for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
             var line = lines[lineIndex];
             int lineNum = lineIndex + 1;
 
+            var namespaceMatch = NamespaceDirectiveRegex().Match(line);
+            if (namespaceMatch.Success)
+            {
+                fileMap.Namespace = namespaceMatch.Groups[1].Value;
+                continue;
+            }
+
             var includeMatch = IncludeRegex().Match(line);
             if (includeMatch.Success)
             {
                 fileMap.Includes.Add(includeMatch.Groups[1].Value.Replace("\\", "/"));
+                continue;
+            }
+
+            var usingMatch = UsingRegex().Match(line);
+            if (usingMatch.Success)
+            {
+                fileMap.Usings.Add(usingMatch.Groups[1].Value.Replace("\\", "/"));
                 continue;
             }
 
@@ -283,12 +335,17 @@ public partial class GscIndexer
             if (!IsFunctionDefinitionLine(lines, lineIndex, out var funcMatch))
                 continue;
 
+            var nameGroup = funcMatch.Groups["name"];
+            var isPrivate = nameGroup.Index > 0 &&
+                HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
+
             var symbol = new GscSymbol(
                 funcMatch.Groups["name"].Value,
                 filePath,
                 lineNum,
                 CleanGscParams(funcMatch.Groups["params"].Value),
-                SymbolType.Function
+                SymbolType.Function,
+                IsPrivate: isPrivate
             );
 
             symbols.Add(symbol);

@@ -1,5 +1,6 @@
 ﻿using GSCLSP.Core.Diagnostics;
 using GSCLSP.Core.Indexing;
+using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -48,6 +49,14 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             if (foundIncludePath == null) return null;
 
             var contentValue = $"### {directive}\n`{foundIncludePath}`";
+
+            if (_indexer.IsTreyarchGsc && directive.Equals("#using", StringComparison.OrdinalIgnoreCase))
+            {
+                var ns = _indexer.GetNamespaceForFile(foundIncludePath);
+                if (!string.IsNullOrEmpty(ns))
+                    contentValue += $"\n\n**Namespace:** `{ns}`";
+            }
+
             var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
             return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
         }
@@ -91,50 +100,99 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
         if (localVarHover != null) return localVarHover;
 
-        var resolution = _indexer.ResolveFunction(filePath, identifier);
-
-        if (resolution.Symbol != null)
+        if (_indexer.IsTreyarchGsc && identifier.Contains("::"))
         {
-            var symbol = resolution.Symbol;
+            var nsParts = identifier.Split("::", 2);
+            var nsName = nsParts[0];
+            var nsFuncName = nsParts[1];
 
-            // If we have a file path but no documentation, we grab it from the source definition
-            if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
+            int wordEnd = request.Position.Character;
+            while (wordEnd < line.Length && (char.IsLetterOrDigit(line[wordEnd]) || line[wordEnd] == '_'))
+                wordEnd++;
+
+            bool cursorOnNamespace = wordEnd + 1 < line.Length && line[wordEnd] == ':' && line[wordEnd + 1] == ':';
+
+            if (cursorOnNamespace)
             {
-                // Use the scanner to find the actual definition and its ScriptDoc
-                var detailedSymbol = ScanFileForFunction(symbol.FilePath, symbol.Name);
-                if (detailedSymbol != null)
+                var nsFilePath = _indexer.ResolveNamespaceToFilePath(nsName, filePath);
+                if (nsFilePath != null)
                 {
-                    symbol = detailedSymbol;
+                    var nsLine = FindNamespaceLineInFile(nsFilePath, nsName);
+                    var contentValue = $"```gsc\n#namespace {nsName};\n```\n---\n**Defined in:** `{nsFilePath}`";
+                    if (nsLine > 0)
+                        contentValue += $"\n\n**Line:** {nsLine}";
+
+                    var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+                    return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
                 }
             }
 
-            var signature = GscCompletionItemFactory.GetSignatureText(symbol);
+            identifier = nsFuncName;
 
-            var contentValue = $"```gsc\n{signature}\n```\n";
-
-            if (!string.IsNullOrEmpty(symbol.Documentation))
+            var nsTargetPath = _indexer.ResolveNamespaceToFilePath(nsName, filePath);
+            if (nsTargetPath != null)
             {
-                var doc = DocRegex().Replace(symbol.Documentation, "**$1:**");
-                contentValue += $"{doc}\n\n";
+                var nsSymbol = _indexer.WorkspaceSymbols
+                    .Concat(_indexer.Symbols)
+                    .FirstOrDefault(s =>
+                        s.FilePath.Equals(nsTargetPath, StringComparison.OrdinalIgnoreCase) &&
+                        s.Name.Equals(nsFuncName, StringComparison.OrdinalIgnoreCase) &&
+                        !s.IsPrivate);
+
+                if (nsSymbol != null)
+                {
+                    var nsResolution = new GscResolution(nsSymbol, ResolutionType.Included, nsTargetPath);
+                    return BuildFunctionHover(nsResolution, filePath);
+                }
             }
 
-            contentValue += "---\n";
-
-            if (symbol.FilePath == "Engine")
-            {
-                contentValue += "*(Engine Built-in)*";
-            }
-            else
-            {
-                contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
-                             $"**Line:** {symbol.LineNumber}";
-            }
-
-            var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-            return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+            return null;
         }
 
-        return null;
+        var resolution = _indexer.ResolveFunction(filePath, identifier);
+        return BuildFunctionHover(resolution, filePath);
+    }
+
+    private Hover? BuildFunctionHover(GscResolution resolution, string callingFilePath)
+    {
+        if (resolution.Symbol == null)
+            return null;
+
+        var symbol = resolution.Symbol;
+
+        if (string.IsNullOrEmpty(symbol.Documentation) && symbol.FilePath != "Engine")
+        {
+            var detailedSymbol = ScanFileForFunction(symbol.FilePath, symbol.Name);
+            if (detailedSymbol != null)
+            {
+                symbol = detailedSymbol;
+            }
+        }
+
+        var signature = GscCompletionItemFactory.GetSignatureText(symbol);
+
+        var contentValue = $"```gsc\n{signature}\n```\n";
+
+        if (!string.IsNullOrEmpty(symbol.Documentation))
+        {
+            var doc = DocRegex().Replace(symbol.Documentation, "**$1:**");
+            contentValue += $"{doc}\n\n";
+        }
+
+        contentValue += "---\n";
+
+        if (symbol.FilePath == "Engine")
+        {
+            contentValue += "*(Engine Built-in)*";
+        }
+        else
+        {
+            contentValue += $"**Defined in:** `{symbol.FilePath}`\n\n" +
+                         $"**Line:** {symbol.LineNumber}";
+        }
+
+        var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+        return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
     }
 
     private static string? MatchMacroIdentifierDirective(string trimmedLine)
@@ -368,6 +426,22 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         var content = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(content) };
+    }
+
+    private int FindNamespaceLineInFile(string filePath, string namespaceName)
+    {
+        try
+        {
+            var fileLines = _indexer.GetFileLines(filePath);
+            for (int i = 0; i < fileLines.Length; i++)
+            {
+                var match = NamespaceDirectiveRegex().Match(fileLines[i]);
+                if (match.Success && match.Groups[1].Value.Equals(namespaceName, StringComparison.OrdinalIgnoreCase))
+                    return i + 1;
+            }
+        }
+        catch { }
+        return 0;
     }
 
     private MacroDefinition GetActveMacroDefinition(string filePath, string identifier, MacroDefinition fallback)

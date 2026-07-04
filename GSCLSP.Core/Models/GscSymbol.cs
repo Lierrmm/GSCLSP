@@ -11,5 +11,6 @@ public record GscSymbol(
     string Documentation = "",
     int? MinArgs = null,
     int? MaxArgs = null,
-    bool IsVariadic = false
+    bool IsVariadic = false,
+    bool IsPrivate = false
 );

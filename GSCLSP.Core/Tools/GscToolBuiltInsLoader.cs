@@ -11,7 +11,11 @@ public static class GscToolBuiltInsLoader
         "iw5", "iw6", "iw7", "iw8", "iw9",
         "s1", "s2", "s4",
         "h1", "h2",
+        "jup",
     };
+
+    private static string GetGscToolKey(string game) =>
+        game.Equals("jup", StringComparison.OrdinalIgnoreCase) ? "iw9" : game;
 
     private static readonly HttpClient http = new()
     {
@@ -72,15 +76,16 @@ public static class GscToolBuiltInsLoader
         try
         {
             var baseUri = source.EngineDirectoryUri;
+            var toolKey = GetGscToolKey(key);
             var funcTask = TryGetFirstAvailableAsync(ct, baseUri,
-                $"{key}_func.cpp",
-                $"{key}_pc_func.cpp");
+                $"{toolKey}_func.cpp",
+                $"{toolKey}_pc_func.cpp");
             var methTask = TryGetFirstAvailableAsync(ct, baseUri,
-                $"{key}_meth.cpp",
-                $"{key}_pc_meth.cpp");
+                $"{toolKey}_meth.cpp",
+                $"{toolKey}_pc_meth.cpp");
             var tokTask = TryGetFirstAvailableAsync(ct, baseUri,
-                $"{key}_token.cpp",
-                $"{key}_pc_token.cpp");
+                $"{toolKey}_token.cpp",
+                $"{toolKey}_pc_token.cpp");
 
             var fetched = await Task.WhenAll(funcTask, methTask, tokTask);
 
