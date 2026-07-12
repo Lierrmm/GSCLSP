@@ -393,14 +393,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         if (!GscHandlerCommon.TryGetLevelFieldAt(line, character, out var fieldName))
             return null;
 
-        var docMatches = GscIndexer.ScanLevelFields(lines, filePath)
-            .Where(f => f.Name.Equals(fieldName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-
-        var field = docMatches.FirstOrDefault(f => f.Value.Length > 0)
-            ?? docMatches.FirstOrDefault()
-            ?? _indexer.ResolveLevelField(fieldName);
-
+        var field = GscHandlerCommon.ResolveLevelField(_indexer, lines, filePath, fieldName);
         if (field == null) return null;
 
         var signature = field.Value.Length > 0

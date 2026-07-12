@@ -72,14 +72,7 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
 
         if (GscHandlerCommon.TryGetLevelFieldAt(line, request.Position.Character, out var levelFieldName))
         {
-            var docMatches = GscIndexer.ScanLevelFields(lines, currentFilePath)
-                .Where(f => f.Name.Equals(levelFieldName, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            var field = docMatches.FirstOrDefault(f => f.Value.Length > 0)
-                ?? docMatches.FirstOrDefault()
-                ?? _indexer.ResolveLevelField(levelFieldName);
-
+            var field = GscHandlerCommon.ResolveLevelField(_indexer, lines, currentFilePath, levelFieldName);
             if (field == null) return new DefinitionResult();
 
             int fieldLine = field.LineNumber - 1;

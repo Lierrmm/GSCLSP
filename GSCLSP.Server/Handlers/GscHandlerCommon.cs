@@ -1,3 +1,5 @@
+using GSCLSP.Core.Indexing;
+using GSCLSP.Core.Models;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Server.Handlers;
@@ -81,6 +83,17 @@ internal static class GscHandlerCommon
 
         fieldName = line[start..end];
         return true;
+    }
+
+    public static GscLevelField? ResolveLevelField(GscIndexer indexer, string[] lines, string filePath, string fieldName)
+    {
+        var docMatches = GscIndexer.ScanLevelFields(lines, filePath)
+            .Where(f => f.Name.Equals(fieldName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        return docMatches.FirstOrDefault(f => f.Value.Length > 0)
+            ?? docMatches.FirstOrDefault()
+            ?? indexer.ResolveLevelField(fieldName);
     }
 
     public static List<(int Start, int End)> GetCodeRanges(string line, ref bool inBlockComment)

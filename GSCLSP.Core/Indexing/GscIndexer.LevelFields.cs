@@ -70,6 +70,8 @@ public partial class GscIndexer
                     AddDumpLevelField(field);
             }
             catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            catch (System.Security.SecurityException) { }
         }
     }
 
