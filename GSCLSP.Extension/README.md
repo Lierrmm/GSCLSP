@@ -73,6 +73,34 @@ Dump folders are used per game by `dumpPaths` in the config. The current `game` 
 }
 ```
 
+## Custom Built-ins
+
+You can extend the built-in function/method list per game with the `builtins` key in the config. Entries show up in autocompletion, hover, and are recognized by diagnostics — and they override a shipped built-in of the same name.
+
+```json
+{
+  "game": "iw4",
+  "builtins": {
+    "iw4": {
+      "functions": [
+        {
+          "name": "mycustomfunc",
+          "description": "Added by my mod's engine patch.",
+          "args": ["player", "value"],
+          "minArgs": 1,
+          "maxArgs": 2
+        }
+      ],
+      "methods": [
+        { "name": "mycustommethod" }
+      ]
+    }
+  }
+}
+```
+
+Only the block matching the active `game` is applied. All fields except `name` are optional; `args` may also use the object form `{ "name": "player", "description": "..." }`.
+
 ## Choosing Your Target Game
 
 Once you are inside a valid _GSC_ file, you will see a `GSC Target Game` dropbox appear in the **bottom right corner.** Choosing the game you are working on will help GSCLSP change the built-ins list and gives accurate diagnostics.

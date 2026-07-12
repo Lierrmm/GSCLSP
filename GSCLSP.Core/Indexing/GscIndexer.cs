@@ -1206,7 +1206,7 @@ public partial class GscIndexer(ILogger logger)
 
         try
         {
-            LoadConfiguredBuiltIns(hasWorkspaceConfig, workspaceConfig?.Game, workspaceConfig?.GscToolRepository);
+            LoadConfiguredBuiltIns(hasWorkspaceConfig, workspaceConfig?.Game, workspaceConfig?.GscToolRepository, workspaceConfig?.BuiltIns);
         }
         catch (Exception ex)
         {
@@ -1252,7 +1252,7 @@ public partial class GscIndexer(ILogger logger)
 
     private static readonly TimeSpan GscToolCacheMaxAge = TimeSpan.FromDays(7);
 
-    private void LoadConfiguredBuiltIns(bool hasWorkspaceConfig, string? workspaceGame, string? workspaceGscToolRepository)
+    private void LoadConfiguredBuiltIns(bool hasWorkspaceConfig, string? workspaceGame, string? workspaceGscToolRepository, IReadOnlyDictionary<string, JsonElement>? workspaceBuiltIns)
     {
         var game = ResolveGameValue(hasWorkspaceConfig, workspaceGame);
         var normalizedGame = string.IsNullOrWhiteSpace(game)
@@ -1261,6 +1261,19 @@ public partial class GscIndexer(ILogger logger)
 
         var gameChanged = !string.Equals(CurrentGame, normalizedGame, StringComparison.Ordinal);
         CurrentGame = normalizedGame;
+
+        var previousBuiltIns = SnapshotBuiltIns();
+
+        JsonElement? extensions = null;
+        if (workspaceBuiltIns != null && workspaceBuiltIns.TryGetValue(normalizedGame, out var extensionsElement))
+            extensions = extensionsElement;
+        BuiltIns.SetWorkspaceExtensions(extensions);
+
+        void NotifyIfChanged()
+        {
+            if (gameChanged || !BuiltInSetsEqual(previousBuiltIns, SnapshotBuiltIns()))
+                GameChanged?.Invoke(normalizedGame);
+        }
 
         var basePath = AppDomain.CurrentDomain.BaseDirectory;
         var dataPath = Path.Combine(basePath, "data");
@@ -1272,7 +1285,7 @@ public partial class GscIndexer(ILogger logger)
         {
             BuiltIns.LoadBuiltIns(requestedPath);
             _logger.LogInformation("Loaded builtins for game '{Game}'.", normalizedGame);
-            if (gameChanged) GameChanged?.Invoke(normalizedGame);
+            NotifyIfChanged();
             return;
         }
 
@@ -1284,16 +1297,9 @@ public partial class GscIndexer(ILogger logger)
             var cached = GscToolBuiltInsLoader.TryLoadFromCache(normalizedGame, source);
             if (cached != null)
             {
-                var previousFunctions = SnapshotBuiltInNames(SymbolType.Function);
-                var previousMethods = SnapshotBuiltInNames(SymbolType.Method);
-
                 BuiltIns.LoadNameOnlyBuiltIns(cached.Functions, cached.Methods, cached.Tokens);
                 _logger.LogDebug("Loaded cached builtins for game '{Game}'{SourceLabel}.", normalizedGame, sourceLabel);
-
-                var builtInsChanged = !BuiltInNamesEqual(previousFunctions, cached.Functions)
-                                   || !BuiltInNamesEqual(previousMethods, cached.Methods);
-
-                if (gameChanged || builtInsChanged) GameChanged?.Invoke(normalizedGame);
+                NotifyIfChanged();
 
                 if (GscToolBuiltInsLoader.IsCacheStale(normalizedGame, source, GscToolCacheMaxAge))
                     _ = RefreshGscToolBuiltInsAsync(normalizedGame, source);
@@ -1302,7 +1308,7 @@ public partial class GscIndexer(ILogger logger)
             {
                 BuiltIns.LoadNameOnlyBuiltIns([], [], []);
                 _logger.LogDebug("No cached builtins for game '{Game}'{SourceLabel}, fetching from gsc-tool...", normalizedGame, sourceLabel);
-                if (gameChanged) GameChanged?.Invoke(normalizedGame);
+                NotifyIfChanged();
                 _ = RefreshGscToolBuiltInsAsync(normalizedGame, source);
             }
             return;
@@ -1316,12 +1322,12 @@ public partial class GscIndexer(ILogger logger)
         if (File.Exists(fallbackPath))
         {
             BuiltIns.LoadBuiltIns(fallbackPath);
-            if (gameChanged) GameChanged?.Invoke(normalizedGame);
+            NotifyIfChanged();
             return;
         }
 
         _logger.LogDebug("No builtins file found for game '{Game}', expected data/iw4_builtins.json", normalizedGame);
-        if (gameChanged) GameChanged?.Invoke(normalizedGame);
+        NotifyIfChanged();
     }
 
     private async Task RefreshGscToolBuiltInsAsync(string game, GscToolSource source)
@@ -1336,19 +1342,14 @@ public partial class GscIndexer(ILogger logger)
         if (!string.Equals(CurrentGame, game, StringComparison.OrdinalIgnoreCase))
             return;
 
-        var previousFunctions = SnapshotBuiltInNames(SymbolType.Function);
-        var previousMethods = SnapshotBuiltInNames(SymbolType.Method);
-        var builtInsChanged = !BuiltInNamesEqual(previousFunctions, fetched.Functions)
-            || !BuiltInNamesEqual(previousMethods, fetched.Methods);
-
+        var previousBuiltIns = SnapshotBuiltIns();
         BuiltIns.LoadNameOnlyBuiltIns(fetched.Functions, fetched.Methods, fetched.Tokens);
         _logger.LogDebug("Refreshed builtins for game '{Game}' from {Source}.", game, source.DisplayName);
-        if (builtInsChanged)
+        if (!BuiltInSetsEqual(previousBuiltIns, SnapshotBuiltIns()))
             GameChanged?.Invoke(game);
     }
 
-    private string[] SnapshotBuiltInNames(SymbolType symbolType) =>
-        [..BuiltIns.GetAll().Where(s => s.Type == symbolType).Select(s => s.Name)];
+    private GscSymbol[] SnapshotBuiltIns() => [..BuiltIns.GetAll()];
 
     private static GscToolSource ResolveGscToolSource(string? raw)
     {
@@ -1361,10 +1362,9 @@ public partial class GscIndexer(ILogger logger)
         return GscToolSource.Default;
     }
 
-    private static bool BuiltInNamesEqual(IEnumerable<string> left, IEnumerable<string> right)
+    private static bool BuiltInSetsEqual(IEnumerable<GscSymbol> left, IEnumerable<GscSymbol> right)
     {
-        return new HashSet<string>(left, StringComparer.OrdinalIgnoreCase)
-            .SetEquals(right);
+        return new HashSet<GscSymbol>(left).SetEquals(right);
     }
 
     private static string ResolveGameValue(bool hasWorkspaceConfig, string? workspaceGame)
@@ -1378,7 +1378,8 @@ public partial class GscIndexer(ILogger logger)
     private sealed record WorkspaceConfig(
         IReadOnlyDictionary<string, string>? DumpPaths,
         string? Game,
-        string? GscToolRepository);
+        string? GscToolRepository,
+        IReadOnlyDictionary<string, JsonElement>? BuiltIns);
 
     private static (bool HasConfigFile, WorkspaceConfig? Config) TryReadWorkspaceConfig(string? workspacePath)
     {
@@ -1425,7 +1426,18 @@ public partial class GscIndexer(ILogger logger)
             if (root.TryGetProperty("gsc_tool_repository", out var gscToolRepositoryProperty) && gscToolRepositoryProperty.ValueKind == JsonValueKind.String)
                 gscToolRepository = gscToolRepositoryProperty.GetString();
 
-            return new WorkspaceConfig(dumpPaths, game, gscToolRepository);
+            Dictionary<string, JsonElement>? builtIns = null;
+            if (root.TryGetProperty("builtins", out var builtInsProperty) && builtInsProperty.ValueKind == JsonValueKind.Object)
+            {
+                builtIns = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+                foreach (var entry in builtInsProperty.EnumerateObject())
+                {
+                    if (entry.Value.ValueKind == JsonValueKind.Object)
+                        builtIns[entry.Name] = entry.Value.Clone();
+                }
+            }
+
+            return new WorkspaceConfig(dumpPaths, game, gscToolRepository, builtIns);
         }
         catch { }
 

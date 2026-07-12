@@ -83,6 +83,10 @@ internal static class GscCompletionItemFactory
 
         var paramDetail = GetParameterDetail(symbol, parsedArgs);
 
+        var documentationValue = $"**Source:** `{Path.GetFileName(symbol.FilePath)}`";
+        if (!string.IsNullOrEmpty(symbol.Documentation))
+            documentationValue = $"{symbol.Documentation}\n\n{documentationValue}";
+
         return new SymbolCompletionCache
         {
             ParamDetail = paramDetail,
@@ -91,7 +95,7 @@ internal static class GscCompletionItemFactory
             Documentation = new StringOrMarkupContent(new MarkupContent
             {
                 Kind = MarkupKind.Markdown,
-                Value = $"**Source:** `{Path.GetFileName(symbol.FilePath)}`"
+                Value = documentationValue
             })
         };
     }
