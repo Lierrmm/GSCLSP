@@ -16,6 +16,11 @@ public class BuiltInProvider(ILogger logger)
         new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase),
         new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase));
 
+    private Dictionary<string, GscSymbol> _baseFunctions = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, GscSymbol> _baseMethods = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, GscSymbol> _extensionFunctions = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, GscSymbol> _extensionMethods = new(StringComparer.OrdinalIgnoreCase);
+
     public void LoadBuiltIns(string jsonPath)
     {
         if (!File.Exists(jsonPath))
@@ -81,12 +86,17 @@ public class BuiltInProvider(ILogger logger)
             var isVariadic = VariadicBuiltIns.Contains(name);
             var parms = ReadArgs(element, name, minArgs, maxArgs, isVariadic);
 
+            var documentation = string.Empty;
+            if (element.TryGetProperty("description", out var descriptionElement) && descriptionElement.ValueKind == JsonValueKind.String)
+                documentation = descriptionElement.GetString() ?? string.Empty;
+
             target[name] = new GscSymbol(
                 name,
                 "Engine",
                 0,
                 parms,
                 symbolType,
+                Documentation: documentation,
                 MinArgs: minArgs,
                 MaxArgs: maxArgs,
                 IsVariadic: isVariadic
@@ -210,8 +220,51 @@ public class BuiltInProvider(ILogger logger)
         ReplaceSnapshot(builtInFunctions, builtInMethods);
     }
 
+    public void SetWorkspaceExtensions(JsonElement? root)
+    {
+        var extensionFunctions = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
+        var extensionMethods = new Dictionary<string, GscSymbol>(StringComparer.OrdinalIgnoreCase);
+
+        if (root is { ValueKind: JsonValueKind.Object } element)
+        {
+            if (element.TryGetProperty("functions", out var functions) && functions.ValueKind == JsonValueKind.Array)
+                LoadEntries(functions, extensionFunctions, SymbolType.Function);
+
+            if (element.TryGetProperty("methods", out var methods) && methods.ValueKind == JsonValueKind.Array)
+                LoadEntries(methods, extensionMethods, SymbolType.Method);
+        }
+
+        _extensionFunctions = extensionFunctions;
+        _extensionMethods = extensionMethods;
+        RebuildSnapshot();
+
+        if (extensionFunctions.Count > 0 || extensionMethods.Count > 0)
+            logger.LogInformation("Applied {FunctionCount} workspace built-in function extension(s) and {MethodCount} method extension(s).", extensionFunctions.Count, extensionMethods.Count);
+    }
+
     private void ReplaceSnapshot(Dictionary<string, GscSymbol> functions, Dictionary<string, GscSymbol> methods)
     {
+        _baseFunctions = functions;
+        _baseMethods = methods;
+        RebuildSnapshot();
+    }
+
+    private void RebuildSnapshot()
+    {
+        var functions = _baseFunctions;
+        var methods = _baseMethods;
+
+        if (_extensionFunctions.Count > 0 || _extensionMethods.Count > 0)
+        {
+            functions = new Dictionary<string, GscSymbol>(functions, StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, symbol) in _extensionFunctions)
+                functions[name] = symbol;
+
+            methods = new Dictionary<string, GscSymbol>(methods, StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, symbol) in _extensionMethods)
+                methods[name] = symbol;
+        }
+
         Interlocked.Exchange(ref _snapshot, new BuiltInSnapshot(functions, methods));
     }
 
