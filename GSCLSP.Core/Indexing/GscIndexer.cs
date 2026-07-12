@@ -91,6 +91,7 @@ public partial class GscIndexer(ILogger logger)
     public TimeSpan IndexFolder(string folderPath)
     {
         _symbols.Clear();
+        ClearDumpLevelFields();
         var sw = Stopwatch.StartNew();
 
         if (Directory.Exists(folderPath))
@@ -122,18 +123,32 @@ public partial class GscIndexer(ILogger logger)
         DumpPath = newPath;
         ClearGlobalIndexAndCaches();
 
+        string levelFieldsCacheFile = Path.Combine(newPath, "levelfields.json");
+
         Task _ = Task.Run(() =>
         {
             if (File.Exists(cacheFile))
             {
                 _logger.LogDebug("Loading existing GSC dump cache from {CacheFile}", cacheFile);
                 LoadGlobalIndex(cacheFile);
+
+                if (File.Exists(levelFieldsCacheFile))
+                {
+                    LoadLevelFieldsCache(levelFieldsCacheFile);
+                }
+                else
+                {
+                    _logger.LogDebug("No level fields cache found. Crawling folder {FolderPath}...", newPath);
+                    IndexLevelFieldsFolder(newPath);
+                    SaveLevelFieldsCache(levelFieldsCacheFile);
+                }
             }
             else
             {
                 _logger.LogDebug("No cache found. Crawling folder {FolderPath}...", newPath);
                 IndexFolder(newPath);
                 ExportIndexToJson(newPath, cacheFile);
+                SaveLevelFieldsCache(levelFieldsCacheFile);
 
                 _logger.LogDebug("Created new cache with {Count} symbols.", _symbols.Count);
                 LoadGlobalIndex(cacheFile);
@@ -168,6 +183,9 @@ public partial class GscIndexer(ILogger logger)
     {
         var fileMap = new GscFileMap { FilePath = path };
         var lines = File.ReadAllLines(path);
+
+        foreach (var levelField in ScanLevelFields(lines, path))
+            AddDumpLevelField(levelField);
 
         for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {

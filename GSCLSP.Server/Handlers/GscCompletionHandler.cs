@@ -184,6 +184,25 @@ namespace GSCLSP.Server.Handlers
                 return GscCompletionItemFactory.ToFilteredList(completions);
             }
 
+            if (LevelFieldAccessRegex().IsMatch(lineUntilCursor))
+            {
+                var seenFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var field in GscIndexer.ScanLevelFields(currentFileLines, currentFilePath))
+                {
+                    if (seenFields.Add(field.Name))
+                        completions.Add(GscCompletionItemFactory.FromLevelField(field));
+                }
+
+                foreach (var field in _indexer.GetAllLevelFields())
+                {
+                    if (seenFields.Add(field.Name))
+                        completions.Add(GscCompletionItemFactory.FromLevelField(field));
+                }
+
+                return GscCompletionItemFactory.ToFilteredList(completions);
+            }
+
             var isTreyarch = _indexer.IsTreyarchGsc;
 
             if (!isTreyarch)

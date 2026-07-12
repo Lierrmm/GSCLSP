@@ -217,6 +217,7 @@ public partial class GscIndexer
         _symbols.Clear();
         _fileMaps.Clear();
         _fileNamespaceCache.Clear();
+        ClearDumpLevelFields();
 
         lock (_scanCacheLock)
         {
@@ -298,6 +299,7 @@ public partial class GscIndexer
         var lines = File.ReadAllLines(filePath);
 
         fileMap.OverridePath = ExtractOverridePath(lines);
+        fileMap.LevelFields = ScanLevelFields(lines, filePath);
 
         for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {

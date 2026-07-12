@@ -79,4 +79,10 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"^\s*")]
     public static partial Regex LeadingWhitespaceRegex();
+
+    [GeneratedRegex(@"(?<![.\w\\])level\s*\.\s*(?<name>[A-Za-z_]\w*)(?<access>(?:\s*\.\s*\w+|\s*\[[^\]\r\n]*\])*)\s*(?<op>\+\+|--|[-+*/%&|^]?=(?!=))\s*(?<value>[^;\r\n]*)", RegexOptions.IgnoreCase)]
+    public static partial Regex LevelFieldAssignmentRegex();
+
+    [GeneratedRegex(@"(?<![.\w\\])level\s*\.\s*(?<partial>[A-Za-z_]\w*)?$", RegexOptions.IgnoreCase)]
+    public static partial Regex LevelFieldAccessRegex();
 }
