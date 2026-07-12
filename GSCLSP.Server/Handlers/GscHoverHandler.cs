@@ -94,6 +94,9 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         // for expression directives, we dont need anything else so early return here
         if (isExpressionDirective) return null;
 
+        var levelFieldHover = FindLevelField(filePath, lines, line, request.Position.Character);
+        if (levelFieldHover != null) return levelFieldHover;
+
         var globalVarHover = FindGlobalVariable(filePath, identifier);
         if (globalVarHover != null) return globalVarHover;
 
@@ -383,6 +386,33 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var contentValue = $"```gsc\n#define {identifier}\n```\n---\n*(gsc-tool Preprocessor)*";
         var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
         return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+    }
+
+    private Hover? FindLevelField(string filePath, string[] lines, string line, int character)
+    {
+        if (!GscHandlerCommon.TryGetLevelFieldAt(line, character, out var fieldName))
+            return null;
+
+        var docMatches = GscIndexer.ScanLevelFields(lines, filePath)
+            .Where(f => f.Name.Equals(fieldName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var field = docMatches.FirstOrDefault(f => f.Value.Length > 0)
+            ?? docMatches.FirstOrDefault()
+            ?? _indexer.ResolveLevelField(fieldName);
+
+        if (field == null) return null;
+
+        var signature = field.Value.Length > 0
+            ? $"level.{field.Name} = {field.Value}"
+            : $"level.{field.Name}";
+
+        var defLines = field.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase)
+            ? lines
+            : _indexer.GetFileLines(field.FilePath);
+        var comment = GetDefinitionComment(defLines, field.LineNumber - 1);
+
+        return BuildDefinitionHover(signature, comment, "Level Field", field.FilePath, field.LineNumber);
     }
 
     private Hover? FindGlobalVariable(string filePath, string identifier)

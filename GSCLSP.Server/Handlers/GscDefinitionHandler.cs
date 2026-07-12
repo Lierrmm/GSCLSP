@@ -70,6 +70,29 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
             });
         }
 
+        if (GscHandlerCommon.TryGetLevelFieldAt(line, request.Position.Character, out var levelFieldName))
+        {
+            var docMatches = GscIndexer.ScanLevelFields(lines, currentFilePath)
+                .Where(f => f.Name.Equals(levelFieldName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var field = docMatches.FirstOrDefault(f => f.Value.Length > 0)
+                ?? docMatches.FirstOrDefault()
+                ?? _indexer.ResolveLevelField(levelFieldName);
+
+            if (field == null) return new DefinitionResult();
+
+            int fieldLine = field.LineNumber - 1;
+            return new DefinitionResult(new Location
+            {
+                Uri = DocumentUri.FromFileSystemPath(field.FilePath),
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(fieldLine, 0),
+                    new Position(fieldLine, 0)
+                )
+            });
+        }
+
         var globalVar = GscIndexer.ResolveGlobalVariable(currentFilePath, identifier);
         if (globalVar != null)
         {

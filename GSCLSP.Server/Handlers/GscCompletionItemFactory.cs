@@ -184,6 +184,28 @@ internal static class GscCompletionItemFactory
         };
     }
 
+    public static CompletionItem FromLevelField(GscLevelField field)
+    {
+        return new CompletionItem
+        {
+            Label = field.Name,
+            LabelDetails = new CompletionItemLabelDetails
+            {
+                Detail = field.Value.Length > 0 ? $" = {field.Value}" : "",
+                Description = "Level Field"
+            },
+            Kind = CompletionItemKind.Field,
+            Documentation = new StringOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = $"**Source:** `{Path.GetFileName(field.FilePath)}`"
+            }),
+            InsertText = field.Name,
+            InsertTextFormat = InsertTextFormat.PlainText,
+            FilterText = field.Name
+        };
+    }
+
     public static CompletionItem FromLocalVariable(GscIndexer.LocalVariable localVar)
     {
         return new CompletionItem

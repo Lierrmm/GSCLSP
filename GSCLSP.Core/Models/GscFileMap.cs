@@ -9,4 +9,5 @@ public class GscFileMap
     public List<string> Usings { get; set; } = [];
     public List<string> Inlines { get; set; } = [];
     public List<GscSymbol> LocalSymbols { get; set; } = [];
+    public List<GscLevelField> LevelFields { get; set; } = [];
 }

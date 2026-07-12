@@ -40,6 +40,49 @@ internal static class GscHandlerCommon
         return false;
     }
 
+    public static bool TryGetLevelFieldAt(string line, int character, out string fieldName)
+    {
+        fieldName = string.Empty;
+
+        static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c == '_';
+
+        int start = Math.Clamp(character, 0, line.Length);
+        if (start >= line.Length || !IsWordChar(line[start]))
+        {
+            if (start > 0 && IsWordChar(line[start - 1])) start--;
+            else return false;
+        }
+
+        while (start > 0 && IsWordChar(line[start - 1])) start--;
+
+        int end = start;
+        while (end < line.Length && IsWordChar(line[end])) end++;
+
+        if (end == start || char.IsDigit(line[start])) return false;
+
+        int i = start - 1;
+        while (i >= 0 && char.IsWhiteSpace(line[i])) i--;
+        if (i < 0 || line[i] != '.') return false;
+
+        i--;
+        while (i >= 0 && char.IsWhiteSpace(line[i])) i--;
+        if (i < 0) return false;
+
+        int callerEnd = i + 1;
+        int callerStart = callerEnd;
+        while (callerStart > 0 && IsWordChar(line[callerStart - 1])) callerStart--;
+
+        if (!line[callerStart..callerEnd].Equals("level", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // reject chained access like foo.level.x or maps\level.x
+        if (callerStart > 0 && (line[callerStart - 1] == '.' || line[callerStart - 1] == '\\'))
+            return false;
+
+        fieldName = line[start..end];
+        return true;
+    }
+
     public static List<(int Start, int End)> GetCodeRanges(string line, ref bool inBlockComment)
     {
         var ranges = new List<(int Start, int End)>();
