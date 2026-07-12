@@ -20,6 +20,7 @@ public class BuiltInProvider(ILogger logger)
     private Dictionary<string, GscSymbol> _baseMethods = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, GscSymbol> _extensionFunctions = new(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, GscSymbol> _extensionMethods = new(StringComparer.OrdinalIgnoreCase);
+    private readonly object _rebuildLock = new();
 
     public void LoadBuiltIns(string jsonPath)
     {
@@ -234,9 +235,12 @@ public class BuiltInProvider(ILogger logger)
                 LoadEntries(methods, extensionMethods, SymbolType.Method);
         }
 
-        _extensionFunctions = extensionFunctions;
-        _extensionMethods = extensionMethods;
-        RebuildSnapshot();
+        lock (_rebuildLock)
+        {
+            _extensionFunctions = extensionFunctions;
+            _extensionMethods = extensionMethods;
+            RebuildSnapshot();
+        }
 
         if (extensionFunctions.Count > 0 || extensionMethods.Count > 0)
             logger.LogInformation("Applied {FunctionCount} workspace built-in function extension(s) and {MethodCount} method extension(s).", extensionFunctions.Count, extensionMethods.Count);
@@ -244,9 +248,12 @@ public class BuiltInProvider(ILogger logger)
 
     private void ReplaceSnapshot(Dictionary<string, GscSymbol> functions, Dictionary<string, GscSymbol> methods)
     {
-        _baseFunctions = functions;
-        _baseMethods = methods;
-        RebuildSnapshot();
+        lock (_rebuildLock)
+        {
+            _baseFunctions = functions;
+            _baseMethods = methods;
+            RebuildSnapshot();
+        }
     }
 
     private void RebuildSnapshot()
