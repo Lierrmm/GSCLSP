@@ -2,5 +2,6 @@
   <Project Path="GSCLSP.Benchmark/GSCLSP.Benchmark.csproj" />
   <Project Path="GSCLSP.Core/GSCLSP.Core.csproj" />
   <Project Path="GSCLSP.Lexer/GSCLSP.Lexer.csproj" />
+  <Project Path="GSCLSP.Mcp/GSCLSP.Mcp.csproj" />
   <Project Path="GSCLSP.Server/GSCLSP.Server.csproj" />
 </Solution>
