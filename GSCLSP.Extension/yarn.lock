@@ -492,14 +492,7 @@
   dependencies:
     "@textlint/ast-node-types" "15.7.1"
 
-"@types/bun@^1.3.14":
-  version "1.3.14"
-  resolved "https://registry.npmjs.org/@types/bun/-/bun-1.3.14.tgz"
-  integrity sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw==
-  dependencies:
-    bun-types "1.3.14"
-
-"@types/node@*", "@types/node@^24.13.2":
+"@types/node@^24.13.2":
   version "24.13.3"
   resolved "https://registry.npmjs.org/@types/node/-/node-24.13.3.tgz"
   integrity sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==
@@ -516,7 +509,7 @@
   resolved "https://registry.npmjs.org/@types/sarif/-/sarif-2.1.7.tgz"
   integrity sha512-kRz0VEkJqWLf1LLVN4pT1cg1Z9wAuvI6L97V3m2f5B76Tg8d413ddvLBPTEHAZJlnn4XSvu0FkZtViCQGVyrXQ==
 
-"@types/vscode@^1.75.0":
+"@types/vscode@^1.90.0":
   version "1.125.0"
   resolved "https://registry.npmjs.org/@types/vscode/-/vscode-1.125.0.tgz"
   integrity sha512-0icm/ZQAaism87P0ekHqi4/Ju9du+Tm0RUW+y7vqRsxY2cY0FNRX1nAnaW7nT6npPt2tfHiheZ55Zm9UhqonFA==
@@ -756,13 +749,6 @@ buffer-equal-constant-time@^1.0.1:
   version "1.0.1"
   resolved "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz"
   integrity sha512-zRpUiDwd/xk6ADqPMATG8vc9VPrkck7T07OIx0gnjmJAnHnTVXNQG3vfvWNuiZIkwu9KrKdA1iJKfsfTVxE6NA==
-
-bun-types@1.3.14:
-  version "1.3.14"
-  resolved "https://registry.npmjs.org/bun-types/-/bun-types-1.3.14.tgz"
-  integrity sha512-4N0ig0fEomHt5R0KCFWjovxow98rIoRwKolrYdCcknNwMekCXRnWEUvgu5soYV8QXtVsrUD8B95MBOZGPvr6KQ==
-  dependencies:
-    "@types/node" "*"
 
 bundle-name@^4.1.0:
   version "4.1.0"

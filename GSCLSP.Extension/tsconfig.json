@@ -10,7 +10,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
 
-    "types": ["node", "bun"]
+    "types": ["node"]
   },
   "exclude": ["node_modules", ".vscode-test", "build.ts"]
 }

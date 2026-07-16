@@ -357,6 +357,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
   // Register MCP Server
   const mcpExe = context.asAbsolutePath(path.join("out", "GSCLSP.Mcp.exe"));
   const didChangeEmitter = new vscode.EventEmitter<void>();
+  context.subscriptions.push(didChangeEmitter);
   context.subscriptions.push(
     vscode.lm.registerMcpServerDefinitionProvider("gsclsp", {
       onDidChangeMcpServerDefinitions: didChangeEmitter.event,
