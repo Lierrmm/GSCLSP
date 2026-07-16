@@ -13,7 +13,7 @@ facts against the *active* game and context rather than guessing things.
 **.GSC** is the scripting language of **Call of Duty**
 games. It runs on Infinity Ward's IW engine, and after Call of Duty 4 (IW3), Treyarch's engine variants also add a
 few syntactic extensions later on in their fork. Studios and modders use it to implement almost all gameplay
-logic that isn't hard-coded in the C++ engine for be ran in-agme: gamemodes, map scripts, killstreaks, perks,
+logic that isn't hard-coded in the C++ engine for be ran in-game: gamemodes, map scripts, killstreaks, perks,
 bots, events from engine -> GSC, spawning, literally most of the ingame logic is done through **GSC**. It can even do *in-game HUD rendering/drawing* which is scripted togther with GSC *(used frequently in GSC dumps, it is called "hud utils", "hud_utils", etc.)*
 
 **.GSC** is derived from "QuakeC", the compiled language developed in 1996 by John Carmack of id Software to program parts of Quake. While GSC is *not* as advanced as QuakeC may be, it still very well handles all of the in-game logic for gameplay. It is essentially the backend of the actual gameplay, and has specific sets of rules and things.
