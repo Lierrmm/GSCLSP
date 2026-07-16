@@ -1,5 +1,6 @@
 import * as path from "path";
 import * as fs from "fs/promises";
+import * as vscode from "vscode";
 
 import {
   type ExtensionContext,
@@ -51,7 +52,7 @@ const KNOWN_GAMES = [
   "t9",
   "h1",
   "h2",
-  "jup"
+  "jup",
 ];
 
 function targetWorkspaceFolder(): WorkspaceFolder | undefined {
@@ -281,9 +282,7 @@ export async function activate(context: ExtensionContext): Promise<void> {
           const targetWorkspace = targetWorkspaceFolder();
 
           if (!targetWorkspace || targetWorkspace.uri.scheme !== "file") {
-            window.showErrorMessage(
-              "GSCLSP: Open a local workspace folder to save config",
-            );
+            window.showErrorMessage("GSCLSP: Open a local workspace folder to save config");
             return;
           }
 
@@ -354,6 +353,22 @@ export async function activate(context: ExtensionContext): Promise<void> {
   context.subscriptions.push(client);
 
   await client.start();
+
+  // Register MCP Server
+  const mcpExe = context.asAbsolutePath(path.join("out", "GSCLSP.Mcp.exe"));
+  const didChangeEmitter = new vscode.EventEmitter<void>();
+  context.subscriptions.push(
+    vscode.lm.registerMcpServerDefinitionProvider("gsclsp", {
+      onDidChangeMcpServerDefinitions: didChangeEmitter.event,
+      provideMcpServerDefinitions: async () => {
+        let servers: vscode.McpServerDefinition[] = [];
+        servers.push(
+          new vscode.McpStdioServerDefinition("GSCLSP MCP Server Provider", mcpExe, [], {}),
+        );
+        return servers;
+      },
+    }),
+  );
 
   if (context.extensionMode === ExtensionMode.Development) {
     await client.setTrace(Trace.Verbose);
