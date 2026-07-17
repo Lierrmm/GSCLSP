@@ -1,19 +1,149 @@
 # GSC Primer
 
-You are using the GSCLSP MCP server. This document teaches you to read and write **GSC**, the
-Call of Duty scripting language. GSC is game-specific and sparsely documented online. Your
-training data about it is unreliable. Verify everything against the *active game* with the
-tools in section 8.
+GSC = the Call of Duty scripting language. It is game-specific and sparsely documented online.
+Your training data on it is unreliable. Every function you write must be verified against the
+ACTIVE game with the tools below. Never write a call the tools cannot confirm.
 
-## 0. Rules (always apply)
+Two tiers: the **Core** below is operational (read it fully before writing GSC); the
+**Reference** after the divider is lookup material (read sections on demand).
 
-1. Call `get_status` first. Note the active game id. All code you write targets that game.
-2. Before using any function, confirm it exists for the active game: `resolve_function`,
+---
+
+# Core
+
+## Rules (always apply)
+
+1. Call `get_status` first. Note `currentGame`. All code you write targets that game.
+2. Before using any function, confirm it exists for the active game with `resolve_function`,
    `get_symbol`, or `list_builtins`. If it does not resolve, do not use it.
 3. Learn idioms by reading the dump (`read_script`), then write workspace code in that style.
 4. Never carry an API from one game to another without re-verifying it in the target game.
-5. Names like `_id_52F7` or `function_a1b2c3` mean the dump is **hashed** — see section 7.
+5. Names like `_id_52F7` or `function_a1b2c3` mean the dump is **hashed** — see Reference §7.
 6. If you cannot call tools, say so and ask the user. Do not guess APIs from memory.
+
+## Task router
+
+Pick the recipe that matches your task, then follow its tool sequence literally.
+
+| Task | Recipe |
+|------|--------|
+| Edit existing workspace code | Recipe A |
+| Write new code / call an unfamiliar function | Recipe B |
+| Dump shows `_id_XXXX` / `function_abc123` names | Recipe C (hashed) |
+| Tool returns empty/odd result | Call `get_status`; confirm the workspace and active game |
+| Understand an unknown builtin | `search_script_content` for real usages, then `read_script` one |
+
+## Recipes (copy the shape)
+
+```
+Recipe A — edit existing code:
+1. get_status                                              → note currentGame
+2. read_script {scriptPath: "<file you are editing>"}      → see the surrounding idiom
+3. For each function it references:
+     get_symbol {name: "<name>"}                           → exists for this game? args?
+4. Make edits in that file's existing style.
+5. resolve_function {callingScriptPath: "<file>", functionName: "path::name"}
+     for EVERY cross-file call                             → must not be NotFound
+6. Do NOT copy an API out of an inactive #ifdef branch (Reference §2).
+```
+
+```
+Recipe B — write new code / verify a function:
+1. get_status                                              → note currentGame
+2. search_symbols {query: "endgame"}                       → exists for this game?
+3. get_symbol {name: "endgame"}                            → signature, arg counts
+4. read_script {scriptPath: "<file from step 2>"}          → copy the real idiom
+5. Write code in that style.
+6. resolve_function {callingScriptPath: "<your file>", functionName: "path::name"}
+     for EVERY cross-file call                             → must not be NotFound
+```
+
+```
+Recipe C — identify a hashed function via string anchors:
+1. Locate the function in a NAMED dump of a nearby title (iw8 for s4/iw9).
+     Find its definition and call sites.
+2. Collect anchors that survive hashing: string literals ("tie"), array keys
+     (game["end_reason"]["tie"]), builtin calls (logstring), branch shape
+     (if (level.teambased)), argument counts.
+3. search_script_content {pattern: "tie", pathFilter: "gametypes", contextLines: 2}
+     in the hashed dump                                    → grep bodies; search_symbols
+     matches names only and cannot find string anchors.
+4. Match SEMANTICS not text: same string args + same branching around the call = your function.
+5. For each neighbor call you enable: get_symbol / list_builtins → confirm it exists this game.
+6. State your confidence. Full procedure: Reference §7.
+```
+
+## Code templates (fill the blanks)
+
+```gsc
+// Thread-watcher: endon self-cleans the thread; every loop has a wait.
+watch_<EVENT>()
+{
+    self endon( "disconnect" );
+    while ( true )
+    {
+        self waittill( "<EVENT>" );
+        // handle event
+        wait 0.05;
+    }
+}
+```
+
+```gsc
+// Function reference: store a ref (::name, or &name on new-Treyarch), invoke with [[ ]].
+level.callback = ::<FUNC>;           // &<FUNC> on new-Treyarch GSC
+thread [[ level.callback ]]();
+```
+
+```gsc
+// Minimal #ifdef region: keep shared lines OUTSIDE the branch.
+end_round()
+{
+    setomnvarforallclients("ui_objective_state", 0);   // shared — outside branch
+#ifdef <GAME_ID>
+    // only lines that differ for this game
+#else
+    // fallback
+#endif
+}
+```
+
+## Pre-write checklist
+
+- [ ] Every new function verified to exist for the active game (`get_symbol` / `search_symbols` / `list_builtins`).
+- [ ] Every cross-file call passes `resolve_function` (not `NotFound`).
+- [ ] Every `waittill` loop has a matching `endon`.
+- [ ] Every loop has a `wait` / `waitframe` (no `wait` starves the frame).
+- [ ] No API copied out of an inactive `#ifdef` branch.
+- [ ] On hashed titles: named calls from older games may not exist (Reference §7).
+- [ ] `::foo` / `&foo` is a reference; `foo()` is a call — used the right one (Reference §3).
+
+## Tools
+
+| Tool | Purpose |
+|------|---------|
+| `get_status` | Active game, workspace, dump indexed?, symbol counts. **Call first.** |
+| `search_symbols` | Substring search of symbol NAMES across builtins + dump + workspace. |
+| `search_script_content` | Grep script BODIES (dump + workspace) for a substring/regex — string literals, hashed names, code patterns. |
+| `get_symbol` | Full detail for one exact name: signature, args, file, builtin flag. |
+| `list_builtins` | Enumerate engine builtins for the active game. |
+| `list_script_files` | List indexed script paths (filter by path substring). |
+| `get_functions_in_file` | Functions defined in one script file. |
+| `read_script` | Read dump/workspace source, with line numbers. |
+| `resolve_function` | Where does `foo()` bind when called from file X? Real resolution order. |
+| `get_gsc_primer` | This document (also resource `gsclsp://primer`). |
+
+Calling rules:
+
+- One tool call at a time; wait for each result.
+- Arguments are plain strings/numbers; results are JSON.
+- Result `{"status":"indexing_in_progress"}` → wait briefly, retry the same call.
+- Empty or odd result → call `get_status`; the server may point at the wrong workspace.
+- Only these tools exist. Do not invent others.
+
+---
+
+# Reference (read sections on demand — do not read linearly)
 
 ## 1. What GSC is
 
@@ -41,7 +171,7 @@ Two engine forks diverged after CoD4 (iw3): **Infinity Ward** style and **Treyar
 | `s4` | Vanguard (2021) | Sledgehammer | dumps **hashed** |
 | `t6` | Black Ops II | Treyarch | last old-syntax Treyarch title |
 | `t7` | Black Ops III | Treyarch | new Treyarch syntax starts here; mod-tools source exists |
-| `t8` / `t9` | Black Ops 4 / Cold War | Treyarch | dumps **hashed** with non gsc-tool compiler (https://github.com/ate47/atian-cod-tools would support this - tell the user if necessary and if they have it, proceed to find it and work with it.) |
+| `t8` / `t9` | Black Ops 4 / Cold War | Treyarch | dumps **hashed**; compiled with a non gsc-tool compiler. atian-cod-tools (https://github.com/ate47/atian-cod-tools) supports these — if the user has it, tell them and work with it. |
 | `jup` | MW III (2023) | unified | fork of `iw9`; same builtins + hash algorithm, tooling aliases iw9 data from gsc-tool, BUT use atian-cod-tools as mentioned above |
 
 Treyarch-syntax games: `t7`, `t8`, `t9`, `jup`. Everything else uses IW syntax. Always
@@ -109,8 +239,7 @@ Macro/conditional preprocessing (`#define`, `#ifdef`, `#elifdef`, `#endif`) is N
 legacy IW games. It comes from **gsc-tool** (xensik/gsc-tool), a community compiler covering
 `iw5`–`iw9`, `h1`, `h2`, `s1`, `s2`, `s4`, `jup`. Games it does not cover (`iw3`, `iw4`,
 `t4`, `t5`) compile with the native engine compiler and reject those directives — GSCLSP
-reports an error there. Treyarch `t7`+ has its own native `#define`/`#insert` support. There could be more too,
-but I don't think there is a lot more to dig into now because you can figure it out if its a `#` statement.
+reports an error there. Treyarch `t7`+ has its own native `#define`/`#insert` support.
 
 ### Conditional compilation
 
@@ -205,9 +334,9 @@ else may be missing, renamed, or take different args on another title. GSCLSP's 
 data: hand-tuned JSON with arg metadata for `iw4`/`iw5`; names-only lists from gsc-tool for
 the rest.
 
-If you don't know what a builtin does: search the dump for real usages (`search_symbols` +
-`read_script`). Final fallback: the CoD4 builtin docs (section 10) — most core builtins
-trace back to it.
+If you don't know what a builtin does, search the dump for real usages, then read one (router:
+"Understand an unknown builtin"). Final fallback: the CoD4 builtin docs (§8) — most core
+builtins trace back to it.
 
 Dumps with human comments are **developer source** (best reference). Known developer GSC:
 iw3 (mod tools), iw4 (shipped raw), iw5 (MS Store re-release developer fastfiles), iw6 (PS4 dump),
@@ -243,7 +372,7 @@ it errors at compile/load. `search_symbols` cannot find `endgame` there; the nam
 
 ### Fuzzy cross-dump matching
 
-For fuzzy cross-dump matching, your goal would be to identify which `_id_XXXX` or `function_ab5ub12` in the hashed dump is a KNOWN function,
+Goal: identify which `_id_XXXX` or `function_ab5ub12` in the hashed dump is a known function
 or location.
 
 1. **Locate the function in a NAMED dump of a nearby title.** For `s4`/`iw9`, use an `iw8`
@@ -297,52 +426,7 @@ Caveats:
 - State your confidence. One weak anchor = say "needs confirming" and suggest an in-game
   test before shipping the call.
 
-## 8. Tools
-
-| Tool | Purpose |
-|------|---------|
-| `get_status` | Active game, workspace, dump indexed?, symbol counts. **Call first.** |
-| `search_symbols` | Substring search of symbol NAMES across builtins + dump + workspace. |
-| `search_script_content` | Grep script BODIES (dump + workspace) for a substring/regex — string literals, hashed names, code patterns. |
-| `get_symbol` | Full detail for one exact name: signature, args, file, builtin flag. |
-| `list_builtins` | Enumerate engine builtins for the active game. |
-| `list_script_files` | List indexed script paths (filter by path substring). |
-| `get_functions_in_file` | Functions defined in one script file. |
-| `read_script` | Read dump/workspace source, with line numbers. |
-| `resolve_function` | Where does `foo()` bind when called from file X? Real resolution order. |
-| `get_gsc_primer` | This document (also resource `gsclsp://primer`). |
-
-Calling rules:
-
-- One tool call at a time; wait for each result.
-- Arguments are plain strings/numbers; results are JSON.
-- Result `{"status":"indexing_in_progress"}` → wait briefly, retry the same call.
-- Empty or odd result → call `get_status`; the server may point at the wrong workspace.
-- Only these tools exist. Do not invent others.
-
-Workflow for writing code:
-
-1. `get_status` → active game.
-2. `search_symbols` / `list_builtins` → does the function exist for this game?
-   (Name search only — use `search_script_content` when hunting strings or code patterns.)
-3. `read_script` a dump file that uses it → copy the real idiom.
-4. Write workspace code in that style.
-5. `resolve_function` on each cross-file call to confirm it binds.
-
-## 9. Pitfalls
-
-- Builtins vary per game — verify every one against the active game.
-- Inactive `#ifdef` regions are dead code — never source an API from them.
-- `waittill` loop without matching `endon` leaks the thread forever.
-- Loop without `wait` starves the scheduler and hangs the frame.
-- No stdlib: if a helper "should exist", search the dump; otherwise write it.
-- `::foo` / `&foo` is a reference; `foo()` is a call.
-- Qualified paths (`maps\mp\_utility`) — one wrong segment = unresolved call. Verify with
-  `resolve_function`.
-- Hashed titles: named calls from older games may not exist (section 7).
-- Trust the tools over memory.
-
-## 10. Sources
+## 8. Sources
 
 - CoD4 "Introduction to GSC" (best intro): https://wiki.zeroy.com/index.php?title=Call_of_Duty_4:_Introduction
 - CoD4 builtin function list: https://scripts.zeroy.com/cod4_script/index.html
