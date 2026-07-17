@@ -335,7 +335,7 @@ public static class GscTools
                 }
                 catch (RegexMatchTimeoutException)
                 {
-                    continue;
+                    return Json(new { error = "regex_timeout", message = $"Regex matching timed out on {path}:{i + 1}. Simplify the pattern." });
                 }
                 if (!hit) continue;
 
