@@ -49,7 +49,8 @@ public static class GscTools
             dumpSymbolCount = indexer.SymbolCount,
             workspaceSymbolCount = indexer.WorkspaceSymbols.Count,
             builtinCount = indexer.BuiltIns.GetNames().Count(),
-            indexingInProgress = service.IndexingInProgress
+            indexingInProgress = service.IndexingInProgress,
+            primer = "If you have not read the GSC primer this session, call get_gsc_primer (or read resource gsclsp://primer) before writing GSC code."
         });
     }
 
