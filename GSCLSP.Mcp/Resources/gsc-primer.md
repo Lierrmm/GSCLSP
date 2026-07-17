@@ -127,6 +127,24 @@ These are gsc-tool macros that are defined ONLY for the following games: IW5, IW
 GSCLSP grays out regions inactive for the active game and excludes them from diagnostics.
 Inactive regions are dead code — never copy an API out of an inactive branch.
 
+**Keep `#ifdef` regions minimal.** Only the lines that actually differ per game belong
+inside; hoist shared code out instead of duplicating it in every branch:
+
+```gsc
+end_round()
+{
+    setomnvarforallclients("ui_objective_state", 0);   // same on all games — outside
+    setomnvar("ui_bomb_interacting", 0);
+#ifdef S4
+    thread scripts\mp\gamelogic::_id_52F7(game["attackers"], game["end_reason"][tolower(game[game["defenders"]]) + "_eliminated"]);
+#else
+    thread scripts\mp\gamelogic::endgame(game["attackers"], game["end_reason"][tolower(game[game["defenders"]]) + "_eliminated"]);
+#endif
+}
+```
+
+When you edit code with duplicated branches like this, deduplicate it the same way.
+
 ### Control flow
 
 C-like: `if/else`, `for`, `while`, `foreach (x in arr)`, `switch/case/default`, `break`,
@@ -233,10 +251,15 @@ or location.
 2. **Collect anchors that survive hashing:** string literals (`"tie"`, log strings), array
    keys (`game["end_reason"]["tie"]`), builtin calls (`logstring`), branch shape
    (`if (level.teambased)`), argument counts, but note it could be `if ( level.teambased )` with spaces on edges of parenthesis too.
-3. **Search the hashed dump for those strings.** Start in gamemode files (`war`, `dm`,
-   `conf`, `dom`, …) and leftover utils — their structure rarely changes between titles.
+3. **Search the hashed dump for those strings** with `search_script_content` (it greps
+   script bodies — `search_symbols` matches names only and cannot find string anchors).
+   Start in gamemode files (`war`, `dm`, `conf`, `dom`, …) and leftover utils — their
+   structure rarely changes between titles.
 4. **Match the context.** Same string args + same branching around the call = the hashed
    name at that site is your function.
+5. **Verify the surrounding code too.** If you are enabling neighbor calls alongside the
+   identified function (e.g. uncommenting `setomnvar` lines), confirm each one exists for
+   the active game with `list_builtins` / `get_symbol` first — do not assume they ported.
 
 Example. iw8 (named):
 
@@ -268,9 +291,9 @@ Caveats:
   across titles — but not always. Check several call sites in the hashed dump before
   trusting a signature.
 - Log strings drift per title (`"[KEY_MOMENT] tie"` vs `"tie"`). Match the distinctive part.
-- The tools index only the ACTIVE game's dump. For cross-dump comparison, ask the user to
-  switch the workspace config to the other game, or read the other dump with the host's own
-  file tools if it is on disk.
+- The tools index only the ACTIVE game's dump — `search_script_content` searches that dump
+  and the workspace. For the OTHER (named) game's dump, ask the user to switch the workspace
+  config to that game, or read it with the host's own file tools if it is on disk.
 - State your confidence. One weak anchor = say "needs confirming" and suggest an in-game
   test before shipping the call.
 
@@ -279,7 +302,8 @@ Caveats:
 | Tool | Purpose |
 |------|---------|
 | `get_status` | Active game, workspace, dump indexed?, symbol counts. **Call first.** |
-| `search_symbols` | Substring search across builtins + dump + workspace. |
+| `search_symbols` | Substring search of symbol NAMES across builtins + dump + workspace. |
+| `search_script_content` | Grep script BODIES (dump + workspace) for a substring/regex — string literals, hashed names, code patterns. |
 | `get_symbol` | Full detail for one exact name: signature, args, file, builtin flag. |
 | `list_builtins` | Enumerate engine builtins for the active game. |
 | `list_script_files` | List indexed script paths (filter by path substring). |
@@ -300,6 +324,7 @@ Workflow for writing code:
 
 1. `get_status` → active game.
 2. `search_symbols` / `list_builtins` → does the function exist for this game?
+   (Name search only — use `search_script_content` when hunting strings or code patterns.)
 3. `read_script` a dump file that uses it → copy the real idiom.
 4. Write workspace code in that style.
 5. `resolve_function` on each cross-file call to confirm it binds.

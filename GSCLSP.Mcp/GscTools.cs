@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
 using ModelContextProtocol.Server;
@@ -269,6 +270,108 @@ public static class GscTools
             endLine = lastLine,
             truncated = lastLine < lines.Length || truncatedByBytes,
             content = sb.ToString()
+        });
+    }
+
+    [McpServerTool(Name = "search_script_content")]
+    [Description("Grep script bodies (dump + workspace) for a substring or regex: string literals, hashed names (_id_XXXX), code patterns. search_symbols matches names only; this searches text. Returns file, line, snippet.")]
+    public static string SearchScriptContent(
+        GscIndexerService service,
+        [Description("Text to find. Plain substring by default (case-insensitive). Set isRegex=true for .NET regex syntax.")] string pattern,
+        [Description("Treat pattern as a case-insensitive .NET regular expression (default false = plain substring).")] bool isRegex = false,
+        [Description("Optional file-path substring filter, e.g. 'gametypes' or 'scripts/mp'. Omit to search everything.")] string? pathFilter = null,
+        [Description("Maximum matches to return (default 30, capped at 100).")] int maxResults = 30,
+        [Description("Context lines before/after each match (default 1, max 4).")] int contextLines = 1)
+    {
+        if (service.IndexingInProgress)
+            return Json(new { status = "indexing_in_progress", message = "The GSC index is still building. Retry shortly or call get_status." });
+
+        if (string.IsNullOrEmpty(pattern))
+            return Json(new { error = "empty_pattern", message = "Provide a non-empty search pattern." });
+
+        int cap = Math.Clamp(maxResults, 1, 100);
+        int context = Math.Clamp(contextLines, 0, 4);
+
+        Regex? regex = null;
+        if (isRegex)
+        {
+            try
+            {
+                regex = new Regex(pattern, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
+            }
+            catch (ArgumentException ex)
+            {
+                return Json(new { error = "invalid_regex", message = ex.Message });
+            }
+        }
+
+        var paths = service.Indexer.GetAllIndexedFilePaths();
+        if (!string.IsNullOrEmpty(pathFilter))
+        {
+            string needle = pathFilter.Replace("\\", "/");
+            paths = paths.Where(p => p.Replace("\\", "/").Contains(needle, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var matches = new List<object>();
+        int filesScanned = 0, filesMatched = 0;
+        bool truncated = false;
+
+        foreach (var path in paths)
+        {
+            string[] lines;
+            try { lines = File.ReadAllLines(path); }
+            catch { continue; }
+            filesScanned++;
+
+            bool fileHit = false;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                bool hit;
+                try
+                {
+                    hit = regex != null
+                        ? regex.IsMatch(lines[i])
+                        : lines[i].Contains(pattern, StringComparison.OrdinalIgnoreCase);
+                }
+                catch (RegexMatchTimeoutException)
+                {
+                    continue;
+                }
+                if (!hit) continue;
+
+                fileHit = true;
+                if (matches.Count >= cap)
+                {
+                    truncated = true;
+                    break;
+                }
+
+                var sb = new System.Text.StringBuilder();
+                int from = Math.Max(0, i - context);
+                int to = Math.Min(lines.Length - 1, i + context);
+                for (int j = from; j <= to; j++)
+                {
+                    string text = lines[j].Length > 300 ? lines[j][..300] + "…" : lines[j];
+                    sb.Append($"{j + 1,6}  {text}\n");
+                }
+
+                matches.Add(new { file = path, line = i + 1, snippet = sb.ToString() });
+            }
+
+            if (fileHit) filesMatched++;
+            if (truncated) break;
+        }
+
+        return Json(new
+        {
+            pattern,
+            isRegex,
+            pathFilter,
+            filesScanned,
+            filesMatched,
+            returned = matches.Count,
+            truncated,
+            matches
         });
     }
 
