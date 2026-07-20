@@ -33,11 +33,21 @@ jobs:
           /p:PublishSingleFile=true
           /p:EnableCompressionInSingleFile=true
 
+      - name: Publish MCP server
+        run: >
+          dotnet publish GSCLSP.MCP/GSCLSP.MCP.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          /p:PublishSingleFile=true
+          /p:EnableCompressionInSingleFile=true
+
       - name: Prepare extension out folder
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "GSCLSP.Extension/out/data" -Force | Out-Null
           Copy-Item "GSCLSP.Server/bin/Release/net10.0/win-x64/publish/GSCLSP.Server.exe" "GSCLSP.Extension/out/GSCLSP.Server.exe" -Force
+          Copy-Item "GSCLSP.Mcp/bin/Release/net10.0/win-x64/publish/GSCLSP.Mcp.exe" "GSCLSP.Extension/out/GSCLSP.Mcp.exe" -Force
           Copy-Item "GSCLSP.Core/data/iw4_builtins.json" "GSCLSP.Extension/out/data/iw4_builtins.json" -Force
 
       - name: Install extension dependencies
@@ -67,4 +77,6 @@ jobs:
         with:
           generate_release_notes: true
           prerelease: ${{ endsWith(github.ref_name, '-pre') }}
-          files: GSCLSP.Extension/*.vsix
+          files: |
+            GSCLSP.Extension/*.vsix
+            GSCLSP.Mcp/bin/Release/net10.0/win-x64/publish/GSCLSP.Mcp.exe

@@ -31,13 +31,19 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "@types/vscode": "^1.75.0",
+    "@types/vscode": "^1.90.0",
     "@vscode/vsce": "latest",
     "oxfmt": "^0.58.0",
     "oxlint": "^1.71.0",
     "typescript": "^6.0.0"
   },
   "contributes": {
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "gsclsp",
+        "label": "GSCLSP MCP Server Provider"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "GSC LSP Configuration",
@@ -91,6 +97,6 @@
   },
   "icon": "logo.png",
   "engines": {
-    "vscode": "^1.80.0"
+    "vscode": "^1.90.0"
   }
 }

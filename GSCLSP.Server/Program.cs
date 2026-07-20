@@ -9,7 +9,8 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using GSCLSP.Core.Tools;
 await BuiltinArgScanner.InferArgsAsync(
     dumpFolder: @"G:\Games\MS-IW5\raw\dump\gsc",
-    builtinsJsonPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\iw5_builtins.json", matchesLogPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\output_iw5.json");
+    builtinsJsonPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\iw5_builtins.json",
+    matchesLogPath: @"F:\Web Development\GSCLSP\GSCLSP.Core\data\output_iw5.json");
 
 return;
 #endif
@@ -44,7 +45,6 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton(provider =>
                 new GscIndexer(provider.GetRequiredService<ILogger<GscIndexer>>()));
             services.AddScoped<GscDiagnosticsHandler>();
-            // Provide a Lazy<GscDiagnosticsHandler> wrapper so handlers depending on Lazy<T> can be resolved
             services.AddScoped(provider =>
                 new Lazy<GscDiagnosticsHandler>(() => provider.GetRequiredService<GscDiagnosticsHandler>()));
         })
@@ -67,7 +67,6 @@ var server = await LanguageServer.From(options =>
                 ?? request.RootUri?.GetFileSystemPath()
                 ?? request.WorkspaceFolders?.FirstOrDefault()?.Uri?.GetFileSystemPath();
 
-
             var logger = loggerFactory.CreateLogger("ServerStartup");
 
             _ = Task.Run(() =>
@@ -81,7 +80,6 @@ var server = await LanguageServer.From(options =>
                     diIndexer.RefreshConfiguration();
                 }
             }, token);
-
 
             logger.LogInformation("Running GSC LSP Server");
 

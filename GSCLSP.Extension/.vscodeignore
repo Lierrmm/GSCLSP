@@ -5,6 +5,7 @@ node_modules/**
 
 !dist/extension.js
 !out/GSCLSP.Server.exe
+!out/GSCLSP.Mcp.exe
 !out/data/*.json
 
 .gitignore
