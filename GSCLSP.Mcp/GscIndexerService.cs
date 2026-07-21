@@ -1,3 +1,4 @@
+using GSCLSP.Core.Diagnostics;
 using GSCLSP.Core.Indexing;
 using Microsoft.Extensions.Logging;
 
@@ -12,6 +13,9 @@ public sealed class GscIndexerService(ILogger<GscIndexerService> logger, ILogger
     private volatile bool _indexingInProgress = true;
 
     public GscIndexer Indexer { get; } = new(loggerFactory.CreateLogger<GscIndexer>());
+
+    public GscDiagnosticsAnalyzer Diagnostics => _diagnostics ??= new GscDiagnosticsAnalyzer(Indexer, loggerFactory.CreateLogger<GscDiagnosticsAnalyzer>());
+    private GscDiagnosticsAnalyzer? _diagnostics;
 
     public string WorkspacePath { get; } = options.WorkspacePath;
 

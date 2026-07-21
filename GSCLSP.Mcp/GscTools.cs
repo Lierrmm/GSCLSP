@@ -402,6 +402,87 @@ public static class GscTools
         });
     }
 
+    [McpServerTool(Name = "get_problems")]
+    [Description("Run the language server's diagnostics over the workspace and return current problems: unresolved functions, missing semicolons, builtin argument-count errors, recursion and early-return warnings. This is the same analysis that produces red underlines in the editor. Optionally filter to files whose path contains a substring. Use it to verify workspace GSC code is clean after edits, or to list what needs fixing.")]
+    public static async Task<string> GetProblemsAsync(
+        GscIndexerService service,
+        [Description("Optional file-path substring filter (case-insensitive), e.g. 'survival' or 'custom_scripts'. Omit to check every workspace file.")] string? pathFilter = null,
+        [Description("Maximum problems to return (default 100, capped at 200).")] int limit = 100,
+        CancellationToken cancellationToken = default)
+    {
+        if (service.IndexingInProgress)
+            return Json(new { status = "indexing_in_progress", message = "The GSC index is still building. Retry shortly or call get_status." });
+
+        int cap = Clamp(limit);
+        var indexer = service.Indexer;
+
+        var files = indexer.WorkspaceScriptFiles;
+        if (!string.IsNullOrEmpty(pathFilter))
+        {
+            string needle = pathFilter.Replace("\\", "/");
+            files = [.. files.Where(p => p.Replace("\\", "/").Contains(needle, StringComparison.OrdinalIgnoreCase))];
+        }
+
+        var problems = new List<object>();
+        int totalProblems = 0, filesWithProblems = 0;
+
+        foreach (var filePath in files.OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var text = indexer.GetFileContent(filePath);
+            if (string.IsNullOrEmpty(text)) continue;
+
+            List<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic> diagnostics;
+            try
+            {
+                diagnostics = await service.Diagnostics.CollectDiagnosticsAsync(filePath, text, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (diagnostics.Count == 0) continue;
+
+            filesWithProblems++;
+            totalProblems += diagnostics.Count;
+
+            foreach (var d in diagnostics)
+            {
+                if (problems.Count >= cap) continue;
+
+                string? code = null;
+                if (d.Code is { } dc) code = dc.IsString ? dc.String : dc.Long.ToString();
+
+                problems.Add(new
+                {
+                    file = filePath,
+                    line = d.Range.Start.Line + 1,
+                    character = d.Range.Start.Character + 1,
+                    severity = d.Severity?.ToString(),
+                    code,
+                    message = d.Message
+                });
+            }
+        }
+
+        return Json(new
+        {
+            pathFilter,
+            filesChecked = files.Count,
+            filesWithProblems,
+            totalProblems,
+            returned = problems.Count,
+            truncated = totalProblems > problems.Count,
+            problems
+        });
+    }
+
     private static string? ResolveScriptPath(GscIndexer indexer, string scriptPath)
     {
         string? viaInclude = indexer.GetIncludePath(scriptPath);

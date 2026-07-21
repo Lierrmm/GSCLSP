@@ -46,6 +46,8 @@ public partial class GscIndexer
         ApplyConfiguredDumpPath();
 
         PreWarmScanCache(localSymbols);
+
+        IndexChanged?.Invoke();
     }
 
     private void PreWarmScanCache(List<GscSymbol> symbols)
@@ -193,6 +195,8 @@ public partial class GscIndexer
 
         WorkspaceSymbols = updatedSymbols;
         _logger.LogDebug("Workspace updated. {SymbolCount} symbols now indexed", WorkspaceSymbols.Count);
+
+        IndexChanged?.Invoke();
     }
 
     private static int GetLineNumberFromIndex(string content, int index)

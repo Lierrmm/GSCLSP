@@ -204,8 +204,9 @@ namespace GSCLSP.Server.Handlers
             }
 
             var isTreyarch = _indexer.IsTreyarchGsc;
+            var allowsPaths = _indexer.AllowsPathQualifiedCalls;
 
-            if (!isTreyarch)
+            if (allowsPaths)
             {
                 if (AddNamespaceFolderCompletions(completions, lineUntilCursor, request.Position))
                     return GscCompletionItemFactory.ToFilteredList(completions);
@@ -215,22 +216,29 @@ namespace GSCLSP.Server.Handlers
             if (namespaceMatch.Success)
             {
                 string qualifier = namespaceMatch.Groups[1].Value;
+                bool qualifierIsPath = qualifier.Contains('\\') || qualifier.Contains('/');
 
-                if (isTreyarch)
+                if (isTreyarch && !qualifierIsPath)
                 {
                     var usedNamespaces = _indexer.GetUsedNamespaces(currentFileLines);
-                    if (usedNamespaces.TryGetValue(qualifier, out var nsFilePath))
+                    if (usedNamespaces.TryGetValue(qualifier, out var nsFilePaths))
                     {
                         var filteredSymbols = _indexer.WorkspaceSymbols
-                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate)
-                            .Concat(_indexer.Symbols
-                            .Where(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) && !s.IsPrivate));
+                            .Concat(_indexer.Symbols)
+                            .Where(s => !s.IsPrivate && nsFilePaths.Contains(s.FilePath, StringComparer.OrdinalIgnoreCase));
 
                         foreach (var symbol in filteredSymbols)
                         {
                             completions.Add(GscCompletionItemFactory.FromSymbol(symbol, CompletionItemKind.Method, $"via {qualifier}::", appendSemicolon));
                         }
+                        return GscCompletionItemFactory.ToFilteredList(completions);
                     }
+
+                    if (!allowsPaths)
+                        return GscCompletionItemFactory.ToFilteredList(completions);
+                }
+                else if (isTreyarch && !allowsPaths)
+                {
                     return GscCompletionItemFactory.ToFilteredList(completions);
                 }
 

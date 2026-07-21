@@ -49,7 +49,7 @@ public class GscDocumentSyncHandler(GscDocumentStore store, Lazy<GscDiagnosticsH
     public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
     {
         _store.Remove(request.TextDocument.Uri);
-        await _diagnosticsHandler.Value.ClearAsync(request.TextDocument.Uri, cancellationToken);
+        await _diagnosticsHandler.Value.PublishFromDiskAsync(request.TextDocument.Uri, cancellationToken);
         return Unit.Value;
     }
 

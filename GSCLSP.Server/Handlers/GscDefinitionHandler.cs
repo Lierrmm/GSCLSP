@@ -139,22 +139,17 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
         if (symbol != null && !string.IsNullOrEmpty(pathFilter))
         {
             var allSymbols = _indexer.Symbols.Concat(_indexer.WorkspaceSymbols);
+            symbol = null;
 
-            if (_indexer.IsTreyarchGsc)
+            if (_indexer.IsTreyarchGsc && !pathFilter.Contains('/'))
             {
-                var nsFilePath = _indexer.ResolveNamespaceToFilePath(pathFilter, currentFilePath);
-                if (nsFilePath != null)
-                {
-                    symbol = allSymbols.FirstOrDefault(s =>
-                        s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
-                        s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase));
-                }
-                else
-                {
-                    symbol = null;
-                }
+                var nsFilePaths = _indexer.ResolveNamespaceToFilePaths(pathFilter, currentFilePath);
+                symbol = allSymbols.FirstOrDefault(s =>
+                    s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&
+                    nsFilePaths.Contains(s.FilePath, StringComparer.OrdinalIgnoreCase));
             }
-            else
+
+            if (symbol == null && _indexer.AllowsPathQualifiedCalls)
             {
                 symbol = allSymbols.FirstOrDefault(s =>
                     s.Name.Equals(lookupName, StringComparison.OrdinalIgnoreCase) &&

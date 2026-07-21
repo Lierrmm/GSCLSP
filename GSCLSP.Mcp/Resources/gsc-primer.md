@@ -20,6 +20,7 @@ Two tiers: the **Core** below is operational (read it fully before writing GSC);
 4. Never carry an API from one game to another without re-verifying it in the target game.
 5. Names like `_id_52F7` or `function_a1b2c3` mean the dump is **hashed** — see Reference §7.
 6. If you cannot call tools, say so and ask the user. Do not guess APIs from memory.
+7. The "Comment Rules" apply to how you think and use comments in any project. **THIS IS IMPORTANT TO MINIMIZE UNNEEDED CODE.**
 
 ## Task router
 
@@ -77,9 +78,11 @@ Recipe C — identify a hashed function via string anchors:
 
 ```gsc
 // Thread-watcher: endon self-cleans the thread; every loop has a wait.
+// The two endons below are the standard pair — see the checklist before dropping either.
 watch_<EVENT>()
 {
-    self endon( "disconnect" );
+    level endon( "game_ended" );   // match over → thread dies (almost always wanted)
+    self endon( "disconnect" );    // when self is a player: player left → thread dies
     while ( true )
     {
         self waittill( "<EVENT>" );
@@ -113,6 +116,7 @@ end_round()
 - [ ] Every new function verified to exist for the active game (`get_symbol` / `search_symbols` / `list_builtins`).
 - [ ] Every cross-file call passes `resolve_function` (not `NotFound`).
 - [ ] Every `waittill` loop has a matching `endon`.
+- [ ] Every spawned thread ends on the right lifetime: `level endon( "game_ended" )` for match-lifetime loops, plus `self endon( "disconnect" )` when it runs on a player. Omit `game_ended` only with an explicit reason (e.g. post-game/killcam logic that waits for its own end event).
 - [ ] Every loop has a `wait` / `waitframe` (no `wait` starves the frame).
 - [ ] No API copied out of an inactive `#ifdef` branch.
 - [ ] On hashed titles: named calls from older games may not exist (Reference §7).
@@ -324,6 +328,31 @@ Standard idiom: `thread` a watcher, put `self endon("...")` at the top so it sel
 loop on `waittill`. Wrong `endon`/`waittill` pairing is the #1 cause of leaked threads. A
 loop with no `wait` hangs the game frame.
 
+### Thread cleanup with `endon` (memory safety)
+
+`endon` is how a thread declares its lifetime; without one it runs until the VM kills it,
+and leaked threads accumulate — on dedicated servers that run match after match this is a
+real crash vector, not a style nit. The two by far most common lifetime anchors:
+
+```gsc
+level endon( "game_ended" );   // level notifies "game_ended" when the match ends
+self endon( "disconnect" );    // a player entity notifies "disconnect" on leaving
+```
+
+Rules of thumb:
+
+- Almost every loop should die with the match: put `level endon( "game_ended" );` at the
+  top of the thread unless there is an explicit reason it must outlive the game (e.g.
+  post-game/killcam logic — anchor that to its own event instead, like a killcam-ended
+  notify).
+- Any thread running on a player (`self` is a player, or the loop touches one) also needs
+  `self endon( "disconnect" );` so it cleans up when that player leaves. Waiting on an
+  entity that no longer exists is a script error waiting to happen.
+- Both together is the normal shape for per-player watcher loops; they are cheap, stack
+  freely, and multiple `endon`s on one thread are fine.
+- `endon` only ends the *current* thread — child threads it spawned keep running and need
+  their own `endon`s.
+
 ## 5. Engine builtins
 
 Builtins are C++ engine functions with no `.gsc` source (`iprintln`, `getentarray`, `spawn`,
@@ -435,3 +464,25 @@ Caveats:
 - Black Ops 3 source code explorer: https://bo3explorer.zeroy.com/
 - Ghosts developer GSC dump: https://github.com/mjkzy/iw6-gsc-dump
 - MWR (H1) reverse-engineered dump, ~98% named — useful for s1/s2/h1/h2: https://github.com/mjkzy/h1-gsc-dump
+
+## Comment Rules
+
+The default behavior is to use **no comment(s)**. Write code that explains itself through naming and structure instead, and can be completely understood without comments. A comment is only justified when it carries information that is *not recoverable from the code*, and that a competent developer reading this file would otherwise get wrong. In practice that means:
+
+- A non-obvious external constraint: a Windows/NT behaviour, an undocumented structure layout, a hardware or
+  emulator quirk that forces the code into a shape that otherwise looks wrong.
+- A deliberate deviation: why the obvious approach was *not* taken, when the code alone would make a reader
+  want to "fix" it.
+- A reference that saves someone a research session: a spec section, an MSDN structure, a known-bug link.
+
+Never write:
+
+- Restatements of the code (`// increment the counter`, `// call the handler`, `// loop over the modules`).
+- Section headers or banners inside a function (`// --- setup ---`, `// Step 3: cleanup`).
+- Narration of your own edit or reasoning (`// changed to fix X`, `// this is safe because ...`, `// now uses Y`).
+  This is talking to the reviewer, not to the next reader, and it is noise the moment the change is merged.
+- Docstring-style headers that just spell out the signature in prose.
+- Obvious type or scope information (`// pointer to the process`).
+
+If you are unsure whether a comment qualifies, it does not. Leave it out. A change that adds zero comments is a
+perfectly good change; a change that sprinkles comments over otherwise readable code will be rejected.

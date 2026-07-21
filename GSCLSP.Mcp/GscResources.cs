@@ -9,6 +9,11 @@ public static class GscResources
 {
     private const string PrimerRelativePath = "Resources/gsc-primer.md";
 
+    [McpServerResource(UriTemplate = "gsclsp://problems", Name = "Workspace Problems", MimeType = "application/json")]
+    [Description("Current diagnostics for every workspace GSC file — the same problems the language server underlines in the editor (unresolved functions, missing semicolons, builtin arg-count errors, warnings). JSON with file, line, severity, code, and message per problem. Equivalent to calling the get_problems tool with no filter.")]
+    public static Task<string> GetProblemsAsync(GscIndexerService service) =>
+        GscTools.GetProblemsAsync(service);
+
     [McpServerResource(UriTemplate = "gsclsp://primer", Name = "GSC Language Primer", MimeType = "text/markdown")]
     [Description("A primer that teaches an AI client how to read and write GSC (Call of Duty scripting) through this server: syntax, per-game quirks, special literals, the runtime model, and how to verify facts with the GSC tools. Read this before generating GSC code.")]
     public static string GetPrimer() => ReadPrimer();

@@ -24,6 +24,7 @@ public class GscDiagnosticsHandler : IDisposable
     private CancellationTokenSource? _republishCancellationTokenSource;
     private readonly ILogger<GscDiagnosticsHandler> _logger;
     private readonly Action<string> _onGameChanged;
+    private readonly Action _onIndexChanged;
     private readonly Action<string, bool> _onDumpStatusChanged;
 
     public GscDiagnosticsHandler(GscIndexer indexer, ILanguageServerFacade languageServer, GscDocumentStore documentStore, ILogger<GscDiagnosticsHandler> logger)
@@ -36,7 +37,8 @@ public class GscDiagnosticsHandler : IDisposable
         _diagnosticsAnalyzer = new GscDiagnosticsAnalyzer(indexer, _logger);
 
         // Use stored delegate instances so we can unsubscribe later (Dispose)
-        _onGameChanged = _ => StartRepublishAllOpenDocuments();
+        _onGameChanged = _ => StartRepublishWorkspace();
+        _onIndexChanged = StartRepublishWorkspace;
         _onDumpStatusChanged = (game, hasDump) =>
         {
             try
@@ -50,10 +52,13 @@ public class GscDiagnosticsHandler : IDisposable
         };
 
         _indexer.GameChanged += _onGameChanged;
+        _indexer.IndexChanged += _onIndexChanged;
         _indexer.DumpStatusChanged += _onDumpStatusChanged;
+
+        StartRepublishWorkspace();
     }
 
-    private void StartRepublishAllOpenDocuments()
+    private void StartRepublishWorkspace()
     {
         var cancellationTokenSource = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _republishCancellationTokenSource, cancellationTokenSource);
@@ -67,15 +72,28 @@ public class GscDiagnosticsHandler : IDisposable
         {
         }
 
-        _ = RepublishAllOpenDocumentsAsync(cancellationTokenSource);
+        _ = RepublishWorkspaceAsync(cancellationTokenSource);
     }
 
-    private async Task RepublishAllOpenDocumentsAsync(CancellationTokenSource cancellationTokenSource)
+    private async Task RepublishWorkspaceAsync(CancellationTokenSource cancellationTokenSource)
     {
         var cancellationToken = cancellationTokenSource.Token;
-        var tasks = _documentStore.OpenDocuments
-            .Select(document => RepublishDocumentAsync(document.Key, document.Value, cancellationToken))
-            .ToArray();
+        var tasks = new List<Task>();
+        var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (uri, text) in _documentStore.OpenDocuments)
+        {
+            seenPaths.Add(GscIndexer.NormalizePath(uri.GetFileSystemPath()));
+            tasks.Add(RepublishDocumentAsync(uri, text, cancellationToken));
+        }
+
+        foreach (var filePath in _indexer.WorkspaceScriptFiles)
+        {
+            if (!seenPaths.Add(GscIndexer.NormalizePath(filePath)))
+                continue;
+
+            tasks.Add(RepublishClosedFileAsync(filePath, cancellationToken));
+        }
 
         try
         {
@@ -102,6 +120,42 @@ public class GscDiagnosticsHandler : IDisposable
         catch (Exception)
         {
         }
+    }
+
+    private async Task RepublishClosedFileAsync(string filePath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var text = _indexer.GetFileContent(filePath);
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            var diagnostics = await CollectDiagnosticsAsync(filePath, text, cancellationToken);
+
+            _languageServer.SendNotification("textDocument/publishDiagnostics", new PublishDiagnosticsParams
+            {
+                Uri = DocumentUri.FromFileSystemPath(filePath),
+                Diagnostics = new Container<Diagnostic>(diagnostics)
+            });
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    public async Task PublishFromDiskAsync(DocumentUri uri, CancellationToken cancellationToken)
+    {
+        var filePath = uri.GetFileSystemPath();
+        if (!File.Exists(filePath))
+        {
+            await ClearAsync(uri, cancellationToken);
+            return;
+        }
+
+        await RepublishClosedFileAsync(filePath, cancellationToken);
     }
 
     public async Task PublishAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
@@ -296,6 +350,13 @@ public class GscDiagnosticsHandler : IDisposable
         {
             if (_onGameChanged is not null)
                 _indexer.GameChanged -= _onGameChanged;
+        }
+        catch { }
+
+        try
+        {
+            if (_onIndexChanged is not null)
+                _indexer.IndexChanged -= _onIndexChanged;
         }
         catch { }
 

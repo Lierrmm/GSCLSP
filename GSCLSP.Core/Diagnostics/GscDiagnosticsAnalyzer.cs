@@ -623,17 +623,26 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             if (PathMatches(currentFilePath, qualifiedPath) && localFunctions.Contains(functionName))
                 return true;
 
-            if (isTreyarch)
-            {
-                var nsFilePath = _indexer.ResolveNamespaceToFilePath(qualifiedPath, currentFilePath);
-                if (nsFilePath == null)
-                    return false;
+            bool looksLikePath = qualifiedPath.Contains('\\') || qualifiedPath.Contains('/');
 
-                return _indexer.WorkspaceSymbols
-                    .Concat(_indexer.Symbols)
-                    .Any(s => s.FilePath.Equals(nsFilePath, StringComparison.OrdinalIgnoreCase) &&
-                              s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
-                              !s.IsPrivate);
+            if (isTreyarch && !looksLikePath)
+            {
+                var nsFilePaths = _indexer.ResolveNamespaceToFilePaths(qualifiedPath, currentFilePath);
+                if (nsFilePaths.Count > 0)
+                {
+                    return _indexer.WorkspaceSymbols
+                        .Concat(_indexer.Symbols)
+                        .Any(s => s.Name.Equals(functionName, StringComparison.OrdinalIgnoreCase) &&
+                                  !s.IsPrivate &&
+                                  nsFilePaths.Contains(s.FilePath, StringComparer.OrdinalIgnoreCase));
+                }
+
+                if (!_indexer.AllowsPathQualifiedCalls)
+                    return false;
+            }
+            else if (isTreyarch && !_indexer.AllowsPathQualifiedCalls)
+            {
+                return false;
             }
 
             if (includedFiles.Any(f => PathMatches(f.Path, qualifiedPath) && f.Functions.Contains(functionName)))

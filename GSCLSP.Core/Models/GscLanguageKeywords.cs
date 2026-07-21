@@ -55,6 +55,9 @@ public static class GscLanguageKeywords
 
     public static bool IsTreyarchGscGame(string gameId) => TreyarchGscGames.Contains(gameId);
 
+    public static bool AllowsPathQualifiedCalls(string gameId) =>
+        !IsTreyarchGscGame(gameId) || gameId == "jup";
+
     public static readonly HashSet<string> LocalVariableReservedWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "if", "else", "do", "while", "for", "foreach", "in",

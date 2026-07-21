@@ -103,7 +103,8 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var localVarHover = FindLocalVariable(filePath, lines, identifier, request.Position.Line);
         if (localVarHover != null) return localVarHover;
 
-        if (_indexer.IsTreyarchGsc && identifier.Contains("::"))
+        if (_indexer.IsTreyarchGsc && identifier.Contains("::") &&
+            !identifier.Contains('\\') && !identifier.Contains('/'))
         {
             var nsParts = identifier.Split("::", 2);
             var nsName = nsParts[0];
@@ -115,41 +116,36 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
             bool cursorOnNamespace = wordEnd + 1 < line.Length && line[wordEnd] == ':' && line[wordEnd + 1] == ':';
 
-            if (cursorOnNamespace)
+            var nsFilePaths = _indexer.ResolveNamespaceToFilePaths(nsName, filePath);
+
+            if (cursorOnNamespace && nsFilePaths.Count > 0)
             {
-                var nsFilePath = _indexer.ResolveNamespaceToFilePath(nsName, filePath);
-                if (nsFilePath != null)
+                var contentValue = $"```gsc\n#namespace {nsName};\n```\n---\n**Defined in:**";
+                foreach (var nsFilePath in nsFilePaths)
                 {
                     var nsLine = FindNamespaceLineInFile(nsFilePath, nsName);
-                    var contentValue = $"```gsc\n#namespace {nsName};\n```\n---\n**Defined in:** `{nsFilePath}`";
-                    if (nsLine > 0)
-                        contentValue += $"\n\n**Line:** {nsLine}";
-
-                    var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
-                    return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
+                    contentValue += $"\n- `{nsFilePath}`" + (nsLine > 0 ? $" (line {nsLine})" : "");
                 }
+
+                var markupContent = new MarkupContent { Kind = MarkupKind.Markdown, Value = contentValue };
+                return new Hover { Contents = new MarkedStringsOrMarkupContent(markupContent) };
             }
 
-            identifier = nsFuncName;
+            var nsSymbol = _indexer.WorkspaceSymbols
+                .Concat(_indexer.Symbols)
+                .FirstOrDefault(s =>
+                    s.Name.Equals(nsFuncName, StringComparison.OrdinalIgnoreCase) &&
+                    !s.IsPrivate &&
+                    nsFilePaths.Contains(s.FilePath, StringComparer.OrdinalIgnoreCase));
 
-            var nsTargetPath = _indexer.ResolveNamespaceToFilePath(nsName, filePath);
-            if (nsTargetPath != null)
+            if (nsSymbol != null)
             {
-                var nsSymbol = _indexer.WorkspaceSymbols
-                    .Concat(_indexer.Symbols)
-                    .FirstOrDefault(s =>
-                        s.FilePath.Equals(nsTargetPath, StringComparison.OrdinalIgnoreCase) &&
-                        s.Name.Equals(nsFuncName, StringComparison.OrdinalIgnoreCase) &&
-                        !s.IsPrivate);
-
-                if (nsSymbol != null)
-                {
-                    var nsResolution = new GscResolution(nsSymbol, ResolutionType.Included, nsTargetPath);
-                    return BuildFunctionHover(nsResolution, filePath);
-                }
+                var nsResolution = new GscResolution(nsSymbol, ResolutionType.Included, nsSymbol.FilePath);
+                return BuildFunctionHover(nsResolution, filePath);
             }
 
-            return null;
+            if (!_indexer.AllowsPathQualifiedCalls)
+                return null;
         }
 
         var resolution = _indexer.ResolveFunction(filePath, identifier);
