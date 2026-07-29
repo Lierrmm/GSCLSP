@@ -190,7 +190,7 @@ public partial class GscIndexer(ILogger logger)
     private void ParseFile(string path)
     {
         var fileMap = new GscFileMap { FilePath = path };
-        var lines = File.ReadAllLines(path);
+        var lines = ReadLinesWithoutDocComments(path);
 
         foreach (var levelField in ScanLevelFields(lines, path))
             AddDumpLevelField(levelField);
@@ -355,6 +355,26 @@ public partial class GscIndexer(ILogger logger)
         }
 
         return line;
+    }
+
+    private static string[] ReadLinesWithoutDocComments(string path)
+    {
+        var raw = File.ReadAllText(path);
+
+        if (raw.Contains("/@", StringComparison.Ordinal))
+        {
+            raw = DocCommentRegex().Replace(raw, m => string.Create(m.Length, m.Value, static (span, source) =>
+            {
+                for (int i = 0; i < source.Length; i++)
+                    span[i] = source[i] is '\n' or '\r' ? source[i] : ' ';
+            }));
+        }
+
+        var lines = raw.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+            lines[i] = lines[i].TrimEnd('\r');
+
+        return lines;
     }
 
     private static string CleanGscParams(string raw)
@@ -752,6 +772,19 @@ public partial class GscIndexer(ILogger logger)
                 }
 
                 if (!hasBrace) continue;
+
+                var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(lines, i - 1);
+                if (docBlock != null)
+                {
+                    return new GscSymbol(
+                        Name: fnName,
+                        FilePath: filePath,
+                        LineNumber: i + 1,
+                        Parameters: paramsText,
+                        Type: SymbolType.Function,
+                        Documentation: docBlock
+                    );
+                }
 
                 // Collect documentation comments immediately above definition
                 List<string>? commentLines = null;

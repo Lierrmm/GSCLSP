@@ -55,9 +55,9 @@ public sealed class GscLexer
                 continue;
             }
 
-            if (current == '/' && Peek(1) == '*')
+            if (current == '/' && (Peek(1) == '*' || Peek(1) == '@'))
             {
-                ReadBlockComment();
+                ReadBlockComment(Peek(1));
                 AddToken(TokenKind.Comment, start, line, column);
                 continue;
             }
@@ -152,7 +152,7 @@ public sealed class GscLexer
         }
     }
 
-    private void ReadBlockComment()
+    private void ReadBlockComment(char terminator)
     {
         var start = _position;
         var line = _line;
@@ -163,7 +163,7 @@ public sealed class GscLexer
 
         while (!IsAtEnd)
         {
-            if (Current == '*' && Peek(1) == '/')
+            if (Current == terminator && Peek(1) == '/')
             {
                 Advance();
                 Advance();

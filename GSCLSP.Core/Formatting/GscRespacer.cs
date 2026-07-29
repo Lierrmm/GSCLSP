@@ -1,4 +1,5 @@
 using System.Text;
+using GSCLSP.Core.Models;
 using GSCLSP.Lexer;
 
 namespace GSCLSP.Core.Formatting;
@@ -17,7 +18,7 @@ internal static class GscRespacer
         "waittill", "waittillmatch", "waittillframeend", "endon", "notify"
     };
 
-    public static List<string> Respace(List<string> rawLines, bool seedInBlock = false)
+    public static List<string> Respace(List<string> rawLines, BlockCommentKind seedInBlock = BlockCommentKind.None)
     {
         var res = new List<string>(rawLines.Count);
         var inBlock = seedInBlock;
@@ -25,7 +26,7 @@ internal static class GscRespacer
         foreach (var rawLine in rawLines)
         {
             var info = LineAnalyzer.Analyze(rawLine, inBlock, false);
-            var startedInBlock = inBlock;
+            var startedInBlock = inBlock != BlockCommentKind.None;
             inBlock = info.EndsInBlockComment;
 
             if (info.IsBlank) { res.Add(""); continue; }

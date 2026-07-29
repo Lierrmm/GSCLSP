@@ -46,7 +46,7 @@ internal static class GscFormatterCleanup
         var lastCode = -1;
         var inStr = false;
         var sc = '\0';
-        var inBlk = false;
+        var blkCloser = '\0';
         var i = 0;
 
         while (i < n)
@@ -54,9 +54,9 @@ internal static class GscFormatterCleanup
             var ch = line[i];
             var ch2 = i + 1 < n ? line[i + 1] : '\0';
 
-            if (inBlk)
+            if (blkCloser != '\0')
             {
-                if (ch == '*' && ch2 == '/') { inBlk = false; i += 2; continue; }
+                if (ch == blkCloser && ch2 == '/') { blkCloser = '\0'; i += 2; continue; }
                 i++; continue;
             }
             if (inStr)
@@ -66,7 +66,7 @@ internal static class GscFormatterCleanup
                 i++; continue;
             }
             if (ch == '/' && ch2 == '/') break;
-            if (ch == '/' && ch2 == '*') { inBlk = true; i += 2; continue; }
+            if (ch == '/' && (ch2 == '*' || ch2 == '@')) { blkCloser = ch2; i += 2; continue; }
             if (ch == '"' || ch == '\'') { inStr = true; sc = ch; i++; continue; }
             if (ch is not ' ' and not '\t') lastCode = i;
             i++;

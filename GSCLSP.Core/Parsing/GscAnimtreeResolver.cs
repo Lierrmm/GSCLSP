@@ -33,7 +33,7 @@ public static class GscAnimtreeResolver
     /// </summary>
     public static IEnumerable<AnimtreeUsage> FindUsages(string[] lines)
     {
-        bool inBlockComment = false;
+        var inBlockComment = BlockCommentKind.None;
 
         for (int i = 0; i < lines.Length; i++)
         {
@@ -43,23 +43,24 @@ public static class GscAnimtreeResolver
         }
     }
 
-    private static string StripComments(string line, ref bool inBlockComment)
+    private static string StripComments(string line, ref BlockCommentKind inBlockComment)
     {
         var chars = line.ToCharArray();
         int i = 0;
 
         while (i < chars.Length)
         {
-            if (inBlockComment)
+            if (inBlockComment != BlockCommentKind.None)
             {
-                int close = line.IndexOf("*/", i, StringComparison.Ordinal);
+                var closer = inBlockComment == BlockCommentKind.Star ? "*/" : "@/";
+                int close = line.IndexOf(closer, i, StringComparison.Ordinal);
                 if (close < 0)
                 {
                     for (int j = i; j < chars.Length; j++) chars[j] = ' ';
                     break;
                 }
                 for (int j = i; j < close + 2; j++) chars[j] = ' ';
-                inBlockComment = false;
+                inBlockComment = BlockCommentKind.None;
                 i = close + 2;
                 continue;
             }
@@ -70,9 +71,9 @@ public static class GscAnimtreeResolver
                 break;
             }
 
-            if (i + 1 < chars.Length && chars[i] == '/' && chars[i + 1] == '*')
+            if (i + 1 < chars.Length && chars[i] == '/' && (chars[i + 1] == '*' || chars[i + 1] == '@'))
             {
-                inBlockComment = true;
+                inBlockComment = chars[i + 1] == '*' ? BlockCommentKind.Star : BlockCommentKind.At;
                 continue;
             }
 

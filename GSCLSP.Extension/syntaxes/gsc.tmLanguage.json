@@ -89,6 +89,25 @@
     "comments": {
       "patterns": [
         {
+          "begin": "/@",
+          "end": "@/",
+          "name": "comment.block.documentation.gsc",
+          "patterns": [
+            {
+              "match": "\\[([A-Z_]+)\\]:",
+              "captures": {
+                "1": {
+                  "name": "storage.type.class.gscdoc"
+                }
+              }
+            },
+            {
+              "match": "<[A-Za-z_]\\w*>",
+              "name": "variable.other.gscdoc"
+            }
+          ]
+        },
+        {
           "begin": "/\\*",
           "end": "\\*/",
           "name": "comment.block.gsc"

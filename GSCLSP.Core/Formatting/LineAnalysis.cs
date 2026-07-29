@@ -1,3 +1,5 @@
+using GSCLSP.Core.Models;
+
 namespace GSCLSP.Core.Formatting;
 
 internal readonly record struct BraceEvent(bool Open, bool IsSwitch);
@@ -11,7 +13,7 @@ internal readonly record struct LineAnalysis(
     int CommentAt,
     bool StartsWithOpenBrace,
     bool IsBracelessHeader,
-    bool EndsInBlockComment,
+    BlockCommentKind EndsInBlockComment,
     bool EndsExpectingSwitchBrace,
     int LeadingClosers,
     string FirstWord,
@@ -27,7 +29,7 @@ internal static class LineAnalyzer
         "if", "for", "while", "foreach", "else", "do"
     };
 
-    public static LineAnalysis Analyze(string line, bool inBlockComment, bool pendingSwitchBrace)
+    public static LineAnalysis Analyze(string line, BlockCommentKind inBlockComment, bool pendingSwitchBrace)
     {
         var n = line.Length;
         var i = 0;
@@ -56,11 +58,12 @@ internal static class LineAnalyzer
             var c = line[i];
             var c2 = i + 1 < n ? line[i + 1] : '\0';
 
-            if (inBlock)
+            if (inBlock != BlockCommentKind.None)
             {
-                if (c == '*' && c2 == '/')
+                var closer = inBlock == BlockCommentKind.Star ? '*' : '@';
+                if (c == closer && c2 == '/')
                 {
-                    inBlock = false;
+                    inBlock = BlockCommentKind.None;
                     i += 2;
                     continue;
                 }
@@ -91,11 +94,11 @@ internal static class LineAnalyzer
                 break;
             }
 
-            if (c == '/' && c2 == '*')
+            if (c == '/' && (c2 == '*' || c2 == '@'))
             {
                 if (firstSig < 0) { firstSig = i; firstSigChar = c; }
                 hasInlineBlockComment = true;
-                inBlock = true;
+                inBlock = c2 == '*' ? BlockCommentKind.Star : BlockCommentKind.At;
                 i += 2;
                 continue;
             }
@@ -206,9 +209,10 @@ internal static class LineAnalyzer
         }
 
         var trimmed = line.Trim();
-        var isBlank = firstSig < 0 && !inBlockComment;
-        var hasCodeAfterBlock = inBlockComment && codeStarted;
-        var isCommentOnly = !codeStarted && !isBlank && !inBlockComment;
+        var startedInBlock = inBlockComment != BlockCommentKind.None;
+        var isBlank = firstSig < 0 && !startedInBlock;
+        var hasCodeAfterBlock = startedInBlock && codeStarted;
+        var isCommentOnly = !codeStarted && !isBlank && !startedInBlock;
         var hasOpenBrace = braces.Exists(b => b.Open);
         var isBracelessHeader =
             codeStarted &&
