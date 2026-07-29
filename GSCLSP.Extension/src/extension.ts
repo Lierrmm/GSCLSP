@@ -18,6 +18,9 @@ import {
   Range,
   Uri,
   LogLevel,
+  languages,
+  type LanguageStatusItem,
+  LanguageStatusSeverity,
 } from "vscode";
 import {
   LanguageClient,
@@ -31,6 +34,8 @@ let client: LanguageClient;
 let targetGameStatusBar: StatusBarItem | undefined;
 let inactiveDecoration: TextEditorDecorationType | undefined;
 const inactiveRangesByUri = new Map<string, Range[]>();
+let compiledStatusItem: LanguageStatusItem | undefined;
+const compiledUris = new Set<string>();
 
 // games that GSCLSP can work on no problem, but they may use IW4 builtins for now
 const KNOWN_GAMES = [
@@ -188,6 +193,42 @@ function handleInactiveRegions(params: InactiveRegionsParams): void {
       applyDecorationsFor(editor);
     }
   }
+}
+
+interface CompiledScriptParams {
+  uri: string;
+  compiled: boolean;
+}
+
+function refreshCompiledStatus(): void {
+  const activeUri = window.activeTextEditor?.document.uri.toString();
+
+  if (!activeUri || !compiledUris.has(activeUri)) {
+    compiledStatusItem?.dispose();
+    compiledStatusItem = undefined;
+    return;
+  }
+
+  if (!compiledStatusItem) {
+    compiledStatusItem = languages.createLanguageStatusItem("gsclsp.compiledScript", {
+      scheme: "file",
+      language: "gsc",
+    });
+  }
+
+  compiledStatusItem.severity = LanguageStatusSeverity.Warning;
+  compiledStatusItem.text = "$(circle-slash) Compiled GSC";
+  compiledStatusItem.detail = "Compiled script — language features disabled";
+}
+
+function handleCompiledScript(params: CompiledScriptParams): void {
+  const key = Uri.parse(params.uri).toString();
+  if (params.compiled) {
+    compiledUris.add(key);
+  } else {
+    compiledUris.delete(key);
+  }
+  refreshCompiledStatus();
 }
 
 async function ensureWorkspaceConfigFile(folder: WorkspaceFolder): Promise<void> {
@@ -413,13 +454,29 @@ export async function activate(context: ExtensionContext): Promise<void> {
   context.subscriptions.push(client.onNotification("custom/dumpStatus", handleDumpStatus));
 
   context.subscriptions.push(
+    client.onNotification("custom/compiledScript", handleCompiledScript),
+    {
+      dispose: () => {
+        compiledStatusItem?.dispose();
+        compiledStatusItem = undefined;
+        compiledUris.clear();
+      },
+    },
+  );
+
+  context.subscriptions.push(
     workspace.onDidCloseTextDocument((doc) => {
-      inactiveRangesByUri.delete(doc.uri.toString());
+      const key = doc.uri.toString();
+      inactiveRangesByUri.delete(key);
+      compiledUris.delete(key);
     }),
   );
 
   context.subscriptions.push(
-    window.onDidChangeActiveTextEditor((editor) => applyDecorationsFor(editor)),
+    window.onDidChangeActiveTextEditor((editor) => {
+      applyDecorationsFor(editor);
+      refreshCompiledStatus();
+    }),
     window.onDidChangeVisibleTextEditors((editors) => {
       for (const e of editors) applyDecorationsFor(e);
     }),

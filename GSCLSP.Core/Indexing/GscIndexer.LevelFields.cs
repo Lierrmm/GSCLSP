@@ -64,6 +64,9 @@ public partial class GscIndexer
 
         foreach (var file in files)
         {
+            if (GscCompiledScriptDetector.IsCompiledFile(file))
+                continue;
+
             try
             {
                 foreach (var field in ScanLevelFields(File.ReadAllLines(file), file))

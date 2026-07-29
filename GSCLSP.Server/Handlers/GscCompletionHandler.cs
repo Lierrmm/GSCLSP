@@ -26,6 +26,8 @@ namespace GSCLSP.Server.Handlers
             var currentFilePath = uri.GetFileSystemPath();
 
             var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(currentFilePath);
+            if (GscCompiledScriptDetector.IsCompiledText(content)) return new CompletionList();
+
             var currentFileLines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
 
             if (request.Position.Line >= currentFileLines.Length) return new CompletionList();

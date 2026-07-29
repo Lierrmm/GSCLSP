@@ -1,3 +1,4 @@
+using GSCLSP.Core.Models;
 using MediatR;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -11,10 +12,22 @@ namespace GSCLSP.Server.Handlers;
 public class GscDocumentStore
 {
     private readonly ConcurrentDictionary<DocumentUri, string> _documents = new();
+    private readonly ConcurrentDictionary<DocumentUri, bool> _compiled = new();
 
-    public void Update(DocumentUri uri, string text) => _documents[uri] = text;
-    public void Remove(DocumentUri uri) => _documents.TryRemove(uri, out _);
+    public void Update(DocumentUri uri, string text)
+    {
+        _documents[uri] = text;
+        _compiled[uri] = GscCompiledScriptDetector.IsCompiledText(text);
+    }
+
+    public void Remove(DocumentUri uri)
+    {
+        _documents.TryRemove(uri, out _);
+        _compiled.TryRemove(uri, out _);
+    }
+
     public string? Get(DocumentUri uri) => _documents.TryGetValue(uri, out var text) ? text : null;
+    public bool IsCompiled(DocumentUri uri) => _compiled.TryGetValue(uri, out var compiled) && compiled;
     public IEnumerable<KeyValuePair<DocumentUri, string>> OpenDocuments => _documents;
 }
 

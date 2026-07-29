@@ -32,7 +32,7 @@ public class GscDefinitionHandler(GscIndexer indexer, GscDocumentStore documentS
         var userDumpPath = _indexer.DumpPath;
 
         var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(currentFilePath);
-        if (string.IsNullOrEmpty(content)) return new DefinitionResult();
+        if (string.IsNullOrEmpty(content) || GscCompiledScriptDetector.IsCompiledText(content)) return new DefinitionResult();
 
         var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         if (request.Position.Line >= lines.Length) return new DefinitionResult();

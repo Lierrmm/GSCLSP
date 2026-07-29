@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
@@ -21,6 +22,7 @@ public class GscDiagnosticsHandler : IDisposable
     private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
     private readonly ILanguageServerFacade _languageServer;
     private readonly GscDocumentStore _documentStore;
+    private readonly ConcurrentDictionary<string, bool> _compiledStateNotified = new();
     private CancellationTokenSource? _republishCancellationTokenSource;
     private readonly ILogger<GscDiagnosticsHandler> _logger;
     private readonly Action<string> _onGameChanged;
@@ -130,6 +132,12 @@ public class GscDiagnosticsHandler : IDisposable
             if (string.IsNullOrEmpty(text))
                 return;
 
+            if (GscCompiledScriptDetector.IsCompiledText(text))
+            {
+                await ClearAsync(DocumentUri.FromFileSystemPath(filePath), cancellationToken);
+                return;
+            }
+
             var diagnostics = await CollectDiagnosticsAsync(filePath, text, cancellationToken);
 
             _languageServer.SendNotification("textDocument/publishDiagnostics", new PublishDiagnosticsParams
@@ -148,6 +156,8 @@ public class GscDiagnosticsHandler : IDisposable
 
     public async Task PublishFromDiskAsync(DocumentUri uri, CancellationToken cancellationToken)
     {
+        _compiledStateNotified.TryRemove(uri.ToString(), out _);
+
         var filePath = uri.GetFileSystemPath();
         if (!File.Exists(filePath))
         {
@@ -160,6 +170,22 @@ public class GscDiagnosticsHandler : IDisposable
 
     public async Task PublishAsync(DocumentUri uri, string text, CancellationToken cancellationToken)
     {
+        if (GscCompiledScriptDetector.IsCompiledText(text))
+        {
+            await ClearAsync(uri, cancellationToken);
+
+            _languageServer.SendNotification("custom/inactiveRegions", new
+            {
+                uri = uri.ToString(),
+                ranges = Array.Empty<object>()
+            });
+
+            NotifyCompiledState(uri, true);
+            return;
+        }
+
+        NotifyCompiledState(uri, false);
+
         var diagnostics = await CollectDiagnosticsAsync(uri.GetFileSystemPath(), text, cancellationToken);
 
         _languageServer.SendNotification("textDocument/publishDiagnostics", new PublishDiagnosticsParams
@@ -193,6 +219,25 @@ public class GscDiagnosticsHandler : IDisposable
             uri = uri.ToString(),
             ranges
         });
+    }
+
+    private void NotifyCompiledState(DocumentUri uri, bool compiled)
+    {
+        var key = uri.ToString();
+
+        if (_compiledStateNotified.TryGetValue(key, out var previous))
+        {
+            if (previous == compiled)
+                return;
+        }
+        else if (!compiled)
+        {
+            _compiledStateNotified[key] = false;
+            return;
+        }
+
+        _compiledStateNotified[key] = compiled;
+        _languageServer.SendNotification("custom/compiledScript", new { uri = key, compiled });
     }
 
     public Task ClearAsync(DocumentUri uri, CancellationToken cancellationToken)

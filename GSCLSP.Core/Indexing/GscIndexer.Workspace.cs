@@ -27,6 +27,9 @@ public partial class GscIndexer
 
         foreach (var file in files)
         {
+            if (GscCompiledScriptDetector.IsCompiledFile(file))
+                continue;
+
             string normalizedPath = NormalizePathKey(file);
             var parsed = ParseWorkspaceFileForIncrementalIndex(file);
 
@@ -168,7 +171,7 @@ public partial class GscIndexer
             if (_workspaceFileMaps.TryGetValue(normalizedPath, out var oldMap) && oldMap.OverridePath != null)
                 _workspaceOverrides.Remove(oldMap.OverridePath);
 
-            if (File.Exists(filePath))
+            if (File.Exists(filePath) && !GscCompiledScriptDetector.IsCompiledFile(filePath))
             {
                 try
                 {

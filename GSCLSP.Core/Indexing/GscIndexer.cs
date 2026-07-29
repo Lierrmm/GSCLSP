@@ -189,6 +189,9 @@ public partial class GscIndexer(ILogger logger)
 
     private void ParseFile(string path)
     {
+        if (GscCompiledScriptDetector.IsCompiledFile(path))
+            return;
+
         var fileMap = new GscFileMap { FilePath = path };
         var lines = File.ReadAllLines(path);
 

@@ -1,4 +1,5 @@
 ﻿using GSCLSP.Core.Indexing;
+using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using Microsoft.Extensions.Configuration;
@@ -23,7 +24,7 @@ namespace GSCLSP.Server.Handlers
             string? normalizedDumpPath = GscIndexer.NormalizePath(rawDumpPath);
 
             string currentContent = _indexer.GetFileContent(currentFilePath);
-            if (string.IsNullOrEmpty(currentContent)) return new LocationContainer();
+            if (string.IsNullOrEmpty(currentContent) || GscCompiledScriptDetector.IsCompiledText(currentContent)) return new LocationContainer();
 
             var currentFileLines = currentContent.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
             var line = currentFileLines[request.Position.Line];
