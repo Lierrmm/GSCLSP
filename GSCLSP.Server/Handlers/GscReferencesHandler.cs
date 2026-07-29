@@ -10,9 +10,10 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace GSCLSP.Server.Handlers
 {
-    public class GscReferencesHandler(GscIndexer indexer, IConfiguration configuration) : IReferencesHandler
+    public class GscReferencesHandler(GscIndexer indexer, GscDocumentStore documentStore, IConfiguration configuration) : IReferencesHandler
     {
         private readonly GscIndexer _indexer = indexer;
+        private readonly GscDocumentStore _documentStore = documentStore;
         private readonly IConfiguration _configuration = configuration;
 
         public async Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken cancellationToken)
@@ -23,7 +24,7 @@ namespace GSCLSP.Server.Handlers
             var rawDumpPath = _indexer.DumpPath ?? _configuration?.GetValue<string>("gsclsp:dumpPath");
             string? normalizedDumpPath = GscIndexer.NormalizePath(rawDumpPath);
 
-            string currentContent = _indexer.GetFileContent(currentFilePath);
+            string currentContent = _documentStore.Get(uri) ?? _indexer.GetFileContent(currentFilePath);
             if (string.IsNullOrEmpty(currentContent) || GscCompiledScriptDetector.IsCompiledText(currentContent)) return new LocationContainer();
 
             var currentFileLines = currentContent.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);

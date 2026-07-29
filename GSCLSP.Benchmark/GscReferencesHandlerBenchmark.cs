@@ -21,7 +21,7 @@ public class GscReferencesHandlerBenchmark
     public void Setup()
     {
         _indexer = new GscIndexer(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
-        _referencesHandler = new GscReferencesHandler(_indexer, null);
+        _referencesHandler = new GscReferencesHandler(_indexer, new GscDocumentStore(), null);
         // Create test workspace
         string tempDir = Path.Combine(Path.GetTempPath(), "gsclsp-references-" + Guid.NewGuid());
         Directory.CreateDirectory(tempDir);

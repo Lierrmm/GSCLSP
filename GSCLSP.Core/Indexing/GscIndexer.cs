@@ -173,9 +173,14 @@ public partial class GscIndexer(ILogger logger)
 
         if (symbols != null)
         {
-            _symbols.AddRange(symbols);
+            var compiledMemo = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
             foreach (var s in symbols)
             {
+                if (IsCompiledCachedPath(s.FilePath, compiledMemo))
+                    continue;
+
+                _symbols.Add(s);
+
                 if (!_fileMaps.ContainsKey(s.FilePath))
                     _fileMaps[s.FilePath] = new GscFileMap { FilePath = s.FilePath };
 
@@ -185,6 +190,14 @@ public partial class GscIndexer(ILogger logger)
 
 
         _logger.LogDebug("Indexer loaded {Count} GSC symbols from JSON.", _symbols.Count);
+    }
+
+    internal static bool IsCompiledCachedPath(string filePath, Dictionary<string, bool> memo)
+    {
+        if (!memo.TryGetValue(filePath, out var compiled))
+            memo[filePath] = compiled = File.Exists(filePath) && GscCompiledScriptDetector.IsCompiledFile(filePath);
+
+        return compiled;
     }
 
     private void ParseFile(string path)

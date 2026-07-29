@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 using static GSCLSP.Core.Models.RegexPatterns;
 
@@ -22,7 +21,8 @@ public class GscDiagnosticsHandler : IDisposable
     private readonly GscDiagnosticsAnalyzer _diagnosticsAnalyzer;
     private readonly ILanguageServerFacade _languageServer;
     private readonly GscDocumentStore _documentStore;
-    private readonly ConcurrentDictionary<string, bool> _compiledStateNotified = new();
+    private readonly Dictionary<string, bool> _compiledStateNotified = new();
+    private readonly object _compiledStateLock = new();
     private CancellationTokenSource? _republishCancellationTokenSource;
     private readonly ILogger<GscDiagnosticsHandler> _logger;
     private readonly Action<string> _onGameChanged;
@@ -156,7 +156,10 @@ public class GscDiagnosticsHandler : IDisposable
 
     public async Task PublishFromDiskAsync(DocumentUri uri, CancellationToken cancellationToken)
     {
-        _compiledStateNotified.TryRemove(uri.ToString(), out _);
+        lock (_compiledStateLock)
+        {
+            _compiledStateNotified.Remove(uri.ToString());
+        }
 
         var filePath = uri.GetFileSystemPath();
         if (!File.Exists(filePath))
@@ -225,19 +228,22 @@ public class GscDiagnosticsHandler : IDisposable
     {
         var key = uri.ToString();
 
-        if (_compiledStateNotified.TryGetValue(key, out var previous))
+        lock (_compiledStateLock)
         {
-            if (previous == compiled)
+            if (_compiledStateNotified.TryGetValue(key, out var previous))
+            {
+                if (previous == compiled)
+                    return;
+            }
+            else if (!compiled)
+            {
+                _compiledStateNotified[key] = false;
                 return;
-        }
-        else if (!compiled)
-        {
-            _compiledStateNotified[key] = false;
-            return;
-        }
+            }
 
-        _compiledStateNotified[key] = compiled;
-        _languageServer.SendNotification("custom/compiledScript", new { uri = key, compiled });
+            _compiledStateNotified[key] = compiled;
+            _languageServer.SendNotification("custom/compiledScript", new { uri = key, compiled });
+        }
     }
 
     public Task ClearAsync(DocumentUri uri, CancellationToken cancellationToken)

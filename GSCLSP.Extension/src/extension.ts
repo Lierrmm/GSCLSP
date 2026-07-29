@@ -393,6 +393,17 @@ export async function activate(context: ExtensionContext): Promise<void> {
 
   context.subscriptions.push(client);
 
+  context.subscriptions.push(
+    client.onNotification("custom/compiledScript", handleCompiledScript),
+    {
+      dispose: () => {
+        compiledStatusItem?.dispose();
+        compiledStatusItem = undefined;
+        compiledUris.clear();
+      },
+    },
+  );
+
   await client.start();
 
   // Register MCP Server
@@ -452,17 +463,6 @@ export async function activate(context: ExtensionContext): Promise<void> {
   );
 
   context.subscriptions.push(client.onNotification("custom/dumpStatus", handleDumpStatus));
-
-  context.subscriptions.push(
-    client.onNotification("custom/compiledScript", handleCompiledScript),
-    {
-      dispose: () => {
-        compiledStatusItem?.dispose();
-        compiledStatusItem = undefined;
-        compiledUris.clear();
-      },
-    },
-  );
 
   context.subscriptions.push(
     workspace.onDidCloseTextDocument((doc) => {
