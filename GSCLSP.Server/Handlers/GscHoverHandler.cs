@@ -174,7 +174,7 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         if (!string.IsNullOrEmpty(symbol.Documentation))
         {
-            var doc = symbol.Documentation.Contains("**", StringComparison.Ordinal)
+            var doc = symbol.DocumentationRendered
                 ? symbol.Documentation
                 : DocRegex().Replace(symbol.Documentation, "**$1:**");
             contentValue += $"{doc}\n\n";

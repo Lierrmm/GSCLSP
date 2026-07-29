@@ -25,6 +25,9 @@ public static partial class GscDocCommentParser
 
         for (int start = endLineIndex; start >= 0; start--)
         {
+            if (start != endLineIndex && EndsDocBlock(lines[start]))
+                return null;
+
             if (!lines[start].TrimStart().StartsWith(BlockStart, StringComparison.Ordinal))
                 continue;
 
