@@ -96,38 +96,48 @@ internal static class GscHandlerCommon
             ?? indexer.ResolveLevelField(fieldName);
     }
 
-    public static List<(int Start, int End)> GetCodeRanges(string line, ref bool inBlockComment)
+    public static List<(int Start, int End)> GetCodeRanges(string line, ref BlockCommentKind inBlockComment)
     {
         var ranges = new List<(int Start, int End)>();
         int i = 0;
 
         while (i < line.Length)
         {
-            if (inBlockComment)
+            if (inBlockComment != BlockCommentKind.None)
             {
-                int close = line.IndexOf("*/", i, StringComparison.Ordinal);
+                var closer = inBlockComment == BlockCommentKind.Star ? "*/" : "@/";
+                int close = line.IndexOf(closer, i, StringComparison.Ordinal);
                 if (close < 0) return ranges;
-                inBlockComment = false;
+                inBlockComment = BlockCommentKind.None;
                 i = close + 2;
             }
             else
             {
                 int lineComment = line.IndexOf("//", i, StringComparison.Ordinal);
-                int blockComment = line.IndexOf("/*", i, StringComparison.Ordinal);
+                int starComment = line.IndexOf("/*", i, StringComparison.Ordinal);
+                int atComment = line.IndexOf("/@", i, StringComparison.Ordinal);
                 int stringLiteral = IndexOfStringLiteral(line, i);
 
                 int next = -1;
                 int handlerType = 0; // 0=none, 1=lineComment, 2=blockComment, 3=string
+                var openedKind = BlockCommentKind.None;
 
                 if (lineComment >= 0 && (next < 0 || lineComment < next))
                 {
                     next = lineComment;
                     handlerType = 1;
                 }
-                if (blockComment >= 0 && (next < 0 || blockComment < next))
+                if (starComment >= 0 && (next < 0 || starComment < next))
                 {
-                    next = blockComment;
+                    next = starComment;
                     handlerType = 2;
+                    openedKind = BlockCommentKind.Star;
+                }
+                if (atComment >= 0 && (next < 0 || atComment < next))
+                {
+                    next = atComment;
+                    handlerType = 2;
+                    openedKind = BlockCommentKind.At;
                 }
                 if (stringLiteral >= 0 && (next < 0 || stringLiteral < next))
                 {
@@ -149,7 +159,7 @@ internal static class GscHandlerCommon
                 }
                 else if (handlerType == 2) // block comment
                 {
-                    inBlockComment = true;
+                    inBlockComment = openedKind;
                     i = next + 2;
                 }
                 else if (handlerType == 3) // string literal

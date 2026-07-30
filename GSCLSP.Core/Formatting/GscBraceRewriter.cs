@@ -1,10 +1,11 @@
+using GSCLSP.Core.Models;
 using static GSCLSP.Core.Models.RegexPatterns;
 
 namespace GSCLSP.Core.Formatting;
 
 internal static class GscBraceRewriter
 {
-    public static List<string> ToAllman(List<string> lines, bool seedInBlock = false)
+    public static List<string> ToAllman(List<string> lines, BlockCommentKind seedInBlock = BlockCommentKind.None)
     {
         var res = new List<string>(lines.Count);
         var inBlock = seedInBlock;
@@ -60,11 +61,11 @@ internal static class GscBraceRewriter
         string Indent,
         string Code,
         string Comment,
-        bool EndsInBlock,
+        BlockCommentKind EndsInBlock,
         bool Transformable
     );
 
-    private static CodeCommentSplit SplitCodeComment(string line, bool inBlock)
+    private static CodeCommentSplit SplitCodeComment(string line, BlockCommentKind inBlock)
     {
         var n = line.Length;
         var i = 0;
@@ -79,9 +80,10 @@ internal static class GscBraceRewriter
             var c = line[i];
             var c2 = i + 1 < n ? line[i + 1] : '\0';
 
-            if (blk)
+            if (blk != BlockCommentKind.None)
             {
-                if (c == '*' && c2 == '/') { blk = false; i += 2; continue; }
+                var closer = blk == BlockCommentKind.Star ? '*' : '@';
+                if (c == closer && c2 == '/') { blk = BlockCommentKind.None; i += 2; continue; }
                 i++;
                 continue;
             }
@@ -95,7 +97,13 @@ internal static class GscBraceRewriter
             }
 
             if (c == '/' && c2 == '/') { commentAt = i; break; }
-            if (c == '/' && c2 == '*') { hasInlineBlock = true; blk = true; i += 2; continue; }
+            if (c == '/' && (c2 == '*' || c2 == '@'))
+            {
+                hasInlineBlock = true;
+                blk = c2 == '*' ? BlockCommentKind.Star : BlockCommentKind.At;
+                i += 2;
+                continue;
+            }
             if (c == '"' || c == '\'') { str = true; sc = c; i++; continue; }
             i++;
         }
@@ -105,7 +113,7 @@ internal static class GscBraceRewriter
         var codeRaw = commentAt >= 0 ? line[..commentAt] : line;
         var code = codeRaw.Trim();
         var comment = commentAt >= 0 ? line[commentAt..] : "";
-        var transformable = !inBlock && !hasInlineBlock && code.Length > 0;
+        var transformable = inBlock == BlockCommentKind.None && !hasInlineBlock && code.Length > 0;
         return new CodeCommentSplit(indent, code, comment, blk, transformable);
     }
 }

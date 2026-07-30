@@ -1,9 +1,11 @@
+using GSCLSP.Core.Models;
+
 namespace GSCLSP.Core.Formatting;
 
 internal sealed class IndentState
 {
     public List<IndentFrame> Stack { get; } = [];
-    public bool InBlock { get; set; }
+    public BlockCommentKind InBlock { get; set; }
     public bool PendingSwitchBrace { get; set; }
     public int ParenCarry { get; set; }
     public bool PrevContinuesExpr { get; set; }
@@ -50,7 +52,7 @@ internal static class GscIndenter
     public static string IndentLine(IndentState state, string line, string indentUnit)
     {
         var info = LineAnalyzer.Analyze(line, state.InBlock, state.PendingSwitchBrace);
-        var startedInBlock = state.InBlock;
+        var startedInBlock = state.InBlock != BlockCommentKind.None;
         state.InBlock = info.EndsInBlockComment;
         state.PendingSwitchBrace = info.EndsExpectingSwitchBrace;
 

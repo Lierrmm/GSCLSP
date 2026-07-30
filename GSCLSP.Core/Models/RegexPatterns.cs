@@ -41,6 +41,9 @@ public partial class RegexPatterns
     [GeneratedRegex(@"/\*.*?\*/", RegexOptions.Singleline)]
     public static partial Regex MultilineCommentRegex();
 
+    [GeneratedRegex(@"/@.*?@/", RegexOptions.Singleline)]
+    public static partial Regex DocCommentRegex();
+
     [GeneratedRegex(@"\s+")]
     public static partial Regex WhiteSpaceTabRegex();
 

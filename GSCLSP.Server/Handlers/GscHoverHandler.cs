@@ -176,7 +176,9 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
 
         if (!string.IsNullOrEmpty(symbol.Documentation))
         {
-            var doc = DocRegex().Replace(symbol.Documentation, "**$1:**");
+            var doc = symbol.DocumentationRendered
+                ? symbol.Documentation
+                : DocRegex().Replace(symbol.Documentation, "**$1:**");
             contentValue += $"{doc}\n\n";
         }
 
@@ -347,6 +349,10 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
     {
         if (lineIndex <= 0 || string.IsNullOrWhiteSpace(lines[lineIndex - 1].Trim()))
             return null;
+
+        var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(lines, lineIndex - 1);
+        if (docBlock != null)
+            return docBlock;
 
         List<string> commentLines = [];
         bool inBlockComment = false;

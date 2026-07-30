@@ -1,0 +1,16 @@
+{
+  "GSC doc comment block": {
+    "prefix": "gscdoc",
+    "description": "gsc-tool script doc comment block",
+    "body": [
+      "/@",
+      "\t[DESCRIPTION]: ${1:description};",
+      "\t[CALL_TYPE]: ${2|function,method|};",
+      "\t[USAGE]: ${3:name( <arg> )};",
+      "\t[PARAMS]: ${4:<type>};",
+      "\t[PARAMS_NOTES]: ${5:notes};",
+      "\t[RETURNS]: ${6:return value};",
+      "@/"
+    ]
+  }
+}

@@ -12,5 +12,6 @@ public record GscSymbol(
     int? MinArgs = null,
     int? MaxArgs = null,
     bool IsVariadic = false,
-    bool IsPrivate = false
+    bool IsPrivate = false,
+    bool DocumentationRendered = false
 );

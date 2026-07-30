@@ -14,7 +14,8 @@
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
     { "open": "\"", "close": "\"", "notIn": ["string"] },
-    { "open": "/*", "close": " */", "notIn": ["string"] }
+    { "open": "/*", "close": " */", "notIn": ["string"] },
+    { "open": "/@", "close": " @/", "notIn": ["string"] }
   ],
   "surroundingPairs": [
     ["{", "}"],
@@ -35,6 +36,12 @@
       "action": { "indent": "indent" }
     }
   ],
+  "folding": {
+    "markers": {
+      "start": "^\\s*(/@|/\\*|/#)",
+      "end": "^\\s*(@/|\\*/|#/)"
+    }
+  },
   "indentationRules": {
     "increaseIndentPattern": "^.*\\{[^}]*$",
     "decreaseIndentPattern": "^\\s*\\}.*$"

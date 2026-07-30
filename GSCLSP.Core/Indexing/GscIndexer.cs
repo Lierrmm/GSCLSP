@@ -206,7 +206,7 @@ public partial class GscIndexer(ILogger logger)
             return;
 
         var fileMap = new GscFileMap { FilePath = path };
-        var lines = File.ReadAllLines(path);
+        var lines = ReadLinesWithoutDocComments(path, out var rawLines);
 
         foreach (var levelField in ScanLevelFields(lines, path))
             AddDumpLevelField(levelField);
@@ -254,13 +254,17 @@ public partial class GscIndexer(ILogger logger)
             var isPrivate = nameGroup.Index > 0 &&
                 HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
 
+            var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(rawLines, lineIndex - 1);
+
             var symbol = new GscSymbol(
                 name,
                 path,
                 lineNum,
                 cleanParams,
                 SymbolType.Function,
-                IsPrivate: isPrivate
+                Documentation: docBlock ?? "",
+                IsPrivate: isPrivate,
+                DocumentationRendered: docBlock != null
             );
             fileMap.LocalSymbols.Add(symbol);
             _symbols.Add(symbol);
@@ -371,6 +375,32 @@ public partial class GscIndexer(ILogger logger)
         }
 
         return line;
+    }
+
+    private static string[] ReadLinesWithoutDocComments(string path, out string[] rawLines)
+    {
+        var raw = File.ReadAllText(path);
+        rawLines = SplitLines(raw);
+
+        if (!raw.Contains("/@", StringComparison.Ordinal))
+            return rawLines;
+
+        var stripped = DocCommentRegex().Replace(raw, m => string.Create(m.Length, m.Value, static (span, source) =>
+        {
+            for (int i = 0; i < source.Length; i++)
+                span[i] = source[i] is '\n' or '\r' ? source[i] : ' ';
+        }));
+
+        return SplitLines(stripped);
+    }
+
+    private static string[] SplitLines(string text)
+    {
+        var lines = text.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+            lines[i] = lines[i].TrimEnd('\r');
+
+        return lines;
     }
 
     private static string CleanGscParams(string raw)
@@ -654,7 +684,7 @@ public partial class GscIndexer(ILogger logger)
                 return null;
 
             // Read all lines once. We need random access to scan backwards for comments.
-            var lines = File.ReadAllLines(filePath);
+            var lines = ReadLinesWithoutDocComments(filePath, out var rawLines);
             if (lines.Length == 0) return null;
 
             var fnName = functionName ?? string.Empty;
@@ -768,6 +798,20 @@ public partial class GscIndexer(ILogger logger)
                 }
 
                 if (!hasBrace) continue;
+
+                var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(rawLines, i - 1);
+                if (docBlock != null)
+                {
+                    return new GscSymbol(
+                        Name: fnName,
+                        FilePath: filePath,
+                        LineNumber: i + 1,
+                        Parameters: paramsText,
+                        Type: SymbolType.Function,
+                        Documentation: docBlock,
+                        DocumentationRendered: true
+                    );
+                }
 
                 // Collect documentation comments immediately above definition
                 List<string>? commentLines = null;
