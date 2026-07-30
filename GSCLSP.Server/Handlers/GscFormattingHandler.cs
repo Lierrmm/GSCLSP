@@ -23,7 +23,7 @@ public class GscFormattingHandler(GscDocumentStore documentStore)
     public Task<TextEditContainer?> Handle(DocumentFormattingParams request, CancellationToken cancellationToken)
     {
         var content = _documentStore.Get(request.TextDocument.Uri);
-        if (string.IsNullOrEmpty(content))
+        if (string.IsNullOrEmpty(content) || _documentStore.IsCompiled(request.TextDocument.Uri))
             return Task.FromResult<TextEditContainer?>(null);
 
         var formatted = GscFormatter.Format(
@@ -65,7 +65,7 @@ public class GscRangeFormattingHandler(GscDocumentStore documentStore)
     public Task<TextEditContainer> Handle(DocumentRangeFormattingParams request, CancellationToken cancellationToken)
     {
         var content = _documentStore.Get(request.TextDocument.Uri);
-        if (string.IsNullOrEmpty(content))
+        if (string.IsNullOrEmpty(content) || _documentStore.IsCompiled(request.TextDocument.Uri))
             return Task.FromResult<TextEditContainer>(new TextEditContainer());
 
         var startLine = request.Range.Start.Line;

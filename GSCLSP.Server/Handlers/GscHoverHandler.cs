@@ -30,6 +30,8 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
         var filePath = uri.GetFileSystemPath();
 
         var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(filePath);
+        if (GscCompiledScriptDetector.IsCompiledText(content)) return null;
+
         var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         if (request.Position.Line >= lines.Length) return null;
 

@@ -15,7 +15,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
     {
         var uri = request.TextDocument.Uri;
         var text = _documentStore.Get(uri);
-        if (string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text) || _documentStore.IsCompiled(uri))
             return new CommandOrCodeActionContainer();
 
         var actions = new List<CommandOrCodeAction>();

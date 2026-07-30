@@ -1,4 +1,5 @@
 using GSCLSP.Core.Indexing;
+using GSCLSP.Core.Models;
 using GSCLSP.Lexer;
 using Microsoft.Extensions.Configuration;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -78,7 +79,7 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
     {
         var currentFilePath = uri.GetFileSystemPath();
         var content = _documentStore.Get(uri) ?? _indexer.GetFileContent(currentFilePath);
-        if (string.IsNullOrEmpty(content)) return null;
+        if (string.IsNullOrEmpty(content) || GscCompiledScriptDetector.IsCompiledText(content)) return null;
 
         var lines = content.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
         if (position.Line >= lines.Length) return null;

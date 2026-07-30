@@ -64,6 +64,9 @@ public partial class GscIndexer
 
         foreach (var file in files)
         {
+            if (GscCompiledScriptDetector.IsCompiledFile(file))
+                continue;
+
             try
             {
                 foreach (var field in ScanLevelFields(File.ReadAllLines(file), file))
@@ -101,8 +104,14 @@ public partial class GscIndexer
             var fields = JsonSerializer.Deserialize(File.ReadAllText(jsonPath), GscJsonContext.Default.ListGscLevelField);
             if (fields == null) return;
 
+            var compiledMemo = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
             foreach (var field in fields)
+            {
+                if (IsCompiledCachedPath(field.FilePath, compiledMemo))
+                    continue;
+
                 AddDumpLevelField(field);
+            }
 
             _logger.LogDebug("Indexer loaded {Count} level fields from JSON.", fields.Count);
         }
