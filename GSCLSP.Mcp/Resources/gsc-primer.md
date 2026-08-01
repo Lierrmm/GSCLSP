@@ -227,6 +227,11 @@ util::wait_network_frame();                                     // Treyarch: `na
 Backslash form is a file path from the script root (`maps\mp\_utility` =
 `maps/mp/_utility.gsc`). Namespace form uses the `#namespace` declared in the target file.
 
+**`jup` only — reserved-keyword namespaces.** If the target file's `#namespace` is a reserved
+keyword (e.g. `class`), `class::func()` collides with the compiler's keyword handling; use the
+path form instead — `scripts\mp\class::func()`. Namespace form stays the default everywhere
+else; only fall back to the path form when the namespace actually breaks compiling.
+
 ### Directives
 
 ```gsc
