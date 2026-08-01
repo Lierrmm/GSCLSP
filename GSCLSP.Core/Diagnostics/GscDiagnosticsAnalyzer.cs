@@ -118,12 +118,16 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         diagnostics.AddRange(CollectMissingAnimtreeErrors(lines, excludedMask));
 
         if (_indexer.IsTreyarchGsc)
-            diagnostics.AddRange(CollectVariableShadowsNamespaceWarnings(lines, muteConfig, excludedMask));
+            diagnostics.AddRange(CollectVariableShadowsNamespaceWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
 
         return diagnostics;
     }
 
-    private List<Diagnostic> CollectVariableShadowsNamespaceWarnings(string[] lines, MuteConfig muteConfig, bool[] excludedMask)
+    private List<Diagnostic> CollectVariableShadowsNamespaceWarnings(
+        string[] lines,
+        IReadOnlyList<Token> tokens,
+        MuteConfig muteConfig,
+        bool[] excludedMask)
     {
         var diagnostics = new List<Diagnostic>();
 
@@ -134,6 +138,8 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         var referencedNamespaces = GetQualifiedNamespaceReferences(lines, excludedMask, usedNamespaces.Keys);
         if (referencedNamespaces.Count == 0)
             return diagnostics;
+
+        var emitted = new HashSet<(int Line, int Column)>();
 
         foreach (var function in GetFunctionDefinitions(lines))
         {
@@ -149,24 +155,64 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
                 if (!referencedNamespaces.TryGetValue(declaration.Name, out var namespaceName))
                     continue;
 
-                if (IsMuted(muteConfig, VariableShadowsNamespaceMuteKey, declaration.Line))
-                    continue;
-
-                diagnostics.Add(new Diagnostic
-                {
-                    Severity = DiagnosticSeverity.Warning,
-                    Source = "gsclsp",
-                    Code = VariableShadowsNamespaceWarningCode,
-                    Data = declaration.Name,
-                    Message = $"Variable '{declaration.Name}' should be named differently: it conflicts with the namespace '{namespaceName}' used by this file.",
-                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                        new Position(declaration.Line, declaration.Column),
-                        new Position(declaration.Line, declaration.Column + declaration.Name.Length))
-                });
+                AddVariableShadowsNamespaceOccurrences(
+                    diagnostics, tokens, muteConfig, excludedMask, emitted,
+                    declaration.Name, namespaceName, function.DefinitionLine, bodyEnd);
             }
         }
 
         return diagnostics;
+    }
+
+    private static void AddVariableShadowsNamespaceOccurrences(
+        List<Diagnostic> diagnostics,
+        IReadOnlyList<Token> tokens,
+        MuteConfig muteConfig,
+        bool[] excludedMask,
+        HashSet<(int Line, int Column)> emitted,
+        string variableName,
+        string namespaceName,
+        int startLine,
+        int endLine)
+    {
+        var message = $"Variable '{variableName}' should be named differently: it conflicts with the namespace '{namespaceName}' used by this file.";
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (token.Line < startLine || token.Line > endLine)
+                continue;
+
+            if (!token.Text.Equals(variableName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (token.Line < excludedMask.Length && excludedMask[token.Line])
+                continue;
+
+            if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
+                continue;
+
+            if (IsMuted(muteConfig, VariableShadowsNamespaceMuteKey, token.Line))
+                continue;
+
+            if (!emitted.Add((token.Line, token.Column)))
+                continue;
+
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Warning,
+                Source = "gsclsp",
+                Code = VariableShadowsNamespaceWarningCode,
+                Data = variableName,
+                Message = message,
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(token.Line, token.Column),
+                    new Position(token.Line, token.Column + token.Length))
+            });
+        }
     }
 
     private static HashSet<string> GetQualifiedNamespaceReferences(string[] lines, bool[] excludedMask, IEnumerable<string> candidates)

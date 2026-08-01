@@ -1,4 +1,7 @@
+using GSCLSP.Core.Diagnostics;
+using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
+using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -35,7 +38,141 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
             }
         }
 
+        var renamedVariables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var diagnostic in request.Context.Diagnostics.Where(IsVariableShadowsNamespaceDiagnostic))
+        {
+            var name = GetDiagnosticIdentifier(diagnostic, text);
+            if (string.IsNullOrWhiteSpace(name) || !renamedVariables.Add(name))
+                continue;
+
+            var renameAction = CreateRenameShadowingVariableAction(uri, text, diagnostic, name);
+            if (renameAction is not null)
+                actions.Add(new CommandOrCodeAction(renameAction));
+        }
+
         return new CommandOrCodeActionContainer(actions);
+    }
+
+    private static bool IsVariableShadowsNamespaceDiagnostic(Diagnostic diagnostic)
+    {
+        return string.Equals(diagnostic.Source, "gsclsp", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Code?.ToString(), GscDiagnosticsAnalyzer.VariableShadowsNamespaceWarningCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static CodeAction? CreateRenameShadowingVariableAction(DocumentUri uri, string text, Diagnostic diagnostic, string name)
+    {
+        var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+        if (diagnostic.Range.Start.Line >= lines.Length)
+            return null;
+
+        var bodyRange = FindEnclosingFunctionBodyRange(lines, diagnostic.Range.Start.Line);
+        if (bodyRange is null)
+            return null;
+
+        var newName = $"_{name}";
+        var edits = CollectVariableRenameEdits(GscLexingHelper.Lex(text).Tokens, bodyRange.Value, name, newName);
+        if (edits.Count == 0)
+            return null;
+
+        return new CodeAction
+        {
+            Title = $"Rename '{name}' to '{newName}'",
+            Kind = CodeActionKind.QuickFix,
+            IsPreferred = true,
+            Diagnostics = new Container<Diagnostic>(diagnostic),
+            Edit = new WorkspaceEdit
+            {
+                Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>
+                {
+                    [uri] = edits
+                }
+            }
+        };
+    }
+
+    private static List<TextEdit> CollectVariableRenameEdits(
+        IReadOnlyList<Token> tokens,
+        (int StartLine, int EndLine) bodyRange,
+        string name,
+        string newName)
+    {
+        var edits = new List<TextEdit>();
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (token.Line < bodyRange.StartLine || token.Line > bodyRange.EndLine)
+                continue;
+
+            if (!token.Text.Equals(name, StringComparison.Ordinal))
+                continue;
+
+            if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
+                continue;
+
+            edits.Add(new TextEdit
+            {
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(token.Line, token.Column),
+                    new Position(token.Line, token.Column + token.Length)),
+                NewText = newName
+            });
+        }
+
+        return edits;
+    }
+
+    private static (int StartLine, int EndLine)? FindEnclosingFunctionBodyRange(string[] lines, int cursorLine)
+    {
+        int funcDefLine = -1;
+        for (int i = cursorLine; i >= 0; i--)
+        {
+            var line = lines[i];
+            if (line.Length == 0 || char.IsWhiteSpace(line[0]))
+                continue;
+            if (line.TrimStart().StartsWith("//", StringComparison.Ordinal))
+                continue;
+            if (line.Contains(';'))
+                continue;
+
+            var match = RegexPatterns.FunctionMultiLineRegex().Match(line);
+            if (match.Success && match.Index == 0)
+            {
+                funcDefLine = i;
+                break;
+            }
+        }
+
+        if (funcDefLine < 0)
+            return null;
+
+        int braceStart = -1;
+        for (int i = funcDefLine; i < lines.Length; i++)
+        {
+            if (lines[i].Contains('{')) { braceStart = i; break; }
+        }
+        if (braceStart < 0)
+            return null;
+
+        int depth = 0;
+        int braceEnd = lines.Length - 1;
+        for (int i = braceStart; i < lines.Length; i++)
+        {
+            foreach (char c in lines[i])
+            {
+                if (c == '{') depth++;
+                else if (c == '}') depth--;
+            }
+            if (depth == 0) { braceEnd = i; break; }
+        }
+
+        if (cursorLine < funcDefLine || cursorLine > braceEnd)
+            return null;
+
+        return (funcDefLine, braceEnd);
     }
 
     public CodeActionRegistrationOptions GetRegistrationOptions(CodeActionCapability capability, ClientCapabilities clientCapabilities)
@@ -58,7 +195,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
 
         foreach (var diagnostic in request.Context.Diagnostics.Where(IsUnresolvedFunctionDiagnostic))
         {
-            var functionName = GetFunctionName(diagnostic, text);
+            var functionName = GetDiagnosticIdentifier(diagnostic, text);
             if (string.IsNullOrWhiteSpace(functionName) || !seen.Add(functionName))
                 continue;
 
@@ -88,7 +225,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
         return diagnostic.Message.Contains("not defined in this file or its included files", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetFunctionName(Diagnostic diagnostic, string text)
+    private static string GetDiagnosticIdentifier(Diagnostic diagnostic, string text)
     {
         var dataValue = diagnostic.Data?.ToString();
         if (!string.IsNullOrWhiteSpace(dataValue))

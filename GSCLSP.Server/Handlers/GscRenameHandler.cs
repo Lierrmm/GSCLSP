@@ -1,5 +1,6 @@
 using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
+using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using Microsoft.Extensions.Configuration;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -116,6 +117,13 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
             return new RenameTarget(RenameKind.Macro, name, token.Line, token.Column, token.Column + token.Length, null, MacroScope.Workspace);
         }
 
+        var tokenIndex = IndexOfToken(lexed.Tokens, token);
+        if (tokenIndex >= 0 &&
+            GscVariableTokenFilter.FindSignificantToken(lexed.Tokens, tokenIndex, 1)?.Kind is TokenKind.DoubleColon)
+        {
+            return null;
+        }
+
         if (IsFunctionReference(lexed.Tokens, token))
         {
             return new RenameTarget(RenameKind.Function, name, token.Line, token.Column, token.Column + token.Length, null, MacroScope.LocalFileOnly);
@@ -188,6 +196,18 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
         return null;
     }
 
+    private static int IndexOfToken(IReadOnlyList<Token> tokens, Token target)
+    {
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.Line == target.Line && token.Column == target.Column && token.Length == target.Length)
+                return i;
+        }
+
+        return -1;
+    }
+
     private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 
     private static bool TryGetDefineNameSpan(Token token, out int column, out int length, out string name)
@@ -244,7 +264,8 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
             if (ln.TrimStart().StartsWith("//", StringComparison.Ordinal)) continue;
             if (ln.Contains(';')) continue;
 
-            if (System.Text.RegularExpressions.Regex.IsMatch(ln, @"^\w[\w:]*\s*\("))
+            var match = RegexPatterns.FunctionMultiLineRegex().Match(ln);
+            if (match.Success && match.Index == 0)
             {
                 funcDefLine = i;
                 break;
@@ -355,11 +376,13 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
         var edits = new List<TextEdit>();
         var (start, end) = target.FunctionBodyRange.Value;
 
-        foreach (var token in lexed.Tokens)
+        for (int i = 0; i < lexed.Tokens.Count; i++)
         {
+            var token = lexed.Tokens[i];
             if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword) continue;
             if (token.Line < start || token.Line > end) continue;
             if (!token.Text.Equals(target.Name, StringComparison.Ordinal)) continue;
+            if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(lexed.Tokens, i)) continue;
 
             edits.Add(new TextEdit
             {
