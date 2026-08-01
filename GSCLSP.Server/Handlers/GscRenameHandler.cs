@@ -1,4 +1,4 @@
-using GSCLSP.Core.Indexing;
+﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
@@ -129,7 +129,7 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
             return new RenameTarget(RenameKind.Function, name, token.Line, token.Column, token.Column + token.Length, null, MacroScope.LocalFileOnly);
         }
 
-        var funcRange = FindEnclosingFunctionBodyRange(lines, token.Line);
+        var funcRange = GscFunctionBodyLocator.FindEnclosingFunctionBodyRange(lines, token.Line);
         if (funcRange is not null)
         {
             return new RenameTarget(RenameKind.LocalVariable, name, token.Line, token.Column, token.Column + token.Length, funcRange, MacroScope.LocalFileOnly);
@@ -251,49 +251,6 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
         }
 
         return next is { Kind: TokenKind.OpenParen };
-    }
-
-    private static (int BraceStartLine, int BraceEndLine)? FindEnclosingFunctionBodyRange(string[] lines, int cursorLine)
-    {
-        int funcDefLine = -1;
-        for (int i = cursorLine; i >= 0; i--)
-        {
-            var ln = lines[i];
-            if (ln.Length == 0) continue;
-            if (char.IsWhiteSpace(ln[0])) continue;
-            if (ln.TrimStart().StartsWith("//", StringComparison.Ordinal)) continue;
-            if (ln.Contains(';')) continue;
-
-            var match = RegexPatterns.FunctionMultiLineRegex().Match(ln);
-            if (match.Success && match.Index == 0)
-            {
-                funcDefLine = i;
-                break;
-            }
-        }
-        if (funcDefLine < 0) return null;
-
-        int braceStart = -1;
-        for (int i = funcDefLine; i < lines.Length; i++)
-        {
-            if (lines[i].Contains('{')) { braceStart = i; break; }
-        }
-        if (braceStart < 0) return null;
-
-        int depth = 0;
-        int braceEnd = lines.Length - 1;
-        for (int i = braceStart; i < lines.Length; i++)
-        {
-            foreach (char c in lines[i])
-            {
-                if (c == '{') depth++;
-                else if (c == '}') depth--;
-            }
-            if (depth == 0) { braceEnd = i; break; }
-        }
-
-        if (cursorLine < funcDefLine || cursorLine > braceEnd) return null;
-        return (funcDefLine, braceEnd);
     }
 
     private static bool IsTopLevelAssignmentTarget(string line, int column, string name)

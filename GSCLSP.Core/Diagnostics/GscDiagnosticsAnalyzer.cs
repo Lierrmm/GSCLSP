@@ -140,6 +140,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             return diagnostics;
 
         var emitted = new HashSet<(int Line, int Column)>();
+        var tokenIndicesByLine = BuildTokenIndicesByLine(tokens);
 
         foreach (var function in GetFunctionDefinitions(lines))
         {
@@ -156,7 +157,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
                     continue;
 
                 AddVariableShadowsNamespaceOccurrences(
-                    diagnostics, tokens, muteConfig, excludedMask, emitted,
+                    diagnostics, tokens, tokenIndicesByLine, muteConfig, excludedMask, emitted,
                     declaration.Name, namespaceName, function.DefinitionLine, bodyEnd);
             }
         }
@@ -164,9 +165,31 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         return diagnostics;
     }
 
+    private static Dictionary<int, List<int>> BuildTokenIndicesByLine(IReadOnlyList<Token> tokens)
+    {
+        var result = new Dictionary<int, List<int>>();
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (!result.TryGetValue(tokens[i].Line, out var indices))
+            {
+                indices = [];
+                result[tokens[i].Line] = indices;
+            }
+
+            indices.Add(i);
+        }
+
+        return result;
+    }
+
     private static void AddVariableShadowsNamespaceOccurrences(
         List<Diagnostic> diagnostics,
         IReadOnlyList<Token> tokens,
+        Dictionary<int, List<int>> tokenIndicesByLine,
         MuteConfig muteConfig,
         bool[] excludedMask,
         HashSet<(int Line, int Column)> emitted,
@@ -177,41 +200,41 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     {
         var message = $"Variable '{variableName}' should be named differently: it conflicts with the namespace '{namespaceName}' used by this file.";
 
-        for (int i = 0; i < tokens.Count; i++)
+        for (int line = startLine; line <= endLine; line++)
         {
-            var token = tokens[i];
-            if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+            if (line < excludedMask.Length && excludedMask[line])
                 continue;
 
-            if (token.Line < startLine || token.Line > endLine)
+            if (!tokenIndicesByLine.TryGetValue(line, out var indices))
                 continue;
 
-            if (!token.Text.Equals(variableName, StringComparison.OrdinalIgnoreCase))
+            if (IsMuted(muteConfig, VariableShadowsNamespaceMuteKey, line))
                 continue;
 
-            if (token.Line < excludedMask.Length && excludedMask[token.Line])
-                continue;
-
-            if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
-                continue;
-
-            if (IsMuted(muteConfig, VariableShadowsNamespaceMuteKey, token.Line))
-                continue;
-
-            if (!emitted.Add((token.Line, token.Column)))
-                continue;
-
-            diagnostics.Add(new Diagnostic
+            foreach (var i in indices)
             {
-                Severity = DiagnosticSeverity.Warning,
-                Source = "gsclsp",
-                Code = VariableShadowsNamespaceWarningCode,
-                Data = variableName,
-                Message = message,
-                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
-                    new Position(token.Line, token.Column),
-                    new Position(token.Line, token.Column + token.Length))
-            });
+                var token = tokens[i];
+                if (!token.Text.Equals(variableName, StringComparison.Ordinal))
+                    continue;
+
+                if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
+                    continue;
+
+                if (!emitted.Add((token.Line, token.Column)))
+                    continue;
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Source = "gsclsp",
+                    Code = VariableShadowsNamespaceWarningCode,
+                    Data = variableName,
+                    Message = message,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                        new Position(token.Line, token.Column),
+                        new Position(token.Line, token.Column + token.Length))
+                });
+            }
         }
     }
 
@@ -247,14 +270,20 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     private static List<VariableDeclaration> GetDeclaredVariables(string[] lines, FunctionDefinition function, int bodyEnd, bool[] excludedMask)
     {
         var result = new List<VariableDeclaration>();
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        var headerMatch = FunctionMultiLineRegex().Match(lines[function.DefinitionLine]);
+        var headerEnd = Math.Min(Math.Max(function.BraceLine, function.DefinitionLine), lines.Length - 1);
+        var header = string.Join('\n', lines[function.DefinitionLine..(headerEnd + 1)]);
+
+        var headerMatch = FunctionMultiLineRegex().Match(header);
         if (headerMatch.Success)
         {
             var paramsGroup = headerMatch.Groups["params"];
-            foreach (var (name, column) in EnumerateParameterDeclarations(paramsGroup.Value, paramsGroup.Index))
-                TryAddDeclaration(result, seen, name, function.DefinitionLine, column);
+            foreach (var (name, offset) in EnumerateParameterDeclarations(paramsGroup.Value, paramsGroup.Index))
+            {
+                var (line, column) = TranslateHeaderOffset(lines, function.DefinitionLine, offset);
+                TryAddDeclaration(result, seen, name, line, column);
+            }
         }
 
         for (int lineIndex = function.BraceLine; lineIndex <= bodyEnd && lineIndex < lines.Length; lineIndex++)
@@ -280,6 +309,19 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         }
 
         return result;
+    }
+
+    private static (int Line, int Column) TranslateHeaderOffset(string[] lines, int headerStartLine, int offset)
+    {
+        var line = headerStartLine;
+
+        while (line < lines.Length && offset > lines[line].Length)
+        {
+            offset -= lines[line].Length + 1;
+            line++;
+        }
+
+        return (line, offset);
     }
 
     private static void TryAddDeclaration(List<VariableDeclaration> result, HashSet<string> seen, string name, int line, int column)

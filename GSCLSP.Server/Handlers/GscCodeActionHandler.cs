@@ -1,4 +1,4 @@
-using GSCLSP.Core.Diagnostics;
+﻿using GSCLSP.Core.Diagnostics;
 using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
@@ -38,7 +38,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
             }
         }
 
-        var renamedVariables = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var renamedVariables = new HashSet<string>(StringComparer.Ordinal);
         foreach (var diagnostic in request.Context.Diagnostics.Where(IsVariableShadowsNamespaceDiagnostic))
         {
             var name = GetDiagnosticIdentifier(diagnostic, text);
@@ -65,12 +65,13 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
         if (diagnostic.Range.Start.Line >= lines.Length)
             return null;
 
-        var bodyRange = FindEnclosingFunctionBodyRange(lines, diagnostic.Range.Start.Line);
+        var bodyRange = GscFunctionBodyLocator.FindEnclosingFunctionBodyRange(lines, diagnostic.Range.Start.Line);
         if (bodyRange is null)
             return null;
 
-        var newName = $"_{name}";
-        var edits = CollectVariableRenameEdits(GscLexingHelper.Lex(text).Tokens, bodyRange.Value, name, newName);
+        var tokens = GscLexingHelper.Lex(text).Tokens;
+        var newName = CreateUniqueName(tokens, bodyRange.Value, name);
+        var edits = CollectVariableRenameEdits(tokens, bodyRange.Value, name, newName);
         if (edits.Count == 0)
             return null;
 
@@ -90,9 +91,34 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
         };
     }
 
+    private static string CreateUniqueName(
+        IReadOnlyList<Token> tokens,
+        (int BraceStartLine, int BraceEndLine) bodyRange,
+        string name)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var token in tokens)
+        {
+            if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (token.Line < bodyRange.BraceStartLine || token.Line > bodyRange.BraceEndLine)
+                continue;
+
+            used.Add(token.Text);
+        }
+
+        var candidate = $"_{name}";
+        for (int suffix = 2; used.Contains(candidate); suffix++)
+            candidate = $"_{name}{suffix}";
+
+        return candidate;
+    }
+
     private static List<TextEdit> CollectVariableRenameEdits(
         IReadOnlyList<Token> tokens,
-        (int StartLine, int EndLine) bodyRange,
+        (int BraceStartLine, int BraceEndLine) bodyRange,
         string name,
         string newName)
     {
@@ -104,7 +130,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
             if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
                 continue;
 
-            if (token.Line < bodyRange.StartLine || token.Line > bodyRange.EndLine)
+            if (token.Line < bodyRange.BraceStartLine || token.Line > bodyRange.BraceEndLine)
                 continue;
 
             if (!token.Text.Equals(name, StringComparison.Ordinal))
@@ -123,56 +149,6 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
         }
 
         return edits;
-    }
-
-    private static (int StartLine, int EndLine)? FindEnclosingFunctionBodyRange(string[] lines, int cursorLine)
-    {
-        int funcDefLine = -1;
-        for (int i = cursorLine; i >= 0; i--)
-        {
-            var line = lines[i];
-            if (line.Length == 0 || char.IsWhiteSpace(line[0]))
-                continue;
-            if (line.TrimStart().StartsWith("//", StringComparison.Ordinal))
-                continue;
-            if (line.Contains(';'))
-                continue;
-
-            var match = RegexPatterns.FunctionMultiLineRegex().Match(line);
-            if (match.Success && match.Index == 0)
-            {
-                funcDefLine = i;
-                break;
-            }
-        }
-
-        if (funcDefLine < 0)
-            return null;
-
-        int braceStart = -1;
-        for (int i = funcDefLine; i < lines.Length; i++)
-        {
-            if (lines[i].Contains('{')) { braceStart = i; break; }
-        }
-        if (braceStart < 0)
-            return null;
-
-        int depth = 0;
-        int braceEnd = lines.Length - 1;
-        for (int i = braceStart; i < lines.Length; i++)
-        {
-            foreach (char c in lines[i])
-            {
-                if (c == '{') depth++;
-                else if (c == '}') depth--;
-            }
-            if (depth == 0) { braceEnd = i; break; }
-        }
-
-        if (cursorLine < funcDefLine || cursorLine > braceEnd)
-            return null;
-
-        return (funcDefLine, braceEnd);
     }
 
     public CodeActionRegistrationOptions GetRegistrationOptions(CodeActionCapability capability, ClientCapabilities clientCapabilities)

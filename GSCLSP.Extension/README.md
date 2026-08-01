@@ -57,7 +57,7 @@ When you hover your mouse cursor over any sort of function, macro, variable, or 
 ### Code Actions
 
 - Quick fix to insert `#include ...` for unresolved functions
-- Quick fix to rename a variable that shadows a used namespace to `_<name>`
+- Quick fix to rename a variable that shadows a used namespace to `_<name>` (a numeric suffix is added if that name is already taken)
 
 ## Project Setup
 
@@ -138,6 +138,7 @@ Supported format:
 - `// gsclsp-disable: recursive-function`
 - `// gsclsp-disable: missing-semicolon`
 - `// gsclsp-disable: builtin-arg-count`
+- `// gsclsp-disable: variable-shadows-namespace`
 - `// gsclsp-disable: recursive, semicolon, builtin-args`
 - `// gsclsp-disable: all`
 
@@ -146,6 +147,7 @@ Aliases supported:
 - `recursive` -> `recursive-function`
 - `semicolon` -> `missing-semicolon`
 - `builtin-args` or `arity` -> `builtin-arg-count`
+- `namespace-shadow` or `shadowed-namespace` -> `variable-shadows-namespace`
 
 ## Command
 

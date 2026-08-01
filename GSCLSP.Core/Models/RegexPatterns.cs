@@ -56,7 +56,7 @@ public partial class RegexPatterns
     [GeneratedRegex(@"^([A-Za-z_]\w*)\s*=\s*(.+?)\s*;")]
     public static partial Regex GlobalVarAssignmentRegex();
 
-    [GeneratedRegex(@"\bforeach\s*\(\s*(?<first>[A-Za-z_]\w*)\s*(?:,\s*(?<second>[A-Za-z_]\w*)\s*)?\bin\b")]
+    [GeneratedRegex(@"\bforeach\s*\(\s*(?<first>[A-Za-z_]\w*)\s*(?:,\s*(?<second>[A-Za-z_]\w*)\s*)?\bin\b", RegexOptions.IgnoreCase)]
     public static partial Regex ForeachVariablesRegex();
 
     [GeneratedRegex(@"(?:(?<path>[a-zA-Z_]\w*(?:\\[a-zA-Z_]\w*)*)::|(?<global>::))?(?<name>[a-zA-Z_]\w*)\s*\(")]
