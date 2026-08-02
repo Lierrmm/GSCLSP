@@ -1,5 +1,6 @@
-using GSCLSP.Core.Indexing;
+﻿using GSCLSP.Core.Indexing;
 using GSCLSP.Core.Models;
+using GSCLSP.Core.Parsing;
 using GSCLSP.Lexer;
 using Microsoft.Extensions.Configuration;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -116,12 +117,19 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
             return new RenameTarget(RenameKind.Macro, name, token.Line, token.Column, token.Column + token.Length, null, MacroScope.Workspace);
         }
 
+        var tokenIndex = IndexOfToken(lexed.Tokens, token);
+        if (tokenIndex >= 0 &&
+            GscVariableTokenFilter.FindSignificantToken(lexed.Tokens, tokenIndex, 1)?.Kind is TokenKind.DoubleColon)
+        {
+            return null;
+        }
+
         if (IsFunctionReference(lexed.Tokens, token))
         {
             return new RenameTarget(RenameKind.Function, name, token.Line, token.Column, token.Column + token.Length, null, MacroScope.LocalFileOnly);
         }
 
-        var funcRange = FindEnclosingFunctionBodyRange(lines, token.Line);
+        var funcRange = GscFunctionBodyLocator.FindEnclosingFunctionBodyRange(lines, token.Line);
         if (funcRange is not null)
         {
             return new RenameTarget(RenameKind.LocalVariable, name, token.Line, token.Column, token.Column + token.Length, funcRange, MacroScope.LocalFileOnly);
@@ -188,6 +196,18 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
         return null;
     }
 
+    private static int IndexOfToken(IReadOnlyList<Token> tokens, Token target)
+    {
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.Line == target.Line && token.Column == target.Column && token.Length == target.Length)
+                return i;
+        }
+
+        return -1;
+    }
+
     private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 
     private static bool TryGetDefineNameSpan(Token token, out int column, out int length, out string name)
@@ -231,48 +251,6 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
         }
 
         return next is { Kind: TokenKind.OpenParen };
-    }
-
-    private static (int BraceStartLine, int BraceEndLine)? FindEnclosingFunctionBodyRange(string[] lines, int cursorLine)
-    {
-        int funcDefLine = -1;
-        for (int i = cursorLine; i >= 0; i--)
-        {
-            var ln = lines[i];
-            if (ln.Length == 0) continue;
-            if (char.IsWhiteSpace(ln[0])) continue;
-            if (ln.TrimStart().StartsWith("//", StringComparison.Ordinal)) continue;
-            if (ln.Contains(';')) continue;
-
-            if (System.Text.RegularExpressions.Regex.IsMatch(ln, @"^\w[\w:]*\s*\("))
-            {
-                funcDefLine = i;
-                break;
-            }
-        }
-        if (funcDefLine < 0) return null;
-
-        int braceStart = -1;
-        for (int i = funcDefLine; i < lines.Length; i++)
-        {
-            if (lines[i].Contains('{')) { braceStart = i; break; }
-        }
-        if (braceStart < 0) return null;
-
-        int depth = 0;
-        int braceEnd = lines.Length - 1;
-        for (int i = braceStart; i < lines.Length; i++)
-        {
-            foreach (char c in lines[i])
-            {
-                if (c == '{') depth++;
-                else if (c == '}') depth--;
-            }
-            if (depth == 0) { braceEnd = i; break; }
-        }
-
-        if (cursorLine < funcDefLine || cursorLine > braceEnd) return null;
-        return (funcDefLine, braceEnd);
     }
 
     private static bool IsTopLevelAssignmentTarget(string line, int column, string name)
@@ -355,11 +333,13 @@ public class GscRenameHandler(GscIndexer indexer, GscDocumentStore documentStore
         var edits = new List<TextEdit>();
         var (start, end) = target.FunctionBodyRange.Value;
 
-        foreach (var token in lexed.Tokens)
+        for (int i = 0; i < lexed.Tokens.Count; i++)
         {
+            var token = lexed.Tokens[i];
             if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword) continue;
             if (token.Line < start || token.Line > end) continue;
             if (!token.Text.Equals(target.Name, StringComparison.Ordinal)) continue;
+            if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(lexed.Tokens, i)) continue;
 
             edits.Add(new TextEdit
             {

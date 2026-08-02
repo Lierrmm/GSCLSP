@@ -17,11 +17,15 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     public const string InvalidBuiltinArgCountDiagnosticCode = "gsclsp.invalidBuiltinArgCount";
     public const string EarlyReturnWarningCode = "gsclsp.earlyReturn";
     public const string MissingAnimtreeDiagnosticCode = "gsclsp.missingAnimtree";
+    public const string VariableShadowsNamespaceWarningCode = "gsclsp.variableShadowsNamespace";
 
     private const string RecursiveWarningMuteKey = "recursive-function";
     private const string MissingSemicolonMuteKey = "missing-semicolon";
     private const string BuiltinArgCountMuteKey = "builtin-arg-count";
     private const string EarlyReturnMuteKey = "early-return";
+    private const string VariableShadowsNamespaceMuteKey = "variable-shadows-namespace";
+
+    private static readonly string[] ForeachVariableGroups = ["first", "second"];
     private static readonly bool ResolutionTraceEnabled =
         string.Equals(Environment.GetEnvironmentVariable("GSCLSP_TRACE_RESOLUTION"), "1", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(Environment.GetEnvironmentVariable("GSCLSP_TRACE_RESOLUTION"), "true", StringComparison.OrdinalIgnoreCase);
@@ -113,7 +117,246 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
         diagnostics.AddRange(CollectMissingAnimtreeErrors(lines, excludedMask));
 
+        if (_indexer.IsTreyarchGsc)
+            diagnostics.AddRange(CollectVariableShadowsNamespaceWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
+
         return diagnostics;
+    }
+
+    private List<Diagnostic> CollectVariableShadowsNamespaceWarnings(
+        string[] lines,
+        IReadOnlyList<Token> tokens,
+        MuteConfig muteConfig,
+        bool[] excludedMask)
+    {
+        var diagnostics = new List<Diagnostic>();
+
+        var usedNamespaces = _indexer.GetUsedNamespaces(lines);
+        if (usedNamespaces.Count == 0)
+            return diagnostics;
+
+        var referencedNamespaces = GetQualifiedNamespaceReferences(lines, excludedMask, usedNamespaces.Keys);
+        if (referencedNamespaces.Count == 0)
+            return diagnostics;
+
+        var emitted = new HashSet<(int Line, int Column)>();
+        var tokenIndicesByLine = BuildTokenIndicesByLine(tokens);
+
+        foreach (var function in GetFunctionDefinitions(lines))
+        {
+            if (function.DefinitionLine < excludedMask.Length && excludedMask[function.DefinitionLine])
+                continue;
+
+            var bodyEnd = FindFunctionBodyEndLine(lines, function.BraceLine);
+            if (bodyEnd < function.BraceLine)
+                continue;
+
+            foreach (var declaration in GetDeclaredVariables(lines, function, bodyEnd, excludedMask))
+            {
+                if (!referencedNamespaces.TryGetValue(declaration.Name, out var namespaceName))
+                    continue;
+
+                AddVariableShadowsNamespaceOccurrences(
+                    diagnostics, tokens, tokenIndicesByLine, muteConfig, excludedMask, emitted,
+                    declaration.Name, namespaceName, function.DefinitionLine, bodyEnd);
+            }
+        }
+
+        return diagnostics;
+    }
+
+    private static Dictionary<int, List<int>> BuildTokenIndicesByLine(IReadOnlyList<Token> tokens)
+    {
+        var result = new Dictionary<int, List<int>>();
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            if (tokens[i].Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (!result.TryGetValue(tokens[i].Line, out var indices))
+            {
+                indices = [];
+                result[tokens[i].Line] = indices;
+            }
+
+            indices.Add(i);
+        }
+
+        return result;
+    }
+
+    private static void AddVariableShadowsNamespaceOccurrences(
+        List<Diagnostic> diagnostics,
+        IReadOnlyList<Token> tokens,
+        Dictionary<int, List<int>> tokenIndicesByLine,
+        MuteConfig muteConfig,
+        bool[] excludedMask,
+        HashSet<(int Line, int Column)> emitted,
+        string variableName,
+        string namespaceName,
+        int startLine,
+        int endLine)
+    {
+        var message = $"Variable '{variableName}' should be named differently: it conflicts with the namespace '{namespaceName}' used by this file.";
+
+        for (int line = startLine; line <= endLine; line++)
+        {
+            if (line < excludedMask.Length && excludedMask[line])
+                continue;
+
+            if (!tokenIndicesByLine.TryGetValue(line, out var indices))
+                continue;
+
+            if (IsMuted(muteConfig, VariableShadowsNamespaceMuteKey, line))
+                continue;
+
+            foreach (var i in indices)
+            {
+                var token = tokens[i];
+                if (!token.Text.Equals(variableName, StringComparison.Ordinal))
+                    continue;
+
+                if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
+                    continue;
+
+                if (!emitted.Add((token.Line, token.Column)))
+                    continue;
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Source = "gsclsp",
+                    Code = VariableShadowsNamespaceWarningCode,
+                    Data = variableName,
+                    Message = message,
+                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                        new Position(token.Line, token.Column),
+                        new Position(token.Line, token.Column + token.Length))
+                });
+            }
+        }
+    }
+
+    private static HashSet<string> GetQualifiedNamespaceReferences(string[] lines, bool[] excludedMask, IEnumerable<string> candidates)
+    {
+        var pool = new HashSet<string>(candidates, StringComparer.OrdinalIgnoreCase);
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (int lineIndex = 0; lineIndex < lines.Length && referenced.Count < pool.Count; lineIndex++)
+        {
+            if (lineIndex < excludedMask.Length && excludedMask[lineIndex])
+                continue;
+
+            var line = StripTrailingLineComment(lines[lineIndex]);
+
+            int index = line.IndexOf("::", StringComparison.Ordinal);
+            while (index >= 0)
+            {
+                int start = index;
+                while (start > 0 && (char.IsLetterOrDigit(line[start - 1]) || line[start - 1] == '_'))
+                    start--;
+
+                if (start < index && pool.TryGetValue(line[start..index], out var canonical))
+                    referenced.Add(canonical);
+
+                index = line.IndexOf("::", index + 2, StringComparison.Ordinal);
+            }
+        }
+
+        return referenced;
+    }
+
+    private static List<VariableDeclaration> GetDeclaredVariables(string[] lines, FunctionDefinition function, int bodyEnd, bool[] excludedMask)
+    {
+        var result = new List<VariableDeclaration>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        var headerEnd = Math.Min(Math.Max(function.BraceLine, function.DefinitionLine), lines.Length - 1);
+        var header = string.Join('\n', lines[function.DefinitionLine..(headerEnd + 1)]);
+
+        var headerMatch = FunctionMultiLineRegex().Match(header);
+        if (headerMatch.Success)
+        {
+            var paramsGroup = headerMatch.Groups["params"];
+            foreach (var (name, offset) in EnumerateParameterDeclarations(paramsGroup.Value, paramsGroup.Index))
+            {
+                var (line, column) = TranslateHeaderOffset(lines, function.DefinitionLine, offset);
+                TryAddDeclaration(result, seen, name, line, column);
+            }
+        }
+
+        for (int lineIndex = function.BraceLine; lineIndex <= bodyEnd && lineIndex < lines.Length; lineIndex++)
+        {
+            if (lineIndex < excludedMask.Length && excludedMask[lineIndex])
+                continue;
+
+            var line = StripTrailingLineComment(lines[lineIndex]);
+
+            var assignment = LocalVarAssignmentRegex().Match(line);
+            if (assignment.Success)
+                TryAddDeclaration(result, seen, assignment.Groups[1].Value, lineIndex, assignment.Groups[1].Index);
+
+            foreach (Match iteration in ForeachVariablesRegex().Matches(line))
+            {
+                foreach (var groupName in ForeachVariableGroups)
+                {
+                    var group = iteration.Groups[groupName];
+                    if (group.Success)
+                        TryAddDeclaration(result, seen, group.Value, lineIndex, group.Index);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static (int Line, int Column) TranslateHeaderOffset(string[] lines, int headerStartLine, int offset)
+    {
+        var line = headerStartLine;
+
+        while (line < lines.Length && offset > lines[line].Length)
+        {
+            offset -= lines[line].Length + 1;
+            line++;
+        }
+
+        return (line, offset);
+    }
+
+    private static void TryAddDeclaration(List<VariableDeclaration> result, HashSet<string> seen, string name, int line, int column)
+    {
+        if (string.IsNullOrEmpty(name) || GscLanguageKeywords.LocalVariableReservedWords.Contains(name))
+            return;
+
+        if (seen.Add(name))
+            result.Add(new VariableDeclaration(name, line, column));
+    }
+
+    private static IEnumerable<(string Name, int Column)> EnumerateParameterDeclarations(string parameters, int parametersColumn)
+    {
+        int segmentStart = 0;
+
+        for (int i = 0; i <= parameters.Length; i++)
+        {
+            if (i < parameters.Length && parameters[i] != ',')
+                continue;
+
+            var segment = parameters[segmentStart..i];
+
+            int nameStart = 0;
+            while (nameStart < segment.Length && (char.IsWhiteSpace(segment[nameStart]) || segment[nameStart] is '&' or '*'))
+                nameStart++;
+
+            int nameEnd = nameStart;
+            while (nameEnd < segment.Length && (char.IsLetterOrDigit(segment[nameEnd]) || segment[nameEnd] == '_'))
+                nameEnd++;
+
+            if (nameEnd > nameStart && (char.IsLetter(segment[nameStart]) || segment[nameStart] == '_'))
+                yield return (segment[nameStart..nameEnd], parametersColumn + segmentStart + nameStart);
+
+            segmentStart = i + 1;
+        }
     }
 
     private static List<Diagnostic> CollectMissingAnimtreeErrors(string[] lines, bool[] excludedMask)
@@ -874,6 +1117,12 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             if (normalized is "early-return" or "early-returns" or "unreachable")
             {
                 keys.Add(EarlyReturnMuteKey);
+                continue;
+            }
+
+            if (normalized is "variable-shadows-namespace" or "namespace-shadow" or "shadowed-namespace")
+            {
+                keys.Add(VariableShadowsNamespaceMuteKey);
             }
         }
 
@@ -1117,4 +1366,5 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     private sealed record IncludedFileScope(string Path, HashSet<string> Functions, string? Namespace = null);
     private sealed record FunctionDefinition(string Name, int DefinitionLine, int NameColumn, int BraceLine);
     private sealed record MuteConfig(HashSet<string> TopOfFileMutes, Dictionary<int, HashSet<string>> LineMutes);
+    private sealed record VariableDeclaration(string Name, int Line, int Column);
 }

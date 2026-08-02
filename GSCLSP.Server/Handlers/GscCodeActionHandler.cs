@@ -1,4 +1,7 @@
+﻿using GSCLSP.Core.Diagnostics;
+using GSCLSP.Core.Models;
 using GSCLSP.Core.Parsing;
+using GSCLSP.Lexer;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -35,7 +38,117 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
             }
         }
 
+        var renamedVariables = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var diagnostic in request.Context.Diagnostics.Where(IsVariableShadowsNamespaceDiagnostic))
+        {
+            var name = GetDiagnosticIdentifier(diagnostic, text);
+            if (string.IsNullOrWhiteSpace(name) || !renamedVariables.Add(name))
+                continue;
+
+            var renameAction = CreateRenameShadowingVariableAction(uri, text, diagnostic, name);
+            if (renameAction is not null)
+                actions.Add(new CommandOrCodeAction(renameAction));
+        }
+
         return new CommandOrCodeActionContainer(actions);
+    }
+
+    private static bool IsVariableShadowsNamespaceDiagnostic(Diagnostic diagnostic)
+    {
+        return string.Equals(diagnostic.Source, "gsclsp", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(diagnostic.Code?.ToString(), GscDiagnosticsAnalyzer.VariableShadowsNamespaceWarningCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static CodeAction? CreateRenameShadowingVariableAction(DocumentUri uri, string text, Diagnostic diagnostic, string name)
+    {
+        var lines = text.Split(["\r\n", "\r", "\n"], StringSplitOptions.None);
+        if (diagnostic.Range.Start.Line >= lines.Length)
+            return null;
+
+        var bodyRange = GscFunctionBodyLocator.FindEnclosingFunctionBodyRange(lines, diagnostic.Range.Start.Line);
+        if (bodyRange is null)
+            return null;
+
+        var tokens = GscLexingHelper.Lex(text).Tokens;
+        var newName = CreateUniqueName(tokens, bodyRange.Value, name);
+        var edits = CollectVariableRenameEdits(tokens, bodyRange.Value, name, newName);
+        if (edits.Count == 0)
+            return null;
+
+        return new CodeAction
+        {
+            Title = $"Rename '{name}' to '{newName}'",
+            Kind = CodeActionKind.QuickFix,
+            IsPreferred = true,
+            Diagnostics = new Container<Diagnostic>(diagnostic),
+            Edit = new WorkspaceEdit
+            {
+                Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>
+                {
+                    [uri] = edits
+                }
+            }
+        };
+    }
+
+    private static string CreateUniqueName(
+        IReadOnlyList<Token> tokens,
+        (int BraceStartLine, int BraceEndLine) bodyRange,
+        string name)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var token in tokens)
+        {
+            if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (token.Line < bodyRange.BraceStartLine || token.Line > bodyRange.BraceEndLine)
+                continue;
+
+            used.Add(token.Text);
+        }
+
+        var candidate = $"_{name}";
+        for (int suffix = 2; used.Contains(candidate); suffix++)
+            candidate = $"_{name}{suffix}";
+
+        return candidate;
+    }
+
+    private static List<TextEdit> CollectVariableRenameEdits(
+        IReadOnlyList<Token> tokens,
+        (int BraceStartLine, int BraceEndLine) bodyRange,
+        string name,
+        string newName)
+    {
+        var edits = new List<TextEdit>();
+
+        for (int i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (token.Kind is not TokenKind.Identifier and not TokenKind.Keyword)
+                continue;
+
+            if (token.Line < bodyRange.BraceStartLine || token.Line > bodyRange.BraceEndLine)
+                continue;
+
+            if (!token.Text.Equals(name, StringComparison.Ordinal))
+                continue;
+
+            if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
+                continue;
+
+            edits.Add(new TextEdit
+            {
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(token.Line, token.Column),
+                    new Position(token.Line, token.Column + token.Length)),
+                NewText = newName
+            });
+        }
+
+        return edits;
     }
 
     public CodeActionRegistrationOptions GetRegistrationOptions(CodeActionCapability capability, ClientCapabilities clientCapabilities)
@@ -58,7 +171,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
 
         foreach (var diagnostic in request.Context.Diagnostics.Where(IsUnresolvedFunctionDiagnostic))
         {
-            var functionName = GetFunctionName(diagnostic, text);
+            var functionName = GetDiagnosticIdentifier(diagnostic, text);
             if (string.IsNullOrWhiteSpace(functionName) || !seen.Add(functionName))
                 continue;
 
@@ -88,7 +201,7 @@ public class GscCodeActionHandler(GscDocumentStore documentStore, GscDiagnostics
         return diagnostic.Message.Contains("not defined in this file or its included files", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetFunctionName(Diagnostic diagnostic, string text)
+    private static string GetDiagnosticIdentifier(Diagnostic diagnostic, string text)
     {
         var dataValue = diagnostic.Data?.ToString();
         if (!string.IsNullOrWhiteSpace(dataValue))

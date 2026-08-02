@@ -465,6 +465,41 @@ Caveats:
 - Ghosts developer GSC dump: https://github.com/mjkzy/iw6-gsc-dump
 - MWR (H1) reverse-engineered dump, ~98% named — useful for s1/s2/h1/h2: https://github.com/mjkzy/h1-gsc-dump
 
+## JUP-only rules (IMPORTANT FOR JUP)
+
+**reserved-keyword namespaces.** If the target file's `#namespace` is a reserved
+keyword (e.g. `class`), `class::func()` collides with the atian-cod-tools compiler's keyword handling; use the
+script path form instead from legacy GSC like so:  `scripts\mp\class::func()`. Namespace form stays the default everywhere else; only fall back to the path form when the namespace actually breaks compiling, or you think it may warrant a use case over the namespace being used.
+
+**issue with entity thread function calls.** The atian-cod-tools compiler miscompiles a
+threaded call that has BOTH an entity prefix AND a direct function name. The script compiles
+but the call misbehaves at runtime. Broken shape — `<entity> thread <name>(args)`:
+
+```gsc
+self thread monitor(slot);                      // BROKEN
+player thread util::do_thing(a, b);             // BROKEN — namespace form too
+self thread scripts\mp\class::setclass(x);      // BROKEN — path form too
+```
+
+Rewrite **every such call** as a function-reference invoke. It **is preferred** when there is a thread keyword being used in function calls. To do it properly, you take `&name`, call it with `[[ ]]` wrapping it:
+
+```gsc
+self thread [[ &monitor ]](slot);                    // local function
+player thread [[ &util::do_thing ]](a, b);           // namespace-qualified
+self thread [[ &scripts\mp\class::setclass ]](x);    // path-qualified
+```
+
+NOT affected — leave these forms alone:
+
+```gsc
+foo();                        // no entity prefix
+self foo();                   // no thread
+self thread [[ ref ]]();      // already a reference invoke ([[ variable ]] or [[ &name ]])
+```
+
+Detection rule: the token before `thread` is an entity (`self`, `level`, or a variable) AND
+the token after `thread` is a function name, not `[[`. On `jup`, ALWAYS apply the rewrite. Other 3arc GSC games do **not** need this.
+
 ## Comment Rules
 
 The default behavior is to use **no comment(s)**. Write code that explains itself through naming and structure instead, and can be completely understood without comments. A comment is only justified when it carries information that is *not recoverable from the code*, and that a competent developer reading this file would otherwise get wrong. In practice that means:
