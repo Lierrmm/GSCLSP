@@ -139,15 +139,17 @@ Supported format:
 - `// gsclsp-disable: missing-semicolon`
 - `// gsclsp-disable: builtin-arg-count`
 - `// gsclsp-disable: variable-shadows-namespace`
+- `// gsclsp-disable: misleading-indentation`
 - `// gsclsp-disable: recursive, semicolon, builtin-args`
 - `// gsclsp-disable: all`
 
-Aliases supported:
+Aliases are also supported:
 
 - `recursive` -> `recursive-function`
 - `semicolon` -> `missing-semicolon`
 - `builtin-args` or `arity` -> `builtin-arg-count`
 - `namespace-shadow` or `shadowed-namespace` -> `variable-shadows-namespace`
+- `missing-braces` or `braces` -> `misleading-indentation`
 
 ## Command
 

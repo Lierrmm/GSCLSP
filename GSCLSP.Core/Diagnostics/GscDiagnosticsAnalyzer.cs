@@ -18,12 +18,14 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     public const string EarlyReturnWarningCode = "gsclsp.earlyReturn";
     public const string MissingAnimtreeDiagnosticCode = "gsclsp.missingAnimtree";
     public const string VariableShadowsNamespaceWarningCode = "gsclsp.variableShadowsNamespace";
+    public const string MisleadingIndentationErrorCode = "gsclsp.misleadingIndentation";
 
     private const string RecursiveWarningMuteKey = "recursive-function";
     private const string MissingSemicolonMuteKey = "missing-semicolon";
     private const string BuiltinArgCountMuteKey = "builtin-arg-count";
     private const string EarlyReturnMuteKey = "early-return";
     private const string VariableShadowsNamespaceMuteKey = "variable-shadows-namespace";
+    private const string MisleadingIndentationMuteKey = "misleading-indentation";
 
     private static readonly string[] ForeachVariableGroups = ["first", "second"];
     private static readonly bool ResolutionTraceEnabled =
@@ -116,6 +118,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         diagnostics.AddRange(CollectRecursiveFunctionWarnings(lines, tokensByLine, muteConfig, excludedMask));
         diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
         diagnostics.AddRange(CollectMissingAnimtreeErrors(lines, excludedMask));
+        diagnostics.AddRange(CollectMisleadingIndentationErrors(lines, lexed.Tokens, muteConfig, excludedMask));
 
         if (_indexer.IsTreyarchGsc)
             diagnostics.AddRange(CollectVariableShadowsNamespaceWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
@@ -384,6 +387,197 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         }
 
         return diagnostics;
+    }
+
+    private static List<Diagnostic> CollectMisleadingIndentationErrors(
+        string[] lines,
+        IReadOnlyList<Token> tokens,
+        MuteConfig muteConfig,
+        bool[] excludedMask)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var reportedLines = new HashSet<int>();
+        var significant = new List<Token>(tokens.Count);
+
+        foreach (var token in tokens)
+        {
+            if (IsSignificantToken(token) && token.Kind != TokenKind.Directive)
+                significant.Add(token);
+        }
+
+        for (int i = 0; i < significant.Count; i++)
+        {
+            var header = significant[i];
+            if (header.Kind != TokenKind.Keyword || !IsBracelessBodyKeyword(header.Text))
+                continue;
+
+            if (header.Text.Equals("if", StringComparison.OrdinalIgnoreCase) &&
+                i > 0 && IsKeywordToken(significant[i - 1], "else"))
+                continue;
+
+            var keyword = header.Text.ToLowerInvariant();
+            var cursor = i + 1;
+
+            if (keyword == "else" && cursor < significant.Count &&
+                significant[cursor].Kind == TokenKind.Keyword &&
+                significant[cursor].Text.Equals("if", StringComparison.OrdinalIgnoreCase))
+            {
+                keyword = "if";
+                cursor++;
+            }
+
+            if (keyword != "else")
+            {
+                if (cursor >= significant.Count || significant[cursor].Kind != TokenKind.OpenParen)
+                    continue;
+
+                var closeParen = FindMatchingCloseParen(significant, cursor);
+                if (closeParen < 0)
+                    continue;
+
+                cursor = closeParen + 1;
+            }
+
+            if (cursor >= significant.Count)
+                continue;
+
+            if (significant[cursor].Kind is TokenKind.Semicolon or TokenKind.OpenBrace)
+                continue;
+
+            var bodyEnd = FindBracelessBodyEnd(significant, cursor);
+            if (bodyEnd < 0 || bodyEnd + 1 >= significant.Count)
+                continue;
+
+            var next = significant[bodyEnd + 1];
+
+            if (next.Line == header.Line || next.Column <= header.Column)
+                continue;
+
+            if (next.Kind is TokenKind.CloseBrace or TokenKind.Directive)
+                continue;
+
+            if (next.Kind == TokenKind.Keyword &&
+                (next.Text.Equals("else", StringComparison.OrdinalIgnoreCase) ||
+                 next.Text.Equals("case", StringComparison.OrdinalIgnoreCase) ||
+                 next.Text.Equals("default", StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            if ((header.Line < excludedMask.Length && excludedMask[header.Line]) ||
+                (next.Line < excludedMask.Length && excludedMask[next.Line]))
+                continue;
+
+            if (IsMuted(muteConfig, MisleadingIndentationMuteKey, next.Line))
+                continue;
+
+            if (!reportedLines.Add(next.Line))
+                continue;
+
+            var (startColumn, endColumn) = GetLineContentRange(lines[next.Line]);
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Error,
+                Source = "gsclsp",
+                Code = MisleadingIndentationErrorCode,
+                Message = $"Statement is not part of the '{keyword}' body. A brace-less '{keyword}' controls only the next single statement — add '{{' and '}}' around the block or fix the indentation.",
+                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    new Position(next.Line, startColumn),
+                    new Position(next.Line, endColumn))
+            });
+        }
+
+        return diagnostics;
+    }
+
+    private static bool IsBracelessBodyKeyword(string text)
+    {
+        return text.Equals("if", StringComparison.OrdinalIgnoreCase) ||
+            text.Equals("else", StringComparison.OrdinalIgnoreCase) ||
+            text.Equals("for", StringComparison.OrdinalIgnoreCase) ||
+            text.Equals("foreach", StringComparison.OrdinalIgnoreCase) ||
+            text.Equals("while", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int FindMatchingCloseParen(IReadOnlyList<Token> tokens, int openParenIndex)
+    {
+        var depth = 0;
+        for (int i = openParenIndex; i < tokens.Count; i++)
+        {
+            if (tokens[i].Kind == TokenKind.OpenParen)
+                depth++;
+            else if (tokens[i].Kind == TokenKind.CloseParen)
+            {
+                depth--;
+                if (depth == 0)
+                    return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindBracelessBodyEnd(IReadOnlyList<Token> tokens, int bodyStart)
+    {
+        var parenDepth = 0;
+        var bracketDepth = 0;
+        var unmatchedIfs = 0;
+
+        for (int i = bodyStart; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            switch (token.Kind)
+            {
+                case TokenKind.OpenParen:
+                    parenDepth++;
+                    break;
+                case TokenKind.CloseParen:
+                    parenDepth--;
+                    break;
+                case TokenKind.OpenBracket:
+                    bracketDepth++;
+                    break;
+                case TokenKind.CloseBracket:
+                    bracketDepth--;
+                    break;
+                case TokenKind.OpenBrace when parenDepth == 0 && bracketDepth == 0:
+                {
+                    var braceDepth = 1;
+                    i++;
+                    while (i < tokens.Count && braceDepth > 0)
+                    {
+                        if (tokens[i].Kind == TokenKind.OpenBrace)
+                            braceDepth++;
+                        else if (tokens[i].Kind == TokenKind.CloseBrace)
+                            braceDepth--;
+                        i++;
+                    }
+
+                    i--;
+                    if (i >= tokens.Count)
+                        return -1;
+
+                    if (unmatchedIfs == 0 || i + 1 >= tokens.Count || !IsKeywordToken(tokens[i + 1], "else"))
+                        return i;
+                    break;
+                }
+                case TokenKind.Semicolon when parenDepth == 0 && bracketDepth == 0:
+                    if (unmatchedIfs > 0 && i + 1 < tokens.Count && IsKeywordToken(tokens[i + 1], "else"))
+                        break;
+                    return i;
+                case TokenKind.Keyword when parenDepth == 0 && bracketDepth == 0:
+                    if (token.Text.Equals("if", StringComparison.OrdinalIgnoreCase))
+                        unmatchedIfs++;
+                    else if (token.Text.Equals("else", StringComparison.OrdinalIgnoreCase) && unmatchedIfs > 0)
+                        unmatchedIfs--;
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool IsKeywordToken(Token token, string keyword)
+    {
+        return token.Kind == TokenKind.Keyword && token.Text.Equals(keyword, StringComparison.OrdinalIgnoreCase);
     }
 
     private static List<Diagnostic> CollectEarlyReturnWarnings(
@@ -1123,6 +1317,12 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             if (normalized is "variable-shadows-namespace" or "namespace-shadow" or "shadowed-namespace")
             {
                 keys.Add(VariableShadowsNamespaceMuteKey);
+                continue;
+            }
+
+            if (normalized is "misleading-indentation" or "missing-braces" or "braces")
+            {
+                keys.Add(MisleadingIndentationMuteKey);
             }
         }
 
