@@ -53,6 +53,7 @@ When you hover your mouse cursor over any sort of function, macro, variable, or 
 - `gsclsp.earlyReturn`: Early return cutting off code warning
 - `gsclsp.missingAnimtree`: Sanity check #animtree for valid #using_animtree
 - `gsclsp.variableShadowsNamespace`: Variable named after a namespace the file uses (Treyarch games only)
+- `gsclsp.misleadingIndentation`: Misleading indentation warning
 
 ### Code Actions
 
