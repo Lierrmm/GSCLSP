@@ -284,6 +284,42 @@ C-like: `if/else`, `for`, `while`, `foreach (x in arr)`, `switch/case/default`, 
 `continue`, `return`. Semicolons terminate statements. Allman braces. Variables are
 dynamically typed, created by assignment (`x = 5;`) — no `var`/`let`.
 
+`foreach (x in arr)` loops over the elements of an array, like a `for` loop over values.
+Braces are optional only when the body is exactly one statement — a brace-less
+`if/else/for/foreach/while` controls ONLY the next single statement, no matter how the
+rest is indented:
+
+```gsc
+// WRONG: update_menu ALWAYS runs — it is not part of the if.
+if (self in_menu())
+    self close_menu();
+    self update_menu(menu, cursor, force);
+
+// RIGHT: both statements inside the if.
+if (self in_menu())
+{
+    self close_menu();
+    self update_menu(menu, cursor, force);
+}
+
+// WRONG: fragile — one nested statement is legal, but adding a second line silently
+// falls out of the loop body.
+foreach (bro in bruh)
+    if (bro == player)
+        bro thread [[&wow]]();
+
+// RIGHT: braces on foreach — it almost always needs them.
+foreach (bro in bruh)
+{
+    if (bro == player)
+        bro thread [[&wow]]();
+}
+```
+
+Prefer braces on every control-flow body. The gsclsp.misleadingIndentation error flags
+statements that are indented like part of a brace-less body but actually execute
+unconditionally.
+
 ## 3. Special literals
 
 | Form | Meaning |
