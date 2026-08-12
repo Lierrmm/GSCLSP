@@ -7,7 +7,8 @@ public sealed class GscLexer
         "if", "else", "for", "foreach", "while", "switch", "return", "wait",
         "waittill", "waittillmatch", "waittillframeend", "notify", "endon",
         "thread", "childthread", "break", "continue", "case", "default",
-        "true", "false", "undefined", "self", "level", "game"
+        "true", "false", "undefined", "self", "level", "game",
+        "function", "private", "autoexec", "const"
     };
 
     private string _source = string.Empty;

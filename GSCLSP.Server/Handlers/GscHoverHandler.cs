@@ -302,10 +302,10 @@ public partial class GscHoverHandler(GscIndexer indexer, GscDocumentStore docume
             var localVar = matching[0];
             var comment = GetDefinitionComment(lines, localVar.Line - 1);
 
-            contentValue = $"```gsc\n{localVar.Name} = {localVar.Value}\n```\n";
+            contentValue = $"```gsc\n{(localVar.IsConst ? "const " : "")}{localVar.Name} = {localVar.Value};\n```\n";
             if (!string.IsNullOrEmpty(comment))
                 contentValue += $"{comment}\n\n";
-            contentValue += $"---\n`Variable`\n\n**Line:** {localVar.Line}";
+            contentValue += $"---\n`{(localVar.IsConst ? "Constant" : "Variable")}`\n\n**Line:** {localVar.Line}";
             reassignments = [.. matching.Skip(1)];
         }
 

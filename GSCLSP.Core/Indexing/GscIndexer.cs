@@ -42,7 +42,7 @@ public partial class GscIndexer(ILogger logger)
     private static readonly Lock _scanCacheLock = new();
 
     // local variable cache for GSC functions
-    public record LocalVariable(string Name, string Value, int Line);
+    public record LocalVariable(string Name, string Value, int Line, bool IsConst);
     private static readonly Dictionary<string, List<LocalVariable>> _localVarCache = [];
     private static readonly Lock _localVarCacheLock = new();
 
@@ -981,12 +981,24 @@ public partial class GscIndexer(ILogger logger)
                 if (GscLanguageKeywords.LocalVariableReservedWords.Contains(paramName)) continue;
 
                 if (paramNames.Add(paramName))
-                    result.Add(new LocalVariable(paramName, "parameter", funcDefLine + 1));
+                    result.Add(new LocalVariable(paramName, "parameter", funcDefLine + 1, IsConst: false));
             }
         }
 
         for (int i = braceStart; i <= funcEnd; i++)
         {
+            var constMatch = ConstVarAssignmentRegex().Match(lines[i]);
+            if (constMatch.Success)
+            {
+                string constName = constMatch.Groups[1].Value;
+                string constValue = constMatch.Groups[2].Value.Trim();
+
+                if (GscLanguageKeywords.LocalVariableReservedWords.Contains(constName)) continue;
+
+                result.Add(new LocalVariable(constName, constValue, i + 1, IsConst: true));
+                continue;
+            }
+
             var match = LocalVarAssignmentRegex().Match(lines[i]);
             if (!match.Success) continue;
 
@@ -995,7 +1007,7 @@ public partial class GscIndexer(ILogger logger)
 
             if (GscLanguageKeywords.LocalVariableReservedWords.Contains(name)) continue;
 
-            result.Add(new LocalVariable(name, value, i + 1));
+            result.Add(new LocalVariable(name, value, i + 1, IsConst: false));
         }
 
         return result;

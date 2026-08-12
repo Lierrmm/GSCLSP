@@ -14,7 +14,7 @@ public static class GscLanguageKeywords
         "true", "false", "undefined",
         "size", "game", "self", "anim", "level",
         "isdefined", "istrue",
-        "function", "private", "autoexec"
+        "function", "private", "autoexec", "const"
     };
 
     public static readonly HashSet<string> FunctionModifierKeywords = new(StringComparer.OrdinalIgnoreCase)
@@ -66,6 +66,6 @@ public static class GscLanguageKeywords
         "notify", "endon",
         "thread", "childthread", "thisthread", "call",
         "true", "false", "undefined",
-        "self", "level", "game", "anim"
+        "self", "level", "game", "anim", "const"
     };
 }
