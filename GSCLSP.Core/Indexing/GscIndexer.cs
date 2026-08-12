@@ -987,7 +987,8 @@ public partial class GscIndexer(ILogger logger)
 
         for (int i = braceStart; i <= funcEnd; i++)
         {
-            var constMatch = ConstVarAssignmentRegex().Match(lines[i]);
+            var codeLine = StripTrailingLineComment(lines[i]);
+            var constMatch = ConstVarAssignmentRegex().Match(codeLine);
             if (constMatch.Success)
             {
                 string constName = constMatch.Groups[1].Value;
@@ -999,7 +1000,7 @@ public partial class GscIndexer(ILogger logger)
                 continue;
             }
 
-            var match = LocalVarAssignmentRegex().Match(lines[i]);
+            var match = LocalVarAssignmentRegex().Match(codeLine);
             if (!match.Success) continue;
 
             string name = match.Groups[1].Value;
