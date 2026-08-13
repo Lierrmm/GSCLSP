@@ -577,12 +577,17 @@
     "variables": {
       "patterns": [
         {
-          "comment": "Namespace path: maps\\mp\\gametypes\\_hud_util (backslash-delimited) - not a variable name",
-          "name": "variable.other.gsc",
+          "comment": "Namespace path (ex: maps\\mp\\gametypes\\_hud_util)",
+          "name": "entity.name.namespace.gsc",
           "match": "[A-Za-z_][A-Za-z_0-9]*(\\\\[A-Za-z_][A-Za-z_0-9]*)+"
         },
         {
-          "comment": "Variable name only - not after a dot (members like .glowAlpha stay neutral)",
+          "comment": "Bare namespace qualifier (hud_util)",
+          "name": "entity.name.namespace.gsc",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*::)"
+        },
+        {
+          "comment": "Variable name only",
           "name": "variable.other.constant.gsc",
           "match": "(?<!\\.)\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
