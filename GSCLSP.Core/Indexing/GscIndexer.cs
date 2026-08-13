@@ -251,8 +251,9 @@ public partial class GscIndexer(ILogger logger)
             var rawParams = funcMatch.Groups["params"].Value;
             var cleanParams = CleanGscParams(rawParams);
             var nameGroup = funcMatch.Groups["name"];
-            var isPrivate = nameGroup.Index > 0 &&
-                HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
+            var prefix = line.AsSpan(0, nameGroup.Index);
+            var isPrivate = nameGroup.Index > 0 && HasModifierWord(prefix, "private");
+            var isAutoExec = nameGroup.Index > 0 && HasModifierWord(prefix, "autoexec");
 
             var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(rawLines, lineIndex - 1);
 
@@ -264,6 +265,7 @@ public partial class GscIndexer(ILogger logger)
                 SymbolType.Function,
                 Documentation: docBlock ?? "",
                 IsPrivate: isPrivate,
+                IsAutoExec: isAutoExec,
                 DocumentationRendered: docBlock != null
             );
             fileMap.LocalSymbols.Add(symbol);
@@ -710,6 +712,7 @@ public partial class GscIndexer(ILogger logger)
                     continue;
 
                 int pos = -1;
+                int prefixLength = 0;
                 string checkLine = codeLine;
 
                 if (!codeLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
@@ -748,6 +751,7 @@ public partial class GscIndexer(ILogger logger)
                     if (!skipLine)
                     {
                         int nameStartInCodeLine = codeLine.Length - checkLine.Length;
+                        prefixLength = nameStartInCodeLine;
                         int nameEnd = nameStartInCodeLine + fnLen;
                         if (nameEnd >= codeLine.Length)
                             skipLine = true;
@@ -799,6 +803,10 @@ public partial class GscIndexer(ILogger logger)
 
                 if (!hasBrace) continue;
 
+                var prefix = codeLine.AsSpan(0, prefixLength);
+                var isPrivate = HasModifierWord(prefix, "private");
+                var isAutoExec = HasModifierWord(prefix, "autoexec");
+
                 var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(rawLines, i - 1);
                 if (docBlock != null)
                 {
@@ -809,6 +817,8 @@ public partial class GscIndexer(ILogger logger)
                         Parameters: paramsText,
                         Type: SymbolType.Function,
                         Documentation: docBlock,
+                        IsPrivate: isPrivate,
+                        IsAutoExec: isAutoExec,
                         DocumentationRendered: true
                     );
                 }
@@ -888,7 +898,9 @@ public partial class GscIndexer(ILogger logger)
                     LineNumber: i + 1,
                     Parameters: paramsText,
                     Type: SymbolType.Function,
-                    Documentation: doc
+                    Documentation: doc,
+                    IsPrivate: isPrivate,
+                    IsAutoExec: isAutoExec
                 );
             }
         }

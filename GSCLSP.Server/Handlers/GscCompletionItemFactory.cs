@@ -103,7 +103,13 @@ internal static class GscCompletionItemFactory
     internal static string GetSignatureText(GscSymbol symbol, List<string>? parsedArgs = null)
     {
         var parameterDetail = GetParameterDetail(symbol, parsedArgs);
-        return $"{symbol.Name}{parameterDetail}";
+
+        List<string>? modifiers = null;
+        if (symbol.IsPrivate) (modifiers ??= []).Add("private");
+        if (symbol.IsAutoExec) (modifiers ??= []).Add("autoexec");
+
+        var prefix = modifiers is null ? string.Empty : $"{string.Join(' ', modifiers)} ";
+        return $"{prefix}{symbol.Name}{parameterDetail}";
     }
 
     internal static string GetParameterDetail(GscSymbol symbol, List<string>? parsedArgs = null)

@@ -345,8 +345,9 @@ public partial class GscIndexer
                 continue;
 
             var nameGroup = funcMatch.Groups["name"];
-            var isPrivate = nameGroup.Index > 0 &&
-                HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
+            var prefix = line.AsSpan(0, nameGroup.Index);
+            var isPrivate = nameGroup.Index > 0 && HasModifierWord(prefix, "private");
+            var isAutoExec = nameGroup.Index > 0 && HasModifierWord(prefix, "autoexec");
 
             var symbol = new GscSymbol(
                 funcMatch.Groups["name"].Value,
@@ -354,7 +355,8 @@ public partial class GscIndexer
                 lineNum,
                 CleanGscParams(funcMatch.Groups["params"].Value),
                 SymbolType.Function,
-                IsPrivate: isPrivate
+                IsPrivate: isPrivate,
+                IsAutoExec: isAutoExec
             );
 
             symbols.Add(symbol);
