@@ -414,18 +414,22 @@ namespace GSCLSP.Server.Handlers
                 new Position(position.Line, segmentStart),
                 position);
 
-            var folders = _indexer.GetAllIndexedFilePaths()
+            bool isJup = _indexer.CurrentGame.Equals("jup", StringComparison.Ordinal);
+            if (isJup && lastSlash < 0)
+                return false;
+
+            var candidatePaths = _indexer.GetAllIndexedFilePaths()
                 .Select(ToRelativeScriptPath)
                 .Where(p => p.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase))
                 .Select(p => p.Replace("/", "\\"))
-                .Where(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Where(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+
+            var addedFolder = false;
+            foreach (var folder in candidatePaths
                 .Select(p => p[prefix.Length..])
                 .Where(p => p.Contains('\\'))
                 .Select(p => p[..p.IndexOf('\\')])
-                .Distinct(StringComparer.OrdinalIgnoreCase);
-
-            var addedFolder = false;
-            foreach (var folder in folders)
+                .Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 completions.Add(new CompletionItem
                 {
@@ -441,8 +445,33 @@ namespace GSCLSP.Server.Handlers
                 addedFolder = true;
             }
 
+            var addedFile = false;
+            
+            // JUP has a edge case where legacy GSC paths *do* work, so this shows those
+            if (isJup)
+            {
+                foreach (var fileName in candidatePaths
+                    .Select(p => p[prefix.Length..])
+                    .Where(p => !p.Contains('\\'))
+                    .Select(p => p.EndsWith(".gsc", StringComparison.OrdinalIgnoreCase) ? p[..^4] : p)
+                    .Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    completions.Add(new CompletionItem
+                    {
+                        Label = fileName,
+                        LabelDetails = new CompletionItemLabelDetails { Description = ".gsc" },
+                        Kind = CompletionItemKind.File,
+                        FilterText = fileName,
+                        SortText = "1_" + fileName,
+                        InsertTextFormat = InsertTextFormat.PlainText,
+                        TextEdit = new TextEditOrInsertReplaceEdit(new TextEdit { Range = segmentRange, NewText = fileName })
+                    });
+                    addedFile = true;
+                }
+            }
+
             // the return value only decides whether to stop the parent function early
-            return lastSlash >= 0 && addedFolder;
+            return lastSlash >= 0 && (addedFolder || addedFile);
 
             string ToRelativeScriptPath(string filePath)
             {

@@ -19,6 +19,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     public const string MissingAnimtreeDiagnosticCode = "gsclsp.missingAnimtree";
     public const string VariableShadowsNamespaceWarningCode = "gsclsp.variableShadowsNamespace";
     public const string MisleadingIndentationErrorCode = "gsclsp.misleadingIndentation";
+    public const string ConstReassignmentDiagnosticCode = "gsclsp.constReassignment";
 
     private const string RecursiveWarningMuteKey = "recursive-function";
     private const string MissingSemicolonMuteKey = "missing-semicolon";
@@ -26,6 +27,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     private const string EarlyReturnMuteKey = "early-return";
     private const string VariableShadowsNamespaceMuteKey = "variable-shadows-namespace";
     private const string MisleadingIndentationMuteKey = "misleading-indentation";
+    private const string ConstReassignmentMuteKey = "const-reassignment";
 
     private static readonly string[] ForeachVariableGroups = ["first", "second"];
     private static readonly bool ResolutionTraceEnabled =
@@ -119,6 +121,7 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         diagnostics.AddRange(CollectEarlyReturnWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
         diagnostics.AddRange(CollectMissingAnimtreeErrors(lines, excludedMask));
         diagnostics.AddRange(CollectMisleadingIndentationErrors(lines, lexed.Tokens, muteConfig, excludedMask));
+        diagnostics.AddRange(CollectConstReassignmentErrors(lines, lexed.Tokens, muteConfig, excludedMask));
 
         if (_indexer.IsTreyarchGsc)
             diagnostics.AddRange(CollectVariableShadowsNamespaceWarnings(lines, lexed.Tokens, muteConfig, excludedMask));
@@ -241,6 +244,171 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         }
     }
 
+    private List<Diagnostic> CollectConstReassignmentErrors(
+        string[] lines,
+        IReadOnlyList<Token> tokens,
+        MuteConfig muteConfig,
+        bool[] excludedMask)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var tokenIndicesByLine = BuildTokenIndicesByLine(tokens);
+
+        foreach (var function in GetFunctionDefinitions(lines))
+        {
+            if (function.DefinitionLine < excludedMask.Length && excludedMask[function.DefinitionLine])
+                continue;
+
+            var bodyEnd = FindFunctionBodyEndLine(lines, function.BraceLine);
+            if (bodyEnd < function.BraceLine)
+                continue;
+
+            foreach (var declaration in GetDeclaredVariables(lines, function, bodyEnd, excludedMask))
+            {
+                if (!declaration.IsConst)
+                    continue;
+
+                AddConstReassignmentOccurrences(
+                    diagnostics, lines, tokens, tokenIndicesByLine, muteConfig, excludedMask,
+                    declaration.Name, declaration.Line, bodyEnd);
+            }
+        }
+
+        return diagnostics;
+    }
+
+    private static void AddConstReassignmentOccurrences(
+        List<Diagnostic> diagnostics,
+        string[] lines,
+        IReadOnlyList<Token> tokens,
+        Dictionary<int, List<int>> tokenIndicesByLine,
+        MuteConfig muteConfig,
+        bool[] excludedMask,
+        string constName,
+        int declLine,
+        int bodyEnd)
+    {
+        var emitted = new HashSet<(int Line, int Column)>();
+
+        for (int line = declLine + 1; line <= bodyEnd && line < lines.Length; line++)
+        {
+            if (line < excludedMask.Length && excludedMask[line])
+                continue;
+
+            if (IsMuted(muteConfig, ConstReassignmentMuteKey, line))
+                continue;
+
+            var foreachMatch = ForeachVariablesRegex().Match(StripTrailingLineComment(lines[line]));
+            if (foreachMatch.Success)
+            {
+                foreach (var groupName in ForeachVariableGroups)
+                {
+                    var group = foreachMatch.Groups[groupName];
+                    if (group.Success && group.Value.Equals(constName, StringComparison.Ordinal))
+                        AddConstDiagnostic(diagnostics, emitted, constName, declLine, line, group.Index);
+                }
+            }
+
+            if (!tokenIndicesByLine.TryGetValue(line, out var indices))
+                continue;
+
+            foreach (var i in indices)
+            {
+                var token = tokens[i];
+                if (!token.Text.Equals(constName, StringComparison.Ordinal))
+                    continue;
+
+                if (GscVariableTokenFilter.IsNamespaceOrMemberUsage(tokens, i))
+                    continue;
+
+                if (!IsConstReassignmentToken(tokens, i))
+                    continue;
+
+                AddConstDiagnostic(diagnostics, emitted, constName, declLine, token.Line, token.Column);
+            }
+        }
+    }
+
+    private static void AddConstDiagnostic(
+        List<Diagnostic> diagnostics,
+        HashSet<(int Line, int Column)> emitted,
+        string constName,
+        int declLine,
+        int line,
+        int column)
+    {
+        if (!emitted.Add((line, column)))
+            return;
+
+        diagnostics.Add(new Diagnostic
+        {
+            Severity = DiagnosticSeverity.Error,
+            Source = "gsclsp",
+            Code = ConstReassignmentDiagnosticCode,
+            Data = constName,
+            Message = $"Cannot reassign '{constName}': it was declared as const (line {declLine + 1}).",
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                new Position(line, column),
+                new Position(line, column + constName.Length))
+        });
+    }
+
+    private static bool IsConstReassignmentToken(IReadOnlyList<Token> tokens, int index)
+    {
+        int nextIdx = FindSignificantTokenIndex(tokens, index, 1);
+        if (nextIdx >= 0)
+        {
+            var nextKind = tokens[nextIdx].Kind;
+            if (IsAssignmentOperator(nextKind))
+                return true;
+
+            if (nextKind is TokenKind.Pipe or TokenKind.Ampersand or TokenKind.Caret)
+            {
+                int afterIdx = FindSignificantTokenIndex(tokens, nextIdx, 1);
+                if (afterIdx >= 0 && tokens[afterIdx].Kind == TokenKind.Equals)
+                    return true;
+            }
+        }
+
+        int prevIdx = FindSignificantTokenIndex(tokens, index, -1);
+        if (prevIdx >= 0)
+        {
+            var prevKind = tokens[prevIdx].Kind;
+            if (prevKind is TokenKind.PlusPlus or TokenKind.MinusMinus)
+                return true;
+
+            if (prevKind == TokenKind.Keyword &&
+                tokens[prevIdx].Text.Equals("const", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsAssignmentOperator(TokenKind kind) =>
+        kind is TokenKind.Equals
+            or TokenKind.PlusEquals
+            or TokenKind.MinusEquals
+            or TokenKind.StarEquals
+            or TokenKind.SlashEquals
+            or TokenKind.PercentEquals
+            or TokenKind.PlusPlus
+            or TokenKind.MinusMinus;
+
+    private static int FindSignificantTokenIndex(IReadOnlyList<Token> tokens, int index, int step)
+    {
+        ArgumentOutOfRangeException.ThrowIfZero(step);
+
+        for (int i = index + step; i >= 0 && i < tokens.Count; i += step)
+        {
+            if (tokens[i].Kind is TokenKind.Whitespace or TokenKind.Comment)
+                continue;
+
+            return i;
+        }
+
+        return -1;
+    }
+
     private static HashSet<string> GetQualifiedNamespaceReferences(string[] lines, bool[] excludedMask, IEnumerable<string> candidates)
     {
         var pool = new HashSet<string>(candidates, StringComparer.OrdinalIgnoreCase);
@@ -300,6 +468,10 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             if (assignment.Success)
                 TryAddDeclaration(result, seen, assignment.Groups[1].Value, lineIndex, assignment.Groups[1].Index);
 
+            var constAssignment = ConstVarAssignmentRegex().Match(line);
+            if (constAssignment.Success)
+                TryAddDeclaration(result, seen, constAssignment.Groups[1].Value, lineIndex, constAssignment.Groups[1].Index, isConst: true);
+
             foreach (Match iteration in ForeachVariablesRegex().Matches(line))
             {
                 foreach (var groupName in ForeachVariableGroups)
@@ -327,13 +499,13 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         return (line, offset);
     }
 
-    private static void TryAddDeclaration(List<VariableDeclaration> result, HashSet<string> seen, string name, int line, int column)
+    private static void TryAddDeclaration(List<VariableDeclaration> result, HashSet<string> seen, string name, int line, int column, bool isConst = false)
     {
         if (string.IsNullOrEmpty(name) || GscLanguageKeywords.LocalVariableReservedWords.Contains(name))
             return;
 
         if (seen.Add(name))
-            result.Add(new VariableDeclaration(name, line, column));
+            result.Add(new VariableDeclaration(name, line, column, isConst));
     }
 
     private static IEnumerable<(string Name, int Column)> EnumerateParameterDeclarations(string parameters, int parametersColumn)
@@ -1324,6 +1496,11 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
             {
                 keys.Add(MisleadingIndentationMuteKey);
             }
+
+            if (normalized is "const-reassignment" or "const")
+            {
+                keys.Add(ConstReassignmentMuteKey);
+            }
         }
 
         return keys.Count > 0;
@@ -1566,5 +1743,5 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
     private sealed record IncludedFileScope(string Path, HashSet<string> Functions, string? Namespace = null);
     private sealed record FunctionDefinition(string Name, int DefinitionLine, int NameColumn, int BraceLine);
     private sealed record MuteConfig(HashSet<string> TopOfFileMutes, Dictionary<int, HashSet<string>> LineMutes);
-    private sealed record VariableDeclaration(string Name, int Line, int Column);
+    private sealed record VariableDeclaration(string Name, int Line, int Column, bool IsConst);
 }

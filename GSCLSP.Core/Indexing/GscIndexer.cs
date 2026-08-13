@@ -42,7 +42,7 @@ public partial class GscIndexer(ILogger logger)
     private static readonly Lock _scanCacheLock = new();
 
     // local variable cache for GSC functions
-    public record LocalVariable(string Name, string Value, int Line);
+    public record LocalVariable(string Name, string Value, int Line, bool IsConst);
     private static readonly Dictionary<string, List<LocalVariable>> _localVarCache = [];
     private static readonly Lock _localVarCacheLock = new();
 
@@ -251,8 +251,9 @@ public partial class GscIndexer(ILogger logger)
             var rawParams = funcMatch.Groups["params"].Value;
             var cleanParams = CleanGscParams(rawParams);
             var nameGroup = funcMatch.Groups["name"];
-            var isPrivate = nameGroup.Index > 0 &&
-                HasModifierWord(line.AsSpan(0, nameGroup.Index), "private");
+            var prefix = line.AsSpan(0, nameGroup.Index);
+            var isPrivate = nameGroup.Index > 0 && HasModifierWord(prefix, "private");
+            var isAutoExec = nameGroup.Index > 0 && HasModifierWord(prefix, "autoexec");
 
             var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(rawLines, lineIndex - 1);
 
@@ -264,6 +265,7 @@ public partial class GscIndexer(ILogger logger)
                 SymbolType.Function,
                 Documentation: docBlock ?? "",
                 IsPrivate: isPrivate,
+                IsAutoExec: isAutoExec,
                 DocumentationRendered: docBlock != null
             );
             fileMap.LocalSymbols.Add(symbol);
@@ -710,6 +712,7 @@ public partial class GscIndexer(ILogger logger)
                     continue;
 
                 int pos = -1;
+                int prefixLength = 0;
                 string checkLine = codeLine;
 
                 if (!codeLine.StartsWith(fnName, StringComparison.OrdinalIgnoreCase))
@@ -748,6 +751,7 @@ public partial class GscIndexer(ILogger logger)
                     if (!skipLine)
                     {
                         int nameStartInCodeLine = codeLine.Length - checkLine.Length;
+                        prefixLength = nameStartInCodeLine;
                         int nameEnd = nameStartInCodeLine + fnLen;
                         if (nameEnd >= codeLine.Length)
                             skipLine = true;
@@ -799,6 +803,10 @@ public partial class GscIndexer(ILogger logger)
 
                 if (!hasBrace) continue;
 
+                var prefix = codeLine.AsSpan(0, prefixLength);
+                var isPrivate = HasModifierWord(prefix, "private");
+                var isAutoExec = HasModifierWord(prefix, "autoexec");
+
                 var docBlock = GscDocCommentParser.TryRenderBlockEndingAt(rawLines, i - 1);
                 if (docBlock != null)
                 {
@@ -809,6 +817,8 @@ public partial class GscIndexer(ILogger logger)
                         Parameters: paramsText,
                         Type: SymbolType.Function,
                         Documentation: docBlock,
+                        IsPrivate: isPrivate,
+                        IsAutoExec: isAutoExec,
                         DocumentationRendered: true
                     );
                 }
@@ -888,7 +898,9 @@ public partial class GscIndexer(ILogger logger)
                     LineNumber: i + 1,
                     Parameters: paramsText,
                     Type: SymbolType.Function,
-                    Documentation: doc
+                    Documentation: doc,
+                    IsPrivate: isPrivate,
+                    IsAutoExec: isAutoExec
                 );
             }
         }
@@ -981,13 +993,26 @@ public partial class GscIndexer(ILogger logger)
                 if (GscLanguageKeywords.LocalVariableReservedWords.Contains(paramName)) continue;
 
                 if (paramNames.Add(paramName))
-                    result.Add(new LocalVariable(paramName, "parameter", funcDefLine + 1));
+                    result.Add(new LocalVariable(paramName, "parameter", funcDefLine + 1, IsConst: false));
             }
         }
 
         for (int i = braceStart; i <= funcEnd; i++)
         {
-            var match = LocalVarAssignmentRegex().Match(lines[i]);
+            var codeLine = StripTrailingLineComment(lines[i]);
+            var constMatch = ConstVarAssignmentRegex().Match(codeLine);
+            if (constMatch.Success)
+            {
+                string constName = constMatch.Groups[1].Value;
+                string constValue = constMatch.Groups[2].Value.Trim();
+
+                if (GscLanguageKeywords.LocalVariableReservedWords.Contains(constName)) continue;
+
+                result.Add(new LocalVariable(constName, constValue, i + 1, IsConst: true));
+                continue;
+            }
+
+            var match = LocalVarAssignmentRegex().Match(codeLine);
             if (!match.Success) continue;
 
             string name = match.Groups[1].Value;
@@ -995,7 +1020,7 @@ public partial class GscIndexer(ILogger logger)
 
             if (GscLanguageKeywords.LocalVariableReservedWords.Contains(name)) continue;
 
-            result.Add(new LocalVariable(name, value, i + 1));
+            result.Add(new LocalVariable(name, value, i + 1, IsConst: false));
         }
 
         return result;

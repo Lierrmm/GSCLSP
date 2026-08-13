@@ -23,7 +23,7 @@ public partial class RegexPatterns
     [GeneratedRegex(@"([\w\\]+)::$")]
     public static partial Regex NameSpaceRegex();
 
-    [GeneratedRegex(@"^(?:(?:function\s+(?:private\s+)?(?:autoexec\s+)?)\s*)?(?<name>[a-zA-Z_]\w*)\s*\((?<params>[^)]*)\)", RegexOptions.Multiline)]
+    [GeneratedRegex(@"^(?:(?:(?:function\s+)(?:private\s+)?(?:autoexec\s+)?|autoexec)\s*)?(?<name>[a-zA-Z_]\w*)\s*\((?<params>[^)]*)\)", RegexOptions.Multiline)]
     public static partial Regex FunctionMultiLineRegex();
 
     [GeneratedRegex(@"(Summary|Example|MandatoryArg|OptionalArg|Module|CallOn|SPMP):")]
@@ -52,6 +52,9 @@ public partial class RegexPatterns
 
     [GeneratedRegex(@"^\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;")]
     public static partial Regex LocalVarAssignmentRegex();
+
+    [GeneratedRegex(@"^\s*const\s+([a-zA-Z_]\w*)\s*=\s*(.+?)\s*;", RegexOptions.IgnoreCase)]
+    public static partial Regex ConstVarAssignmentRegex();
 
     [GeneratedRegex(@"^([A-Za-z_]\w*)\s*=\s*(.+?)\s*;")]
     public static partial Regex GlobalVarAssignmentRegex();

@@ -478,11 +478,18 @@
     "keywords": {
       "patterns": [
         {
-          "name": "keyword.control.gsc",
-          "match": "\\b(break(point)?|case|continue|default|else|for|foreach|if|return|switch|thread|waittill|waittillmatch|waittillframeend|while|do|wait|endon|notify|function|private|autoexec)\\b"
+          "match": "\\b(const)\\s+([A-Za-z_]\\w*)",
+          "captures": {
+            "1": { "name": "storage.modifier.const.gsc" },
+            "2": { "name": "variable.other.constant.gsc" }
+          }
         },
         {
-          "name": "variable.language",
+          "name": "keyword.control.gsc",
+          "match": "\\b(break(point)?|case|continue|default|else|for|foreach|if|return|switch|thread|waittill|waittillmatch|waittillframeend|while|do|wait|endon|notify|function|private|autoexec|const)\\b"
+        },
+        {
+          "name": "constant.language.gsc",
           "match": "\\b(game|level|self)\\b"
         }
       ]
@@ -570,8 +577,19 @@
     "variables": {
       "patterns": [
         {
-          "name": "variable.other.gsc",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+          "comment": "Namespace path (ex: maps\\mp\\gametypes\\_hud_util)",
+          "name": "entity.name.namespace.gsc",
+          "match": "[A-Za-z_][A-Za-z_0-9]*(\\\\[A-Za-z_][A-Za-z_0-9]*)+"
+        },
+        {
+          "comment": "Bare namespace qualifier (hud_util)",
+          "name": "entity.name.namespace.gsc",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?=\\s*::)"
+        },
+        {
+          "comment": "Variable name only",
+          "name": "variable.other.constant.gsc",
+          "match": "(?<!\\.)\\b[A-Za-z_][A-Za-z0-9_]*\\b"
         }
       ]
     }
