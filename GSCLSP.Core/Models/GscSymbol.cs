@@ -13,6 +13,6 @@ public record GscSymbol(
     int? MaxArgs = null,
     bool IsVariadic = false,
     bool IsPrivate = false,
-    bool IsAutoExec = false,
-    bool DocumentationRendered = false
+    bool DocumentationRendered = false,
+    bool IsAutoExec = false
 );

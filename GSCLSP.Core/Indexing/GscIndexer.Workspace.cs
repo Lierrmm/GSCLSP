@@ -221,9 +221,12 @@ public partial class GscIndexer
 
     private void ClearGlobalIndexAndCaches()
     {
-        _symbols.Clear();
-        _fileMaps.Clear();
-        _fileNamespaceCache.Clear();
+        lock (_dumpIndexLock)
+        {
+            _symbols = [];
+            _fileMaps = [];
+            _fileNamespaceCache = [];
+        }
         ClearDumpLevelFields();
 
         lock (_scanCacheLock)

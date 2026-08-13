@@ -15,7 +15,7 @@ public partial class GscIndexer(ILogger logger)
 {
     private readonly ILogger _logger = logger;
  
-    private readonly List<GscSymbol> _symbols = [];
+    private List<GscSymbol> _symbols = [];
     public IEnumerable<GscSymbol> Symbols => _symbols;
     public int SymbolCount => _symbols.Count;
     public BuiltInProvider BuiltIns { get; } = new(logger);
@@ -26,7 +26,7 @@ public partial class GscIndexer(ILogger logger)
     public event Action? IndexChanged;
     public List<GscSymbol> WorkspaceSymbols { get; private set; } = [];
     private readonly Dictionary<string, GscFileMap> _workspaceFileMaps = [];
-    private readonly Dictionary<string, GscFileMap> _fileMaps = [];
+    private Dictionary<string, GscFileMap> _fileMaps = [];
 
     // File watching and caching
     private FileSystemWatcher? _fileWatcher;
@@ -52,7 +52,8 @@ public partial class GscIndexer(ILogger logger)
     private static readonly Lock _globalVarCacheLock = new();
 
     // namespace cache for Treyarch GSC files
-    private readonly Dictionary<string, string?> _fileNamespaceCache = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string?> _fileNamespaceCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Lock _dumpIndexLock = new();
 
     // workspace file overrides: normalized override path → actual workspace file path
     private readonly Dictionary<string, string> _workspaceOverrides = new(StringComparer.OrdinalIgnoreCase);
@@ -93,9 +94,24 @@ public partial class GscIndexer(ILogger logger)
         File.WriteAllText(outputPath, json);
     }
 
+    private void PublishDumpIndex(
+        List<GscSymbol> symbols,
+        Dictionary<string, GscFileMap> fileMaps,
+        Dictionary<string, string?> nsCache)
+    {
+        lock (_dumpIndexLock)
+        {
+            _symbols = symbols;
+            _fileMaps = fileMaps;
+            _fileNamespaceCache = nsCache;
+        }
+    }
+
     public TimeSpan IndexFolder(string folderPath)
     {
-        _symbols.Clear();
+        var symbols = new List<GscSymbol>();
+        var fileMaps = new Dictionary<string, GscFileMap>();
+        var nsCache = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         ClearDumpLevelFields();
         var sw = Stopwatch.StartNew();
 
@@ -106,11 +122,12 @@ public partial class GscIndexer(ILogger logger)
 
             foreach (var file in files)
             {
-                ParseFile(file);
+                ParseFile(file, symbols, fileMaps, nsCache);
             }
         }
 
         sw.Stop();
+        PublishDumpIndex(symbols, fileMaps, nsCache);
         return sw.Elapsed;
     }
 
@@ -174,20 +191,46 @@ public partial class GscIndexer(ILogger logger)
         if (symbols != null)
         {
             var compiledMemo = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-            foreach (var s in symbols)
+
+            lock (_dumpIndexLock)
             {
-                if (IsCompiledCachedPath(s.FilePath, compiledMemo))
-                    continue;
+                var newSymbols = new List<GscSymbol>(_symbols);
+                var newFileMaps = new Dictionary<string, GscFileMap>(_fileMaps.Count, StringComparer.Ordinal);
+                foreach (var kvp in _fileMaps)
+                {
+                    var src = kvp.Value;
+                    newFileMaps[kvp.Key] = new GscFileMap
+                    {
+                        FilePath = src.FilePath,
+                        Namespace = src.Namespace,
+                        OverridePath = src.OverridePath,
+                        Includes = src.Includes,
+                        Usings = src.Usings,
+                        Inlines = src.Inlines,
+                        LocalSymbols = new List<GscSymbol>(src.LocalSymbols),
+                        LevelFields = src.LevelFields
+                    };
+                }
 
-                _symbols.Add(s);
+                foreach (var s in symbols)
+                {
+                    if (IsCompiledCachedPath(s.FilePath, compiledMemo))
+                        continue;
 
-                if (!_fileMaps.ContainsKey(s.FilePath))
-                    _fileMaps[s.FilePath] = new GscFileMap { FilePath = s.FilePath };
+                    newSymbols.Add(s);
 
-                _fileMaps[s.FilePath].LocalSymbols.Add(s);
+                    if (!newFileMaps.TryGetValue(s.FilePath, out var map))
+                    {
+                        map = new GscFileMap { FilePath = s.FilePath };
+                        newFileMaps[s.FilePath] = map;
+                    }
+                    map.LocalSymbols.Add(s);
+                }
+
+                _symbols = newSymbols;
+                _fileMaps = newFileMaps;
             }
         }
-
 
         _logger.LogDebug("Indexer loaded {Count} GSC symbols from JSON.", _symbols.Count);
     }
@@ -200,7 +243,7 @@ public partial class GscIndexer(ILogger logger)
         return compiled;
     }
 
-    private void ParseFile(string path)
+    private void ParseFile(string path, List<GscSymbol> symbols, Dictionary<string, GscFileMap> fileMaps, Dictionary<string, string?> nsCache)
     {
         if (GscCompiledScriptDetector.IsCompiledFile(path))
             return;
@@ -269,14 +312,14 @@ public partial class GscIndexer(ILogger logger)
                 DocumentationRendered: docBlock != null
             );
             fileMap.LocalSymbols.Add(symbol);
-            _symbols.Add(symbol);
+            symbols.Add(symbol);
         }
 
         var key = NormalizePathKey(path);
-        _fileMaps[key] = fileMap;
+        fileMaps[key] = fileMap;
 
         if (fileMap.Namespace != null)
-            _fileNamespaceCache[key] = fileMap.Namespace;
+            nsCache[key] = fileMap.Namespace;
     }
 
     private static bool IsFunctionDefinitionLine(string[] lines, int lineIndex, out Match functionMatch)
