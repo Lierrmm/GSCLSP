@@ -1334,9 +1334,19 @@ public sealed class GscDiagnosticsAnalyzer(GscIndexer indexer, ILogger logger)
         var line = lines[lineIndex];
         var codeLine = StripTrailingLineComment(line);
 
-        if (codeLine.Length == 0 || char.IsWhiteSpace(codeLine[0])) return false;
+        if (codeLine.Length == 0 || codeLine.Contains(';')) return false;
+
+        // skip leading indentation so codeLine and matchIndex are aligned for the regex
+        int lead = 0;
+        while (lead < codeLine.Length && (codeLine[lead] == ' ' || codeLine[lead] == '\t')) lead++;
+        if (lead > 0)
+        {
+            codeLine = codeLine.Substring(lead);
+            matchIndex -= lead;
+            if (matchIndex < 0) matchIndex = 0;
+        }
+
         if (matchIndex != 0 && !GscLanguageKeywords.IsValidFunctionPrefix(codeLine.AsSpan(0, matchIndex))) return false;
-        if (codeLine.Contains(';')) return false;
 
         var match = FunctionMultiLineRegex().Match(codeLine);
         if (!match.Success || !match.Groups["name"].Value.Equals(functionName, StringComparison.OrdinalIgnoreCase))
