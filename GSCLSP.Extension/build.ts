@@ -6,6 +6,7 @@ await Bun.build({
   format: "cjs",
   external: ["vscode"],
   naming: "extension.js",
+  sourcemap: "inline",
 });
 
 export {};
